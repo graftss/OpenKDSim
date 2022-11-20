@@ -177,6 +177,14 @@ pub struct Katamari {
   /// offset: 0x86c
   shadow_pos: Vec4,
 
+  /// (??) vs mode value. returned from `KataVsGet_CatchCount` API function.
+  /// offset: 0x3ad4
+  pub vs_catch_count: i16,
+
+  /// (??) vs mode value. returned from `KataVsGet_AttackCount` API function.
+  /// offset: 0x3ad6
+  pub vs_attack_count: i16,
+
   /// Whether or not the "something's coming" alarm is going off.
   /// offset: 0x3b84
   alarm_mode: bool,

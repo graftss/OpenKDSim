@@ -368,13 +368,22 @@ pub unsafe extern "C" fn SetMapChangeMode(map_change_mode: i32) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn KataVsGet_AttackCount(player: i32) -> i32 {
+    STATE.read().read_katamari(player).vs_attack_count.into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn KataVsGet_CatchCount(player: i32) -> i32 {
+    STATE.read().read_katamari(player).vs_catch_count.into()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut i32) {
     *compare_vol = NamePropConfig::get(name_idx).compare_vol_mult;
     *x = NamePropConfig::get(name_idx).innate_motion_type.into();
 }
 
 /*
-
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
 */
@@ -436,10 +445,4 @@ private static extern void MonoInitEnd();
 
     [DllImport("PS2KatamariSimulation")]
     public static extern void SetStoreFlag(int flag);
-
-    [DllImport("PS2KatamariSimulation")]
-    public static extern int KataVsGet_AttackCount(int _pl);
-
-    [DllImport("PS2KatamariSimulation")]
-    public static extern int KataVsGet_CatchCount(int _pl);    
 */
