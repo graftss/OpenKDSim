@@ -8,7 +8,9 @@ mod gamestate;
 mod preclear;
 mod ending;
 mod constants;
+mod delegates;
 
+use delegates::*;
 use gamestate::GameState;
 use static_init::{dynamic};
 use std::fs::{OpenOptions};
@@ -115,6 +117,85 @@ pub unsafe extern "C" fn SetGameMode(mode: i32) {
 pub unsafe extern "C" fn SetKatamariTranslation(player: i32, x: f32, y: f32, z: f32) {
     STATE.write().write_katamari(player).set_translation(x, y, z);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackMonoGenerate(cb: MonoGenerateDelegate) {
+    STATE.write().delegates.mono_generate = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackMotionEnd(cb: MotionEndDelegate) {
+    STATE.write().delegates.motion_end = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackMessageRequest(cb: MessageRequestDelegate) {
+    STATE.write().delegates.message_request = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackDoHit(cb: DoHitDelegate) {
+    STATE.write().delegates.do_hit = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackGetHitCount(cb: GetHitCountDelegate) {
+    STATE.write().delegates.get_hit_count = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackGetImpactPoint(cb: GetImpactPointDelegate) {
+    STATE.write().delegates.get_impact_point = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackGetImpactNormal(cb: GetImpactNormalDelegate) {
+    STATE.write().delegates.get_impact_normal = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackGetHitAttribute(cb: GetHitAttributeDelegate) {
+    STATE.write().delegates.get_hit_attribute = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackPlaySoundFX(cb: PlaySoundFxDelegate) {
+    STATE.write().delegates.play_sound_fx = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackPlayVisualFX(cb: PlayVisualFxDelegate) {
+    STATE.write().delegates.play_visual_fx = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackVibration(cb: VibrationDelegate) {
+    STATE.write().delegates.vibration = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackPlayAnimation(cb: PlayAnimationDelegate) {
+    STATE.write().delegates.play_animation = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackLogPropCollected(cb: LogPropCollectedDelegate) {
+    STATE.write().delegates.log_prop_collected = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackSetCamera(cb: SetCameraDelegate) {
+    STATE.write().delegates.set_camera = Some(cb);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackVsVolumeDiff(cb: VsVolumeDiffDelegate) {
+    STATE.write().delegates.vs_volume_diff = Some(cb);
+}
+
+// [DllImport("PS2KatamariSimulation")]
+// [return: MarshalAs(UnmanagedType.I1)]
+// public static extern bool TakesCallbackOujiState(int playerID, out IntPtr stateData, out int dataSize);
 
 // [DllImport("PS2KatamariSimulation")]
 // public static extern float GetRadiusTargetPercent(int player);
@@ -225,63 +306,6 @@ public static void SetMapChangeMode_(int mode)
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetMapChangeMode(int mode);
 
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackMonoGenerate(myCallbackMonoGenerateDelegate functionPointer, int idx, int u16MonoNameIdx);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int TakesCallbackMotionEnd(myCallbackMotionEndDelegate functionPointer, int playerNo);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackPrint(myCallbackPrintDelegate functionPointer, string text);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackDrawDebugLine(myCallbackDrawDebugLineDelegate callback, float point0x, float point0y, float point0z, float point1x, float point1y, float point1z, int type);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackDrawDebugSphere(myCallbackDrawDebugSphereDelegate callback, float x, float y, float z, float radius);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackMessageRequest(myCallbackMessageRequestDelegate callback, int msgNo);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int TakesCallbackDoHit(myCallbackDoHitDelegate callback, float point0x, float point0y, float point0z, float point1x, float point1y, float point1z, int includeObjects, int drawHits, int callType);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int TakesCallbackGetHitCount(myCallbackGetHitCountDelegate callback);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackGetImpactPoint(myCallbackGetImpactPointDelegate functionPointer, int hitIndex, ref float x, ref float y, ref float z);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackGetImpactNormal(myCallbackGetImpactNormalDelegate functionPointer, int hitIndex, ref float x, ref float y, ref float z);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackGetHitAttribute(myCallbackGetHitAttributeDelegate functionPointer, int hitIndex, ref int hitAttribute);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackPlaySoundFX(myCallbackGetCallbackPlaySoundFX functionPointer, int soundID, float volumne, int pan);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackPlayVisualFX(myCallbackGetCallbackPlayVisualFX functionPointer, int vfxID, float posX, float posY, float posZ, float dirX, float dirY, float dirZ, float scale, int attachID, int playerID);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackVibration(myCallbackGetCallbackVibration functionPointer, int playerNo, float ratio, float time, int no);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackPlayAnimation(myCallbackGetCallbackPlayAnimation functionPointer, int playerNo, int animationID, float speed, int repeat);
-
-[DllImport("PS2KatamariSimulation")]
-[return: MarshalAs(UnmanagedType.I1)]
-public static extern bool TakesCallbackOujiState(int playerID, out IntPtr stateData, out int dataSize);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackLogPropCollected(myCallbackGetCallbackLogPropCollected functionPointer, int monoControlIndex);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackSetCamera(myCallbackGetCallbackSetCamera functionPointer, float xx, float xy, float xz, float yx, float yy, float yz, float zx, float zy, float zz, float tx, float ty, float tz);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void TakesCallbackVsVolumeDiff(myCallbackVsVolumeDiff functionPointer, int f1, int f2, int f3, float ratio, float time, int recover);
 
 private static void MonoInitStart_(IntPtr monoData, int mission, int area, int stage, int kadaiFlag, int clearFlag, int endFlag)
 {

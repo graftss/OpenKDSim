@@ -1,4 +1,4 @@
-use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState};
+use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates};
 
 const PLAYERS: usize = 2;
 
@@ -9,6 +9,7 @@ pub struct GameState {
   pub cameras: [Camera; PLAYERS],
   pub preclear: PreclearState,
   pub ending: EndingState,
+  pub delegates: Delegates,
 }
 
 impl GameState {
