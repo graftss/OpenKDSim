@@ -30,8 +30,8 @@ pub struct CameraTransform {
 
 #[derive(Debug, Default)]
 pub struct Camera {
-  state: CameraState,
-  transform: CameraTransform
+    state: CameraState,
+    transform: CameraTransform,
 }
 
 impl Camera {
@@ -39,13 +39,22 @@ impl Camera {
         self.state.cam_eff_1P = cam_eff_1P > 0;
     }
 
-    pub fn get_matrix(&self, 
-        xx: &mut f32, xy: &mut f32, xz: &mut f32, 
-        yx: &mut f32, yy: &mut f32, yz: &mut f32, 
-        zx: &mut f32, zy: &mut f32, zz: &mut f32, 
-        tx: &mut f32, ty: &mut f32, tz: &mut f32,
+    pub fn get_matrix(
+        &self,
+        xx: &mut f32,
+        xy: &mut f32,
+        xz: &mut f32,
+        yx: &mut f32,
+        yy: &mut f32,
+        yz: &mut f32,
+        zx: &mut f32,
+        zy: &mut f32,
+        zz: &mut f32,
+        tx: &mut f32,
+        ty: &mut f32,
+        tz: &mut f32,
         offset: &mut f32,
-    ) {    
+    ) {
         *xx = self.transform.transform[0];
         *xy = self.transform.transform[1];
         *xz = self.transform.transform[2];

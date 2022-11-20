@@ -18,29 +18,31 @@ mod prince;
 mod prop;
 mod util;
 
+use core::{panic, slice};
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
-use name_prop_config::{NAME_PROP_CONFIGS, NamePropConfig};
+use name_prop_config::{NamePropConfig, NAME_PROP_CONFIGS};
 use prince::OujiState;
-use static_init::{dynamic};
-use core::{panic, slice};
-use std::fs::{OpenOptions};
+use static_init::dynamic;
+use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::path::Path;
 
-#[dynamic] 
+#[dynamic]
 static mut STATE: GameState = GameState::default();
 
 pub fn debug_log(str: &str) {
-    let path = Path::new("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log");
+    let path = Path::new(
+        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log",
+    );
     let mut file = OpenOptions::new()
         .write(true)
         .append(true)
         .open(path)
         .unwrap();
-    
-    if let Err(_e) = writeln!(file, "{}", str){
+
+    if let Err(_e) = writeln!(file, "{}", str) {
         eprintln!("oopsie");
     }
 }
@@ -78,31 +80,59 @@ pub unsafe extern "C" fn GetPreclearAlpha() -> f32 {
 
 #[no_mangle]
 pub unsafe extern "C" fn SetKatamariSpeed(
-    forw_s: f32, side_s: f32, back_s: f32, boost_s: f32, 
-    forw_a: f32, side_a: f32, back_a: f32, boost_a: f32, 
-    rot_s: f32, dp_y: f32, 
-    cam_x: f32, cam_y: f32, cam_z: f32
+    forw_s: f32,
+    side_s: f32,
+    back_s: f32,
+    boost_s: f32,
+    forw_a: f32,
+    side_a: f32,
+    back_a: f32,
+    boost_a: f32,
+    rot_s: f32,
+    dp_y: f32,
+    cam_x: f32,
+    cam_y: f32,
+    cam_z: f32,
 ) {
-    STATE.write().global.set_speeds(forw_s, side_s, back_s, boost_s, forw_a, side_a, back_a, boost_a, rot_s, dp_y, cam_x, cam_y, cam_z);
+    STATE.write().global.set_speeds(
+        forw_s, side_s, back_s, boost_s, forw_a, side_a, back_a, boost_a, rot_s, dp_y, cam_x,
+        cam_y, cam_z,
+    );
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariTranslation(
-    player: i32, 
-    x: &mut f32, y: &mut f32, z: &mut f32, 
-    sx: &mut f32, sy: &mut f32, sz: &mut f32
+    player: i32,
+    x: &mut f32,
+    y: &mut f32,
+    z: &mut f32,
+    sx: &mut f32,
+    sy: &mut f32,
+    sz: &mut f32,
 ) {
-    STATE.read().read_katamari(player).get_translation(x, y, z, sx, sy, sz);
+    STATE
+        .read()
+        .read_katamari(player)
+        .get_translation(x, y, z, sx, sy, sz);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariMatrix(
-    player: i32, 
-    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
-    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
-    zx: &mut f32, zy: &mut f32, zz: &mut f32
+    player: i32,
+    xx: &mut f32,
+    xy: &mut f32,
+    xz: &mut f32,
+    yx: &mut f32,
+    yy: &mut f32,
+    yz: &mut f32,
+    zx: &mut f32,
+    zy: &mut f32,
+    zz: &mut f32,
 ) {
-    STATE.read().read_katamari(player).get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
+    STATE
+        .read()
+        .read_katamari(player)
+        .get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
 }
 
 #[no_mangle]
@@ -112,11 +142,20 @@ pub unsafe extern "C" fn SetGravity(x: f32, y: f32, z: f32) {
 
 #[no_mangle]
 pub unsafe extern "C" fn GetMapRollMatrix(
-    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
-    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
-    zx: &mut f32, zy: &mut f32, zz: &mut f32
+    xx: &mut f32,
+    xy: &mut f32,
+    xz: &mut f32,
+    yx: &mut f32,
+    yy: &mut f32,
+    yz: &mut f32,
+    zx: &mut f32,
+    zy: &mut f32,
+    zz: &mut f32,
 ) {
-    STATE.read().ending.get_map_roll_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
+    STATE
+        .read()
+        .ending
+        .get_map_roll_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
 }
 
 #[no_mangle]
@@ -126,7 +165,10 @@ pub unsafe extern "C" fn SetGameMode(mode: i32) {
 
 #[no_mangle]
 pub unsafe extern "C" fn SetKatamariTranslation(player: i32, x: f32, y: f32, z: f32) {
-    STATE.write().write_katamari(player).set_translation(x, y, z);
+    STATE
+        .write()
+        .write_katamari(player)
+        .set_translation(x, y, z);
 }
 
 #[no_mangle]
@@ -205,53 +247,112 @@ pub unsafe extern "C" fn TakesCallbackVsVolumeDiff(cb: VsVolumeDiffDelegate) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn TakesCallbackOujiState(player: i32, oujistate: &mut *mut OujiState, data_size: &mut i32) -> bool {
-    STATE.write().write_prince(player).copy_oujistate_ptr(oujistate, data_size);
+pub unsafe extern "C" fn TakesCallbackOujiState(
+    player: i32,
+    oujistate: &mut *mut OujiState,
+    data_size: &mut i32,
+) -> bool {
+    STATE
+        .write()
+        .write_prince(player)
+        .copy_oujistate_ptr(oujistate, data_size);
     true
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetGameTime(game_time_ms: i32, remain_time_ticks: i32, freeze: i32, cam_eff_1P: i32) {
-    STATE.write().set_game_time(game_time_ms, remain_time_ticks, freeze, cam_eff_1P);
+pub unsafe extern "C" fn SetGameTime(
+    game_time_ms: i32,
+    remain_time_ticks: i32,
+    freeze: i32,
+    cam_eff_1P: i32,
+) {
+    STATE
+        .write()
+        .set_game_time(game_time_ms, remain_time_ticks, freeze, cam_eff_1P);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetCamera(
-    player: i32, 
-    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
-    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
-    zx: &mut f32, zy: &mut f32, zz: &mut f32, 
-    tx: &mut f32, ty: &mut f32, tz: &mut f32,
-    offset: &mut f32
+    player: i32,
+    xx: &mut f32,
+    xy: &mut f32,
+    xz: &mut f32,
+    yx: &mut f32,
+    yy: &mut f32,
+    yz: &mut f32,
+    zx: &mut f32,
+    zy: &mut f32,
+    zz: &mut f32,
+    tx: &mut f32,
+    ty: &mut f32,
+    tz: &mut f32,
+    offset: &mut f32,
 ) {
-    STATE.read().read_camera(player).get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz, offset);
+    STATE
+        .read()
+        .read_camera(player)
+        .get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz, offset);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetPrince(
-    player: i32, 
-    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
-    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
-    zx: &mut f32, zy: &mut f32, zz: &mut f32, 
-    tx: &mut f32, ty: &mut f32, tz: &mut f32,
-    view_mode: &mut i32, face_mode: &mut i32,
-    alarm_mode: &mut i32, alarm_type: &mut i32,
-    hit_water: &mut i32, map_loop_rate: &mut f32,
+    player: i32,
+    xx: &mut f32,
+    xy: &mut f32,
+    xz: &mut f32,
+    yx: &mut f32,
+    yy: &mut f32,
+    yz: &mut f32,
+    zx: &mut f32,
+    zy: &mut f32,
+    zz: &mut f32,
+    tx: &mut f32,
+    ty: &mut f32,
+    tz: &mut f32,
+    view_mode: &mut i32,
+    face_mode: &mut i32,
+    alarm_mode: &mut i32,
+    alarm_type: &mut i32,
+    hit_water: &mut i32,
+    map_loop_rate: &mut f32,
 ) {
     STATE.read().get_prince(
-        player, 
-        xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz, 
-        view_mode, face_mode, alarm_mode, alarm_type, hit_water, map_loop_rate
+        player,
+        xx,
+        xy,
+        xz,
+        yx,
+        yy,
+        yz,
+        zx,
+        zy,
+        zz,
+        tx,
+        ty,
+        tz,
+        view_mode,
+        face_mode,
+        alarm_mode,
+        alarm_type,
+        hit_water,
+        map_loop_rate,
     );
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn SetStickState(
     player: i32,
-    ls_x: f32, ls_y: f32, rs_x: f32, rs_y: f32,
-    l3_down: bool, r3_down: bool, l3_held: bool, r3_held: bool,
+    ls_x: f32,
+    ls_y: f32,
+    rs_x: f32,
+    rs_y: f32,
+    l3_down: bool,
+    r3_down: bool,
+    l3_held: bool,
+    r3_held: bool,
 ) {
-    STATE.write()
+    STATE
+        .write()
         .write_input(player)
         .set_stick_state(ls_x, ls_y, rs_x, rs_y, l3_down, r3_down, l3_held, r3_held);
 }
@@ -259,29 +360,47 @@ pub unsafe extern "C" fn SetStickState(
 #[no_mangle]
 pub unsafe extern "C" fn SetTriggerState(
     player: i32,
-    l1_down: bool, l1_held: bool, l2_down: bool, l2_held: bool,
-    r1_down: bool, r1_held: bool, r2_down: bool, r2_held: bool,
+    l1_down: bool,
+    l1_held: bool,
+    l2_down: bool,
+    l2_held: bool,
+    r1_down: bool,
+    r1_held: bool,
+    r2_down: bool,
+    r2_held: bool,
     cross_click: bool,
 ) {
-    STATE.write()
-        .write_input(player)
-        .set_trigger_state(l1_down, l1_held, l2_down, l2_held, r1_down, r1_held, r2_down, r2_held, cross_click);
+    STATE.write().write_input(player).set_trigger_state(
+        l1_down,
+        l1_held,
+        l2_down,
+        l2_held,
+        r1_down,
+        r1_held,
+        r2_down,
+        r2_held,
+        cross_click,
+    );
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetSubObjectCount(ctrl_idx: i32) -> i32 {
-    STATE.read()
-        .read_prop(ctrl_idx)
-        .count_subobjects()
+    STATE.read().read_prop(ctrl_idx).count_subobjects()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetSubObjectPosition(
-    ctrl_idx: i32, subobj_idx: i32,
-    pos_x: &mut f32, pos_y: &mut f32, pos_z: &mut f32,
-    rot_x: &mut f32, rot_y: &mut f32, rot_z: &mut f32,
+    ctrl_idx: i32,
+    subobj_idx: i32,
+    pos_x: &mut f32,
+    pos_y: &mut f32,
+    pos_z: &mut f32,
+    rot_x: &mut f32,
+    rot_y: &mut f32,
+    rot_z: &mut f32,
 ) {
-    STATE.read()
+    STATE
+        .read()
         .read_prop(ctrl_idx)
         .get_subobject_position(subobj_idx, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z);
 }
@@ -317,7 +436,9 @@ pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) {
     let mut next_mat = out;
 
     for prop in &STATE.read().props {
-        if !prop.is_initialized() { break; }
+        if !prop.is_initialized() {
+            break;
+        }
 
         // Convert the `f32` pointer into `out` to a matrix pointer.
         let mat: &mut Mat4 = slice::from_raw_parts_mut(next_mat, 16).try_into().unwrap();
@@ -342,12 +463,17 @@ pub unsafe extern "C" fn GetMonoDataConstParent(name_idx: i32) -> i32 {
 
 #[no_mangle]
 pub unsafe extern "C" fn GetMonoDataOffsetExist(name_idx: i32) -> i32 {
-    NamePropConfig::get(name_idx).mono_data_offset_exists().into()
+    NamePropConfig::get(name_idx)
+        .mono_data_offset_exists()
+        .into()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MonoGetVolume(ctrl_idx: i32, volume: &mut f32, collect_diam: &mut i32) {
-    STATE.read().read_prop(ctrl_idx).get_volume(volume, collect_diam);
+    STATE
+        .read()
+        .read_prop(ctrl_idx)
+        .get_volume(volume, collect_diam);
 }
 
 #[no_mangle]
@@ -385,6 +511,12 @@ pub unsafe extern "C" fn GetRadiusTargetPercent(player: i32) -> f32 {
     STATE.read().get_radius_target_percent(player)
 }
 
+/// Writes 3 bytes of status data to `out` for each loaded prop.    
+#[no_mangle]
+pub unsafe extern "C" fn GetPropAttached(out: *mut u8) -> i32 {
+    STATE.read().get_props_attach_status(out)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut i32) {
     *compare_vol = NamePropConfig::get(name_idx).compare_vol_mult;
@@ -394,9 +526,6 @@ pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut 
 /*
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
-
-// [DllImport("PS2KatamariSimulation")]
-// public static extern int GetPropAttached(IntPtr propData);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjNum, bool isInit);
@@ -429,11 +558,11 @@ public static extern void MonoInitAddPropSetParent(int placementIndex, int paren
 [DllImport("PS2KatamariSimulation")]
 private static extern void MonoInitEnd();
 
-	[DllImport("PS2KatamariSimulation")]
-	private static extern float MonoGetHitOffsetGround(int placementIndex);
+    [DllImport("PS2KatamariSimulation")]
+    private static extern float MonoGetHitOffsetGround(int placementIndex);
 
-	[DllImport("PS2KatamariSimulation")]
-	private static extern IntPtr MonoGetPlacementMonoDataName(int placementIndex);
+    [DllImport("PS2KatamariSimulation")]
+    private static extern IntPtr MonoGetPlacementMonoDataName(int placementIndex);
 
 
     [DllImport("PS2KatamariSimulation")]

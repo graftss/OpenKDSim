@@ -2,13 +2,13 @@
 /// (All simulation world space coordinates are 100 times bigger than equivalent Unity coordinates.)
 pub static UNITY_TO_SIM_SCALE: f32 = 100.0;
 
-/// The index of the x translation in a `gl_matrix::Mat4` array. 
+/// The index of the x translation in a `gl_matrix::Mat4` array.
 pub static TRANSFORM_X_POS: usize = 12;
 
-/// The index of the y translation in a `gl_matrix::Mat4` array. 
+/// The index of the y translation in a `gl_matrix::Mat4` array.
 pub static TRANSFORM_Y_POS: usize = 13;
 
-/// The index of the z translation in a `gl_matrix::Mat4` array. 
+/// The index of the z translation in a `gl_matrix::Mat4` array.
 pub static TRANSFORM_Z_POS: usize = 14;
 
 /// The number of prop types.

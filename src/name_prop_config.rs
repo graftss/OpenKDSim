@@ -1,6 +1,9 @@
 use lazy_static::lazy_static;
 
-use crate::{constants::NUM_NAME_PROPS, macros::{read_f32, read_bool, read_u8, read_u16}};
+use crate::{
+    constants::NUM_NAME_PROPS,
+    macros::{read_bool, read_f32, read_u16, read_u8},
+};
 
 static NP_0X30_TABLE: &'static [u8] = include_bytes!("data/name_prop_0x30_table.bin");
 static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("data/name_prop_mono_data_offsets.bin");
@@ -11,7 +14,6 @@ pub struct NamePropConfig {
     ///////////////////////////////////////////
 
     // Offsets are relative to each prop's 0x30-width entry in that table.
-
     /// (??)
     /// offset: 0x8
     pub compare_vol_mult: f32,
@@ -91,7 +93,6 @@ pub struct NamePropConfig {
     /////////////////////////////////////////
     // End `name_prop_0x30_table.bin` fields.
     /////////////////////////////////////////
-
     /// (??) Used by `GetMonoDataOffset`.
     /// Read from `name_prop_mono_data_offsets.bin`.
     pub mono_data_offset_idx: u16,
