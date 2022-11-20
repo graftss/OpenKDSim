@@ -1,10 +1,11 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case, dead_code)]
 
 mod globalstate;
 mod katamari;
 mod mission;
 mod camera;
 mod gamestate;
+mod preclear_mode;
 
 use gamestate::GameState;
 use static_init::{dynamic};
@@ -49,10 +50,42 @@ pub extern "C" fn modify_int(x: &mut i32, y: &mut i32, z: &mut i32) -> () {
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariCatchCountB() -> i32 {
-    let mut state = STATE.write();
-    state.global.catch_count_b += 1;
-    state.global.catch_count_b
+    STATE.read().GetKatamariCatchCountB()
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn GetKatamariRadius(player: i32) -> f32 {
+    STATE.read().GetKatamariRadius(player as usize)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetKatamariDiameterInt(player: i32) -> i32 {
+    STATE.read().GetKatamariDiameterInt(player as usize)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetKatamariVolume(player: i32) -> f32 {
+    STATE.read().GetKatamariVolume(player as usize)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetKatamariDisplayRadius(player: i32) -> f32 {
+    STATE.read().GetKatamariDisplayRadius(player as usize)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetPreclearAlpha() -> f32 {
+    STATE.read().GetPreclearAlpha()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetKatamariSpeed(forw_s: f32, side_s: f32, back_s: f32, boost_s: f32, forw_a: f32, side_a: f32, back_a: f32, boost_a: f32, rot_s: f32, dp_y: f32, cam_x: f32, cam_y: f32, cam_z: f32) -> () {
+    STATE.write().global.set_speeds(forw_s, side_s, back_s, boost_s, forw_a, side_a, back_a, boost_a, rot_s, dp_y, cam_x, cam_y, cam_z);
+}
+
+
+// [DllImport("PS2KatamariSimulation")]
+// public static extern float GetRadiusTargetPercent(int player);
 
 /*
 [DllImport("PS2KatamariSimulation")]
@@ -72,9 +105,6 @@ public static extern int GetMonoDataConstScreamSeType(int u16MonoNameIdx);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern int GetMonoDataConstParent(int u16MonoNameIdx);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetKatamariSpeed(float spF, float spB, float spS, float spD, float acF, float acB, float acS, float acD, float rot, float yLimit, float delayX, float delayY, float delayZ);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void MonoGetVolume(int pracementindex, ref float volume, ref float catchDiameter);
@@ -99,19 +129,6 @@ public static extern void Tick(float delta);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void DoPropPlacementFinalisation();
-
-[DllImport("PS2KatamariSimulation")]
-public static extern float GetKatamariRadius(int player);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern uint GetKatamariDiameterInt(int player);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern float GetKatamariVolume(int player);
-
-
-[DllImport("PS2KatamariSimulation")]
-public static extern float GetKatamariDisplayRadius(int player);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void GetKatamariMatrix(int player, out float xx, out float xy, out float xz, out float yx, out float yy, out float yz, out float zx, out float zy, out float zz);
@@ -151,15 +168,6 @@ public static extern int GetPropAttached(IntPtr propData);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern bool GetPrince(int player, out float xx, out float xy, out float xz, out float yx, out float yy, out float yz, out float zx, out float zy, out float zz, out float tx, out float ty, out float tz, out int viewMode, out int faceMode, out int alMode, out int alType, out int hitWater, out float mapLoopRate);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void GetSpeed(int player, out float x, out float y, out float z);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern float GetRadiusTargetPercent(int player);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern float GetPreclearAlpha();
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetShootingMode(int player, bool fg, bool reset);
@@ -205,24 +213,6 @@ public static void SetMapChangeMode_(int mode)
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetMapChangeMode(int mode);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void AutoPilotStart(float x, float y, float z);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void AutoPilotEnd();
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void AutoPilotUpdate(float x, float y, float z, bool clearMatrix);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetDrawCollisionMesh(bool enabled);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void PullObjectsToPoint1(int type, float speed, float attractionPointSize, float x1, float y1, float z1);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void PullObjectsToPoint2(int type, float speed, float attractionPointSize, float x1, float y1, float z1, float x2, float y2, float z2);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetGravity(float x, float y, float z);

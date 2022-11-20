@@ -1,6 +1,9 @@
 #[allow(dead_code)]
+
+/// Game missions.
+#[derive(Debug)]
 pub enum Mission {
-  Mission0 = 0, // king talking???
+  None = 0, // king talking???
   MAS1 = 1, // MAS1
   MAS2 = 2, // MAS2
   MAS4 = 3, // MAS4

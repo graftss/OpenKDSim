@@ -11,3 +11,4 @@ crate-type=["cdylib"]
 
 [dependencies]
 static_init = "1.0.3"
+gl_matrix = "0.0"
