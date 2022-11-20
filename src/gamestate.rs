@@ -1,8 +1,9 @@
-use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input};
+use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input, prop::Prop};
 
 const PLAYERS: usize = 2;
+const MAX_PROPS: usize = 100;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct GameState {
   pub global: GlobalState,
   pub katamaris: [Katamari; PLAYERS],
@@ -12,6 +13,23 @@ pub struct GameState {
   pub ending: EndingState,
   pub delegates: Delegates,
   pub inputs: [Input; PLAYERS],
+  pub props: [Prop; MAX_PROPS],
+}
+
+impl Default for GameState {
+    fn default() -> Self {
+        Self { 
+            global: Default::default(), 
+            katamaris: Default::default(), 
+            princes: Default::default(), 
+            cameras: Default::default(), 
+            preclear: Default::default(), 
+            ending: Default::default(), 
+            delegates: Default::default(), 
+            inputs: Default::default(), 
+            props: { unsafe { std::mem::zeroed() } },
+        }
+    }
 }
 
 impl GameState {
@@ -45,6 +63,14 @@ impl GameState {
 
   pub fn write_input(&mut self, player: i32) -> &mut Input {
     &mut self.inputs[player as usize]
+  }
+
+  pub fn read_prop(&self, ctrl_idx: i32) -> &Prop {
+    &self.props[ctrl_idx as usize]
+  }
+
+  pub fn write_prop(&mut self, ctrl_idx: i32) -> &mut Prop {
+    &mut self.props[ctrl_idx as usize]
   }
 
   /// Mimicks the `SetGameTime` API function.

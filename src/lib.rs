@@ -11,6 +11,8 @@ mod katamari;
 mod mission;
 mod preclear;
 mod prince;
+mod prop;
+mod util;
 
 use delegates::*;
 use gamestate::GameState;
@@ -259,6 +261,48 @@ pub unsafe extern "C" fn SetTriggerState(
         .set_trigger_state(l1_down, l1_held, l2_down, l2_held, r1_down, r1_held, r2_down, r2_held, cross_click);
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn GetSubObjectCount(ctrl_idx: i32) -> i32 {
+    STATE.read()
+        .read_prop(ctrl_idx)
+        .count_subobjects()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetSubObjectPosition(
+    ctrl_idx: i32, subobj_idx: i32,
+    pos_x: &mut f32, pos_y: &mut f32, pos_z: &mut f32,
+    rot_x: &mut f32, rot_y: &mut f32, rot_z: &mut f32,
+) {
+    STATE.read()
+        .read_prop(ctrl_idx)
+        .get_subobject_position(subobj_idx, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z);
+}
+
+/// Passes the bounding sphere radius of the prop with control index `ctrl_idx` to Unity.
+#[no_mangle]
+pub unsafe extern "C" fn GetPropSize(ctrl_idx: i32, radius: &mut f32) {
+    *radius = STATE.read().read_prop(ctrl_idx).get_radius()
+}
+
+/// Reads whether the prop `ctrl_idx` is attached to a katamari.
+#[no_mangle]
+pub unsafe extern "C" fn IsAttached(ctrl_idx: i32) -> bool {
+    STATE.read().read_prop(ctrl_idx).is_attached()
+}
+
+// [DllImport("PS2KatamariSimulation")]
+// public static extern void GetPropMatrix(int monoControlIndex, IntPtr matrixData);
+
+
+// [DllImport("PS2KatamariSimulation")]
+// public static extern int GetPropMatrices(IntPtr matrixData);
+
+
+// [DllImport("PS2KatamariSimulation")]
+// public static extern int GetPropAttached(IntPtr propData);
+
+
 // [DllImport("PS2KatamariSimulation")]
 // public static extern float GetRadiusTargetPercent(int player);
 
@@ -304,30 +348,6 @@ public static extern void Tick(float delta);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void DoPropPlacementFinalisation();
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void GetPropMatrix(int monoControlIndex, IntPtr matrixData);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int GetSubObjectCount(int monoControlIndex);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void GetSubObjectPosition(int monoControlIndex, int subObjectIndex, out float posX, out float posY, out float posZ, out float rotX, out float rotY, out float rotZ);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void GetPropSize(int monoControlIndex, out float size);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int GetPropMatrices(IntPtr matrixData);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern bool IsAttached(int monoControlIndex);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern bool CanBeCollected(int monoControlIndex);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int GetPropAttached(IntPtr propData);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetTutorialA(int page, int value);
