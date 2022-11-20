@@ -1,4 +1,4 @@
-use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates};
+use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince};
 
 const PLAYERS: usize = 2;
 
@@ -6,6 +6,7 @@ const PLAYERS: usize = 2;
 pub struct GameState {
   pub global: GlobalState,
   pub katamaris: [Katamari; PLAYERS],
+  pub princes: [Prince; PLAYERS],
   pub cameras: [Camera; PLAYERS],
   pub preclear: PreclearState,
   pub ending: EndingState,
@@ -19,5 +20,13 @@ impl GameState {
 
   pub fn write_katamari(&mut self, player: i32) -> &mut Katamari {
     &mut self.katamaris[player as usize]
+  }
+
+  pub fn read_prince(&self, player: i32) -> &Prince {
+    &self.princes[player as usize]
+  }
+
+  pub fn write_prince(&mut self, player: i32) -> &mut Prince {
+    &mut self.princes[player as usize]
   }
 }

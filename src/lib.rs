@@ -1,17 +1,19 @@
 #![allow(non_snake_case, dead_code)]
 
+mod camera;
+mod constants;
+mod delegates;
+mod ending;
+mod gamestate;
 mod global;
 mod katamari;
 mod mission;
-mod camera;
-mod gamestate;
 mod preclear;
-mod ending;
-mod constants;
-mod delegates;
+mod prince;
 
 use delegates::*;
 use gamestate::GameState;
+use prince::OujiState;
 use static_init::{dynamic};
 use std::fs::{OpenOptions};
 use std::io::prelude::*;
@@ -31,25 +33,6 @@ pub fn debug_log(str: &str) {
     if let Err(_e) = writeln!(file, "{}", str){
         eprintln!("oopsie");
     }
-}
-
-#[no_mangle]
-pub extern "C" fn add_numbers(number1: i32, number2: i32) -> i32 {
-    debug_log("asdf");
-    number1 + number2 * 2
-}
-
-#[no_mangle]
-pub extern "C" fn call_fn_ptr(fn_ptr: extern fn(i32) -> ()) -> () {
-    debug_log("hihihihidddddi");
-    fn_ptr(3);
-}
-
-#[no_mangle]
-pub extern "C" fn modify_int(x: &mut i32, y: &mut i32, z: &mut i32) -> () {
-    *z = *x + *y;
-    *x = 0;
-    *y = 0;
 }
 
 #[no_mangle]
@@ -193,9 +176,11 @@ pub unsafe extern "C" fn TakesCallbackVsVolumeDiff(cb: VsVolumeDiffDelegate) {
     STATE.write().delegates.vs_volume_diff = Some(cb);
 }
 
-// [DllImport("PS2KatamariSimulation")]
-// [return: MarshalAs(UnmanagedType.I1)]
-// public static extern bool TakesCallbackOujiState(int playerID, out IntPtr stateData, out int dataSize);
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackOujiState(player: i32, oujistate: &mut *mut OujiState, data_size: &mut i32) -> bool {
+    STATE.write().write_prince(player).get_oujistate_ptr(oujistate, data_size);
+    true
+}
 
 // [DllImport("PS2KatamariSimulation")]
 // public static extern float GetRadiusTargetPercent(int player);
