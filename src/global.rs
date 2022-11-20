@@ -5,13 +5,25 @@ use gl_matrix::{common::{Vec3, Vec4}};
 use crate::{mission::{Mission, GameMode}};
 
 /// Miscellaneous global game state.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GlobalState {
   /// The current mission.
-  pub mission: Mission,
+  pub mission: Option<Mission>,
 
   /// The current game mode.
-  pub gamemode: GameMode,
+  pub gamemode: Option<GameMode>,
+
+  /// The current game time (in *real time*, not ticks).
+  /// offset: 0xff12c
+  pub game_time_ms: i32,
+
+  /// The number of ticks before the mission timer expires.
+  /// offset: 0xff120
+  pub remain_time_ticks: i32,
+
+  /// If true, ticking the physics engine has no effect (it's "frozen").
+  /// offset: 0x10daea
+  pub freeze: bool,
 
   /// The "theme object" score in constellation levels (e.g. number of crabs in Make Cancer).
   pub catch_count_b: i32,
@@ -54,36 +66,10 @@ pub struct GlobalState {
 
   /// Negative gravity direction.
   pub neg_gravity: Vec4,
-}
 
-impl Default for GlobalState {
-    fn default() -> Self {
-        Self { 
-          mission: Mission::None,
-          gamemode: GameMode::Normal,
-          
-          catch_count_b: 0, 
-
-          forwards_speed: 1.0, 
-          sideways_speed: 1.0, 
-          backwards_speed: 1.0, 
-          boost_speed: 1.0,
-
-          forwards_accel: 1.0, 
-          sideways_accel: 1.0, 
-          backwards_accel: 1.0, 
-          boost_accel: 1.0,
-
-          rot_speed: 1.0,
-
-          camera_delay: [1.0, 1.0, 1.0],
-
-          death_plane_y: -5000.0,
-
-          gravity: [0.0, -1.0, 0.0, 0.0],
-          neg_gravity: [0.0, 1.0, 0.0, 0.0],
-        }
-    }
+  /// (??)
+  /// offset: 0xd35580
+  pub map_loop_rate: f32,
 }
 
 impl Display for GlobalState {
@@ -126,6 +112,6 @@ impl GlobalState {
   }
 
   pub fn set_gamemode(&mut self, gamemode: i32) {
-    self.gamemode = gamemode.try_into().unwrap();
+    self.gamemode = Some(gamemode.try_into().unwrap());
   }
 }

@@ -67,17 +67,31 @@ pub unsafe extern "C" fn GetPreclearAlpha() -> f32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetKatamariSpeed(forw_s: f32, side_s: f32, back_s: f32, boost_s: f32, forw_a: f32, side_a: f32, back_a: f32, boost_a: f32, rot_s: f32, dp_y: f32, cam_x: f32, cam_y: f32, cam_z: f32) -> () {
+pub unsafe extern "C" fn SetKatamariSpeed(
+    forw_s: f32, side_s: f32, back_s: f32, boost_s: f32, 
+    forw_a: f32, side_a: f32, back_a: f32, boost_a: f32, 
+    rot_s: f32, dp_y: f32, 
+    cam_x: f32, cam_y: f32, cam_z: f32
+) {
     STATE.write().global.set_speeds(forw_s, side_s, back_s, boost_s, forw_a, side_a, back_a, boost_a, rot_s, dp_y, cam_x, cam_y, cam_z);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetKatamariTranslation(player: i32, x: &mut f32, y: &mut f32, z: &mut f32, sx: &mut f32, sy: &mut f32, sz: &mut f32) -> () {
+pub unsafe extern "C" fn GetKatamariTranslation(
+    player: i32, 
+    x: &mut f32, y: &mut f32, z: &mut f32, 
+    sx: &mut f32, sy: &mut f32, sz: &mut f32
+) {
     STATE.read().read_katamari(player).get_translation(x, y, z, sx, sy, sz);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetKatamariMatrix(player: i32, xx: &mut f32, xy: &mut f32, xz: &mut f32, yx: &mut f32, yy: &mut f32, yz: &mut f32, zx: &mut f32, zy: &mut f32, zz: &mut f32) -> () {
+pub unsafe extern "C" fn GetKatamariMatrix(
+    player: i32, 
+    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
+    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
+    zx: &mut f32, zy: &mut f32, zz: &mut f32
+) {
     STATE.read().read_katamari(player).get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
 }
 
@@ -87,7 +101,11 @@ pub unsafe extern "C" fn SetGravity(x: f32, y: f32, z: f32) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetMapRollMatrix(xx: &mut f32, xy: &mut f32, xz: &mut f32, yx: &mut f32, yy: &mut f32, yz: &mut f32, zx: &mut f32, zy: &mut f32, zz: &mut f32) {
+pub unsafe extern "C" fn GetMapRollMatrix(
+    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
+    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
+    zx: &mut f32, zy: &mut f32, zz: &mut f32
+) {
     STATE.read().ending.get_map_roll_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
 }
 
@@ -182,6 +200,41 @@ pub unsafe extern "C" fn TakesCallbackOujiState(player: i32, oujistate: &mut *mu
     true
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn SetGameTime(game_time_ms: i32, remain_time_ticks: i32, freeze: i32, cam_eff_1P: i32) {
+    STATE.write().set_game_time(game_time_ms, remain_time_ticks, freeze, cam_eff_1P);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetCamera(
+    player: i32, 
+    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
+    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
+    zx: &mut f32, zy: &mut f32, zz: &mut f32, 
+    tx: &mut f32, ty: &mut f32, tz: &mut f32,
+    offset: &mut f32
+) {
+    STATE.read().read_camera(player).get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz, offset);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetPrince(
+    player: i32, 
+    xx: &mut f32, xy: &mut f32, xz: &mut f32, 
+    yx: &mut f32, yy: &mut f32, yz: &mut f32, 
+    zx: &mut f32, zy: &mut f32, zz: &mut f32, 
+    tx: &mut f32, ty: &mut f32, tz: &mut f32,
+    view_mode: &mut i32, face_mode: &mut i32,
+    alarm_mode: &mut i32, alarm_type: &mut i32,
+    hit_water: &mut i32, map_loop_rate: &mut f32,
+) {
+    STATE.read().get_prince(
+        player, 
+        xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz, 
+        view_mode, face_mode, alarm_mode, alarm_type, hit_water, map_loop_rate
+    );
+}
+
 // [DllImport("PS2KatamariSimulation")]
 // public static extern float GetRadiusTargetPercent(int player);
 
@@ -229,9 +282,6 @@ public static extern void Tick(float delta);
 public static extern void DoPropPlacementFinalisation();
 
 [DllImport("PS2KatamariSimulation")]
-public static extern void GetCamera(int player, out float xx, out float xy, out float xz, out float yx, out float yy, out float yz, out float zx, out float zy, out float zz, out float tx, out float ty, out float tz, out float offs);
-
-[DllImport("PS2KatamariSimulation")]
 public static extern void GetPropMatrix(int monoControlIndex, IntPtr matrixData);
 
 [DllImport("PS2KatamariSimulation")]
@@ -254,10 +304,6 @@ public static extern bool CanBeCollected(int monoControlIndex);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern int GetPropAttached(IntPtr propData);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern bool GetPrince(int player, out float xx, out float xy, out float xz, out float yx, out float yy, out float yz, out float zx, out float zy, out float zz, out float tx, out float ty, out float tz, out int viewMode, out int faceMode, out int alMode, out int alType, out int hitWater, out float mapLoopRate);
-
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetShootingMode(int player, bool fg, bool reset);
 
@@ -275,9 +321,6 @@ public static extern void SetTriggerState(int playerNo, bool triggerLeft1Down, b
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPropMatrix(int monoControlIndex, IntPtr matrix);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetGameTime(int gameTime, int remainTime, int freeze, int camEff1P);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
