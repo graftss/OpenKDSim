@@ -1,7 +1,7 @@
 use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input, prop::Prop};
 
 const PLAYERS: usize = 2;
-const MAX_PROPS: usize = 100;
+const MAX_PROPS: usize = 199;
 
 #[derive(Debug)]
 pub struct GameState {

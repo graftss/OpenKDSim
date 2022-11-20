@@ -80,7 +80,7 @@ pub struct Prince {
 }
 
 impl Prince {
-  pub fn get_oujistate_ptr(&mut self, oujistate: &mut *mut OujiState, data_size: &mut i32) {
+  pub fn copy_oujistate_ptr(&mut self, oujistate: &mut *mut OujiState, data_size: &mut i32) {
     *data_size = 0x1b;
     *oujistate = &mut self.oujistate as *mut OujiState;
   }

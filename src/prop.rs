@@ -1,4 +1,6 @@
-use gl_matrix::common::{Vec4, Mat4, Vec3};
+use gl_matrix::{common::{Vec4, Mat4, Vec3}, mat4};
+
+use crate::util::scale_sim_transform;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PropGlobalState {
@@ -206,7 +208,7 @@ pub struct Prop {
 
   /// (??) The additional transform applied to the prop while it is attached to the katamari.
   /// offset: 0x968
-  attach_transform: Mat4,
+  attached_transform: Mat4,
 
   /// While attached, the offset from the katamari center to the prop's center.
   /// offset: 0x9e8
@@ -263,6 +265,10 @@ pub struct Prop {
 }
 
 impl Prop {
+    pub fn is_initialized(&self) -> bool {
+        self.name_idx != u16::MAX
+    }
+
     /// Traverses the prop's linked list of subobjects to compute the list's length.
     pub fn count_subobjects(&self) -> i32 {
         let mut result = 0;
@@ -287,7 +293,7 @@ impl Prop {
 
         loop {
             if let Some(next_subobj) = try_next_subobj {
-                if (next_idx == subobj_idx) {
+                if next_idx == subobj_idx {
                     return try_next_subobj
                 } else {
                     next_idx += 1;
@@ -321,5 +327,19 @@ impl Prop {
 
     pub fn get_radius(&self) -> f32 {
         self.radius
+    }
+
+    /// Writes the active transform to `out`.
+    /// This can either be the unattached transform or the attached transform. 
+    pub unsafe fn unsafe_copy_transform(&self, out: *mut Mat4) {
+        let mut transform = if self.is_attached() {
+            self.attached_transform.clone()
+        } else {
+            self.unattached_transform.clone()
+        };
+
+        scale_sim_transform(&mut transform);
+
+        mat4::copy(&mut *out, &transform); 
     }
 }

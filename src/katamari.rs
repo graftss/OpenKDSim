@@ -1,6 +1,6 @@
 use gl_matrix::{common::{Mat4, Vec4}, vec4};
 
-use crate::constants::RESCALE;
+use crate::constants::{TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE};
 
 /// (??) not sure about this
 #[derive(Debug, Clone, Copy)]
@@ -217,16 +217,17 @@ impl Katamari {
   }
 
   pub fn set_translation(&mut self, x: f32, y: f32, z: f32) {
-    let trans = [x * RESCALE, y * RESCALE, z * RESCALE, 1.0];
+    let K = UNITY_TO_SIM_SCALE;
+    let trans = [x * K, y * K, z * K, 1.0];
 
     // set the center and last center points
     vec4::copy(&mut self.center, &trans);
     vec4::copy(&mut self.last_center, &trans);
 
     // set the translation component of the transform matrix
-    self.transform[12] = trans[0];
-    self.transform[13] = trans[1];
-    self.transform[14] = trans[2];
+    self.transform[TRANSFORM_X_POS] = trans[0];
+    self.transform[TRANSFORM_Y_POS] = trans[1];
+    self.transform[TRANSFORM_Z_POS] = trans[2];
   }
 
   pub fn get_matrix(&self, xx: &mut f32, xy: &mut f32, xz: &mut f32, yx: &mut f32, yy: &mut f32, yz: &mut f32, zx: &mut f32, zy: &mut f32, zz: &mut f32) -> () {

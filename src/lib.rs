@@ -9,6 +9,7 @@ mod global;
 mod input;
 mod katamari;
 mod mission;
+mod name_prop_config;
 mod preclear;
 mod prince;
 mod prop;
@@ -16,8 +17,11 @@ mod util;
 
 use delegates::*;
 use gamestate::GameState;
+use gl_matrix::common::Mat4;
+use name_prop_config::{NAME_PROP_CONFIGS, NamePropConfig};
 use prince::OujiState;
 use static_init::{dynamic};
+use core::{panic, slice};
 use std::fs::{OpenOptions};
 use std::io::prelude::*;
 use std::path::Path;
@@ -199,7 +203,7 @@ pub unsafe extern "C" fn TakesCallbackVsVolumeDiff(cb: VsVolumeDiffDelegate) {
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackOujiState(player: i32, oujistate: &mut *mut OujiState, data_size: &mut i32) -> bool {
-    STATE.write().write_prince(player).get_oujistate_ptr(oujistate, data_size);
+    STATE.write().write_prince(player).copy_oujistate_ptr(oujistate, data_size);
     true
 }
 
@@ -291,13 +295,44 @@ pub unsafe extern "C" fn IsAttached(ctrl_idx: i32) -> bool {
     STATE.read().read_prop(ctrl_idx).is_attached()
 }
 
-// [DllImport("PS2KatamariSimulation")]
-// public static extern void GetPropMatrix(int monoControlIndex, IntPtr matrixData);
+#[no_mangle]
+pub unsafe extern "C" fn MonoGetPlacementDataFloat(ctrl_idx: i32, data_type: i32) -> f32 {
+    if data_type == 0xf {
+        STATE.read().read_prop(ctrl_idx).get_radius()
+    } else {
+        panic!("unexpected `data_type` in `MonOGetPlacementDataFloat`.");
+    }
+}
 
+#[no_mangle]
+pub unsafe extern "C" fn GetPropMatrix(ctrl_idx: i32, out: *mut Mat4) {
+    STATE.read().read_prop(ctrl_idx).unsafe_copy_transform(out);
+}
 
-// [DllImport("PS2KatamariSimulation")]
-// public static extern int GetPropMatrices(IntPtr matrixData);
+#[no_mangle]
+pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) {
+    let mut next_mat = out;
 
+    for prop in &STATE.read().props {
+        if !prop.is_initialized() { break; }
+
+        // Convert the `f32` pointer into `out` to a matrix pointer.
+        let mat: &mut Mat4 = slice::from_raw_parts_mut(next_mat, 16).try_into().unwrap();
+
+        // Copy the next prop's matrix into `out`.
+        prop.unsafe_copy_transform(mat);
+
+        // Increment the pointer into `out` to the next matrix.
+        next_mat = next_mat.offset(16);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TestNamePropConfig(name_idx: i32, attach: &mut f32, is_fish: &mut i32) {
+    let x: &NamePropConfig = &NAME_PROP_CONFIGS[name_idx as usize];
+    *attach = x.attach_vol_mult;
+    *is_fish = x.is_fish.into();
+}
 
 // [DllImport("PS2KatamariSimulation")]
 // public static extern int GetPropAttached(IntPtr propData);
@@ -307,9 +342,6 @@ pub unsafe extern "C" fn IsAttached(ctrl_idx: i32) -> bool {
 // public static extern float GetRadiusTargetPercent(int player);
 
 /*
-[DllImport("PS2KatamariSimulation")]
-public static extern float MonoGetPlacementDataFloat(int placementIndex, int dataType);
-
 [DllImport("PS2KatamariSimulation")]
 public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjNum, bool isInit);
 
