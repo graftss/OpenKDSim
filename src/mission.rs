@@ -49,3 +49,28 @@ pub enum Mission {
   Test3 = 43, // nothing loads
   Test4 = 44, // nothing loads
 }
+
+
+#[derive(Debug)]
+pub enum GameMode {
+  Normal = 0,
+  Tutorial = 1,
+  TutorialB = 2,
+  Ending = 3,
+  Load = 4,
+}
+
+impl TryFrom<i32> for GameMode {
+    type Error = ();
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+      match value {
+        0 => Ok(Self::Normal),
+        1 => Ok(Self::Tutorial),
+        2 => Ok(Self::TutorialB),
+        3 => Ok(Self::Ending),
+        4 => Ok(Self::Load),
+        _ => panic!("unrecognized gamemode")
+      }
+    }
+}

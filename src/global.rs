@@ -1,15 +1,20 @@
-use std::fmt::Display;
+use std::{fmt::Display};
 
-use crate::mission::Mission;
+use gl_matrix::{common::{Vec3, Vec4}};
+
+use crate::{mission::{Mission, GameMode}};
 
 /// Miscellaneous global game state.
 #[derive(Debug)]
 pub struct GlobalState {
-  /// The "theme object" score in constellation levels (e.g. number of crabs in Make Cancer).
-  pub catch_count_b: i32,
-
   /// The current mission.
   pub mission: Mission,
+
+  /// The current game mode.
+  pub gamemode: GameMode,
+
+  /// The "theme object" score in constellation levels (e.g. number of crabs in Make Cancer).
+  pub catch_count_b: i32,
 
   /// Global forward movement speed multiplier.
   pub forwards_speed: f32,
@@ -38,24 +43,25 @@ pub struct GlobalState {
   /// Global multiplier on the speed the prince rotates around the katamari.
   pub rot_speed: f32,
 
-  /// (??) Global camera delay along x axis.
-  pub camera_delay_x: f32,
-
-  /// (??) Global camera delay along y axis.
-  pub camera_delay_y: f32,
-
-  /// (??) Global camera delay along z axis.
-  pub camera_delay_z: f32,
+  /// (??) Global camera delay along x, y, and z axes.
+  pub camera_delay: Vec3,
 
   /// The y-coordinate of the death plane. Anything below this value should be warped.
   pub death_plane_y: f32,
+
+  /// Gravity direction.
+  pub gravity: Vec4,
+
+  /// Negative gravity direction.
+  pub neg_gravity: Vec4,
 }
 
 impl Default for GlobalState {
     fn default() -> Self {
         Self { 
-          mission: Mission::None, 
-
+          mission: Mission::None,
+          gamemode: GameMode::Normal,
+          
           catch_count_b: 0, 
 
           forwards_speed: 1.0, 
@@ -70,11 +76,12 @@ impl Default for GlobalState {
 
           rot_speed: 1.0,
 
-          camera_delay_x: 1.0,
-          camera_delay_y: 1.0,
-          camera_delay_z: 1.0,
+          camera_delay: [1.0, 1.0, 1.0],
 
           death_plane_y: -5000.0,
+
+          gravity: [0.0, -1.0, 0.0, 0.0],
+          neg_gravity: [0.0, 1.0, 0.0, 0.0],
         }
     }
 }
@@ -103,8 +110,22 @@ impl GlobalState {
     self.rot_speed = rot_s;
     self.death_plane_y = dp_y;
 
-    self.camera_delay_x = cam_x;
-    self.camera_delay_y = cam_y;
-    self.camera_delay_z = cam_z;
+    self.camera_delay[0] = cam_x;
+    self.camera_delay[1] = cam_y;
+    self.camera_delay[2] = cam_z;
+  }
+
+  pub fn set_gravity(&mut self, x: f32, y: f32, z: f32) {
+    self.gravity[0] = x;
+    self.gravity[1] = y;
+    self.gravity[2] = z;
+
+    self.neg_gravity[0] = -x;
+    self.neg_gravity[1] = -y;
+    self.neg_gravity[2] = -z;
+  }
+
+  pub fn set_gamemode(&mut self, gamemode: i32) {
+    self.gamemode = gamemode.try_into().unwrap();
   }
 }
