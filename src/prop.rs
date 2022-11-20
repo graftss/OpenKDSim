@@ -342,4 +342,14 @@ impl Prop {
 
         mat4::copy(&mut *out, &transform); 
     }
+
+    /// Mimicks the `MonoGetVolume` API function.
+    pub fn get_volume(&self, volume: &mut f32, collect_diam: &mut i32) {
+        *volume = self.compare_vol_m3;
+        *collect_diam = self.collect_diam_mm;
+    }
+
+    pub fn set_disabled(&mut self, force_disabled: i32) {
+        self.force_disabled = force_disabled != 0;
+    }
 }

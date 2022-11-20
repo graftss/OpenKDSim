@@ -328,15 +328,43 @@ pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn TestNamePropConfig(name_idx: i32, attach: &mut f32, is_fish: &mut i32) {
-    let x: &NamePropConfig = &NAME_PROP_CONFIGS[name_idx as usize];
-    *attach = x.attach_vol_mult;
-    *is_fish = x.is_fish.into();
+pub unsafe extern "C" fn GetMonoDataConstScreamSeType(name_idx: i32) -> i32 {
+    NamePropConfig::get(name_idx).scream_sfx_idx.into()
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn GetMonoDataConstParent(name_idx: i32) -> i32 {
+    NamePropConfig::get(name_idx).const_parent_name_idx.into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn GetMonoDataOffsetExist(name_idx: i32) -> i32 {
+    NamePropConfig::get(name_idx).mono_data_offset_exists().into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn MonoGetVolume(ctrl_idx: i32, volume: &mut f32, collect_diam: &mut i32) {
+    STATE.read().read_prop(ctrl_idx).get_volume(volume, collect_diam);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetPropStopFlag(ctrl_idx: i32, flag: i32) {
+    STATE.write().write_prop(ctrl_idx).set_disabled(flag);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut i32) {
+    *compare_vol = NamePropConfig::get(name_idx).compare_vol_mult;
+    *x = NamePropConfig::get(name_idx).innate_motion_type.into();
+}
+
+/*
+
+*/
+
 
 // [DllImport("PS2KatamariSimulation")]
 // public static extern int GetPropAttached(IntPtr propData);
-
 
 // [DllImport("PS2KatamariSimulation")]
 // public static extern float GetRadiusTargetPercent(int player);
@@ -347,27 +375,6 @@ public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjN
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void GetMonoDataOffset(int u16MonoNameIdx, int objNo, out float px, out float py, out float pz, out float rx, out float ry, out float rz, out float rw);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int GetMonoDataOffsetExist(int u16MonoNameIdx);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int GetMonoDataConstScreamSeType(int u16MonoNameIdx);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int GetMonoDataConstParent(int u16MonoNameIdx);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void MonoGetVolume(int pracementindex, ref float volume, ref float catchDiameter);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern int MonoGetPlacementData(int placementIndex, int dataType);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void MonoGetPlacementDataLocation(int placementIndex, int dataType, out float x, out float y, out float z, out float w);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetPropStopFlag(int index, int flag);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void Init(int playerIndex, float overRideSize, int mission);
@@ -383,9 +390,6 @@ public static extern void DoPropPlacementFinalisation();
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetTutorialA(int page, int value);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetPropMatrix(int monoControlIndex, IntPtr matrix);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
