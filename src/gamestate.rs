@@ -1,4 +1,4 @@
-use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince};
+use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input};
 
 const PLAYERS: usize = 2;
 
@@ -11,6 +11,7 @@ pub struct GameState {
   pub preclear: PreclearState,
   pub ending: EndingState,
   pub delegates: Delegates,
+  pub inputs: [Input; PLAYERS],
 }
 
 impl GameState {
@@ -38,6 +39,15 @@ impl GameState {
     &mut self.cameras[player as usize]
   }
 
+  pub fn read_input(&self, player: i32) -> &Input {
+    &self.inputs[player as usize]
+  }
+
+  pub fn write_input(&mut self, player: i32) -> &mut Input {
+    &mut self.inputs[player as usize]
+  }
+
+  /// Mimicks the `SetGameTime` API function.
   pub fn set_game_time(&mut self, game_time_ms: i32, remain_time_ticks: i32, freeze: i32, cam_eff_1P: i32) {
     self.global.game_time_ms = game_time_ms;
     self.global.remain_time_ticks = remain_time_ticks;
@@ -45,6 +55,7 @@ impl GameState {
     self.cameras[0 as usize].set_cam_eff_1P(cam_eff_1P);
   }
 
+  /// Mimicks the `GetPrice` API function.
   pub fn get_prince(&self, 
     player: i32,
     xx: &mut f32, xy: &mut f32, xz: &mut f32, 

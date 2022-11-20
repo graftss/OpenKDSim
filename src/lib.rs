@@ -6,6 +6,7 @@ mod delegates;
 mod ending;
 mod gamestate;
 mod global;
+mod input;
 mod katamari;
 mod mission;
 mod preclear;
@@ -235,6 +236,29 @@ pub unsafe extern "C" fn GetPrince(
     );
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn SetStickState(
+    player: i32,
+    ls_x: f32, ls_y: f32, rs_x: f32, rs_y: f32,
+    l3_down: bool, r3_down: bool, l3_held: bool, r3_held: bool,
+) {
+    STATE.write()
+        .write_input(player)
+        .set_stick_state(ls_x, ls_y, rs_x, rs_y, l3_down, r3_down, l3_held, r3_held);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetTriggerState(
+    player: i32,
+    l1_down: bool, l1_held: bool, l2_down: bool, l2_held: bool,
+    r1_down: bool, r1_held: bool, r2_down: bool, r2_held: bool,
+    cross_click: bool,
+) {
+    STATE.write()
+        .write_input(player)
+        .set_trigger_state(l1_down, l1_held, l2_down, l2_held, r1_down, r1_held, r2_down, r2_held, cross_click);
+}
+
 // [DllImport("PS2KatamariSimulation")]
 // public static extern float GetRadiusTargetPercent(int player);
 
@@ -304,20 +328,9 @@ public static extern bool CanBeCollected(int monoControlIndex);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern int GetPropAttached(IntPtr propData);
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetShootingMode(int player, bool fg, bool reset);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void AddKatamariRadius(int player, float add);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetStickState(int player, float leftStickX, float leftStickY, float rightStickX, float rightStickY, bool leftStickClickDown, bool rightStickClickDown, bool leftStickClickIsDown, bool rightStickClickIsDown);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetTutorialA(int page, int value);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetTriggerState(int playerNo, bool triggerLeft1Down, bool triggerLeft2Down, bool triggerRight1Down, bool triggerRight2Down, bool triggerLeft1IsDown, bool triggerLeft2IsDown, bool triggerRight1IsDown, bool triggerRight2IsDown, bool crossClick);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPropMatrix(int monoControlIndex, IntPtr matrix);
@@ -351,4 +364,10 @@ public static extern void MonoInitAddPropSetParent(int placementIndex, int paren
 
 [DllImport("PS2KatamariSimulation")]
 private static extern void MonoInitEnd();
+
+	[DllImport("PS2KatamariSimulation")]
+	private static extern float MonoGetHitOffsetGround(int placementIndex);
+
+	[DllImport("PS2KatamariSimulation")]
+	private static extern IntPtr MonoGetPlacementMonoDataName(int placementIndex);
 */
