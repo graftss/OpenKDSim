@@ -170,6 +170,10 @@ pub struct MissionConfig {
 }
 
 impl MissionConfig {
+  pub fn get(mission: Mission) -> &'static MissionConfig {
+    &MISSION_CONFIGS[mission as usize]
+  }
+
   pub fn read_from_data(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     Self::read_mission_config_0x60_table(configs);
   }
@@ -200,7 +204,7 @@ impl MissionConfig {
 }
 
 lazy_static! {
-  pub static ref MISSION_CONFIGS: [MissionConfig; NUM_MISSIONS] = unsafe {
+  static ref MISSION_CONFIGS: [MissionConfig; NUM_MISSIONS] = unsafe {
       let mut configs: [MissionConfig; NUM_MISSIONS] = std::mem::zeroed();
       MissionConfig::read_from_data(&mut configs);
       configs

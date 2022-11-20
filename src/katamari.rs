@@ -195,6 +195,10 @@ pub struct Katamari {
 }
 
 impl Katamari {
+  pub fn get_init_radius(&self) -> f32 {
+    self.init_diam_cm / 2.0
+  }
+
   pub fn get_radius(&self) -> f32 {
     self.rad_cm
   }

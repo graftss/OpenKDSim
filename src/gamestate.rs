@@ -1,4 +1,4 @@
-use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input, prop::Prop, constants::{MAX_PLAYERS, MAX_PROPS}};
+use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input, prop::Prop, constants::{MAX_PLAYERS, MAX_PROPS}, mission::MissionConfig};
 
 #[derive(Debug)]
 pub struct GameState {
@@ -121,5 +121,17 @@ impl GameState {
   /// Mimicks the `SetMapChangeMode` API function.
   pub fn set_map_change_mode(&mut self, map_change_mode: i32) {
     self.global.map_change_mode = map_change_mode != 0;
+  }
+
+  /// Mimicks the `GetRadiusTargetPercent` API function.
+  pub fn get_radius_target_percent(&self, player: i32) -> f32 {
+    let kat = self.read_katamari(player);
+    let init_rad = kat.get_init_radius();
+    let curr_rad = kat.get_radius();
+
+    let mission_conf = MissionConfig::get(self.global.mission.unwrap());
+    let goal_rad = mission_conf.goal_diam_cm / 2.0;
+
+    (curr_rad - init_rad) / (goal_rad - init_rad)
   }
 }

@@ -381,15 +381,17 @@ pub unsafe extern "C" fn KataVsGet_CatchCount(player: i32) -> i32 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn GetRadiusTargetPercent(player: i32) -> f32 {
+    STATE.read().get_radius_target_percent(player)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut i32) {
     *compare_vol = NamePropConfig::get(name_idx).compare_vol_mult;
     *x = NamePropConfig::get(name_idx).innate_motion_type.into();
 }
 
 /*
-// [DllImport("PS2KatamariSimulation")]
-// public static extern float GetRadiusTargetPercent(int player);
-
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
 
