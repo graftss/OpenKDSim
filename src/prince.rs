@@ -74,6 +74,12 @@ pub struct Prince {
   /// offset: 0x1c
   last_pos: Vec4,
 
+  /// If >0, ignores player input, and decrements by 1 each frame.
+  /// If <0, ignores player input forever until changed.
+  /// If 0, player input is read as usual.
+  /// offset: 0xf4
+  ignore_input_timer: i16,
+
   /// The transform matrix of the prince.
   /// offset: 0x138
   transform: Mat4,
@@ -107,5 +113,9 @@ impl Prince {
     *tx = self.pos[0];
     *ty = self.pos[1];
     *tz = self.pos[2];
+  }
+
+  pub fn set_ignore_input_timer(&mut self, value: i16) {
+    self.ignore_input_timer = value;
   }
 }

@@ -353,6 +353,21 @@ pub unsafe extern "C" fn SetPropStopFlag(ctrl_idx: i32, flag: i32) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn SetGameStart(player: i32, area: i32) {
+    STATE.write().set_game_start(player, area);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetAreaChange(player: i32) {
+    STATE.write().set_area_change(player);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetMapChangeMode(map_change_mode: i32) {
+    STATE.write().set_map_change_mode(map_change_mode);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut i32) {
     *compare_vol = NamePropConfig::get(name_idx).compare_vol_mult;
     *x = NamePropConfig::get(name_idx).innate_motion_type.into();
@@ -360,6 +375,8 @@ pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut 
 
 /*
 
+[DllImport("PS2KatamariSimulation")]
+public static extern void SetPreclearMode(int mode);
 */
 
 
@@ -391,23 +408,6 @@ public static extern void DoPropPlacementFinalisation();
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetTutorialA(int page, int value);
 
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetPreclearMode(int mode);
-
-public static void SetMapChangeMode_(int mode)
-{
-    //PMod.Debug.DebugUtil.TempDebugLog($"SetMapChangeMode({mode})");
-    SetMapChangeMode(mode);
-}
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetMapChangeMode(int mode);
-
-
-private static void MonoInitStart_(IntPtr monoData, int mission, int area, int stage, int kadaiFlag, int clearFlag, int endFlag)
-{
-    MonoInitStart(monoData, mission, area, stage, kadaiFlag, clearFlag, endFlag);
-}
 
 [DllImport("PS2KatamariSimulation")]
 private static extern void MonoInitStart(IntPtr monoData, int mission, int area, int stage, int kadaiFlag, int clearFlag, int endFlag);
@@ -426,4 +426,20 @@ private static extern void MonoInitEnd();
 
 	[DllImport("PS2KatamariSimulation")]
 	private static extern IntPtr MonoGetPlacementMonoDataName(int placementIndex);
+
+
+    [DllImport("PS2KatamariSimulation")]
+    public static extern void SetCameraCheckScaleUp(int player, int flag);
+
+    [DllImport("PS2KatamariSimulation")]
+    public static extern void SetCameraMode(int player, int mode);
+
+    [DllImport("PS2KatamariSimulation")]
+    public static extern void SetStoreFlag(int flag);
+
+    [DllImport("PS2KatamariSimulation")]
+    public static extern int KataVsGet_AttackCount(int _pl);
+
+    [DllImport("PS2KatamariSimulation")]
+    public static extern int KataVsGet_CatchCount(int _pl);    
 */

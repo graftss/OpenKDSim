@@ -104,4 +104,25 @@ impl GameState {
 
     *map_loop_rate = self.global.map_loop_rate;
   }
+
+  /// Mimicks the `SetGameStart` API function.
+  /// Note that in the actual simulation, the "area" argument is unused.
+  pub fn set_game_start(&mut self, player: i32, _area: i32) {
+    self.global.freeze = false;
+    self.global.map_change_mode = false;
+    self.write_prince(player).set_ignore_input_timer(0);
+  }
+
+  /// Mimicks the `SetAreaChange` API function.
+  pub fn set_area_change(&mut self, player: i32) {
+    self.global.freeze = true;
+    self.global.map_change_mode = true;
+    self.write_prince(player).set_ignore_input_timer(-1);
+    self.write_katamari(player).set_immobile();
+  }
+
+  /// Mimicks the `SetMapChangeMode` API function.
+  pub fn set_map_change_mode(&mut self, map_change_mode: i32) {
+    self.global.map_change_mode = map_change_mode != 0;
+  }
 }

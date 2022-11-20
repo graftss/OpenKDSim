@@ -13,6 +13,11 @@ pub struct GlobalState {
   /// The current game mode.
   pub gamemode: Option<GameMode>,
 
+  /// (??) true when map is being changed (i.e. during a new area load).
+  /// Presumably nothing should be moving while this is on.
+  /// offset: 0x10daec
+  pub map_change_mode: bool,
+
   /// The current game time (in *real time*, not ticks).
   /// offset: 0xff12c
   pub game_time_ms: i32,

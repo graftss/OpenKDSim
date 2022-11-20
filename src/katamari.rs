@@ -251,3 +251,11 @@ impl Katamari {
     self.physics_flags.in_water
   }
 }
+
+impl Katamari {
+  /// Forcibly end the katamari's movement, if it's moving.
+  /// offset: 0x1f390
+  pub fn set_immobile(&mut self) {
+    // TODO
+  }
+}
