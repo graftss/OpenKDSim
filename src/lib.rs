@@ -1,5 +1,8 @@
 #![allow(non_snake_case, dead_code)]
 
+// reference this first so it's available to all other modules
+mod macros;
+
 mod camera;
 mod constants;
 mod delegates;
@@ -384,23 +387,17 @@ pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut 
 }
 
 /*
+// [DllImport("PS2KatamariSimulation")]
+// public static extern float GetRadiusTargetPercent(int player);
+
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
-*/
-
 
 // [DllImport("PS2KatamariSimulation")]
 // public static extern int GetPropAttached(IntPtr propData);
 
-// [DllImport("PS2KatamariSimulation")]
-// public static extern float GetRadiusTargetPercent(int player);
-
-/*
 [DllImport("PS2KatamariSimulation")]
 public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjNum, bool isInit);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void GetMonoDataOffset(int u16MonoNameIdx, int objNo, out float px, out float py, out float pz, out float rx, out float ry, out float rz, out float rw);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void Init(int playerIndex, float overRideSize, int mission);

@@ -1,19 +1,16 @@
-use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input, prop::Prop};
-
-const PLAYERS: usize = 2;
-const MAX_PROPS: usize = 199;
+use crate::{global::GlobalState, katamari::Katamari, camera::Camera, preclear::PreclearState, ending::EndingState, delegates::Delegates, prince::Prince, input::Input, prop::Prop, constants::{MAX_PLAYERS, MAX_PROPS}};
 
 #[derive(Debug)]
 pub struct GameState {
   pub global: GlobalState,
-  pub katamaris: [Katamari; PLAYERS],
-  pub princes: [Prince; PLAYERS],
-  pub cameras: [Camera; PLAYERS],
+  pub katamaris: [Katamari; MAX_PLAYERS],
+  pub princes: [Prince; MAX_PLAYERS],
+  pub cameras: [Camera; MAX_PLAYERS],
+  pub inputs: [Input; MAX_PLAYERS],
+  pub props: [Prop; MAX_PROPS],
   pub preclear: PreclearState,
   pub ending: EndingState,
   pub delegates: Delegates,
-  pub inputs: [Input; PLAYERS],
-  pub props: [Prop; MAX_PROPS],
 }
 
 impl Default for GameState {

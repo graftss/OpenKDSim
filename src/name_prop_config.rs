@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-const NUM_NAME_PROPS: usize = 1718;
+use crate::{constants::NUM_NAME_PROPS, macros::{read_f32, read_bool, read_u8, read_u16}};
 
 static NP_0X30_TABLE: &'static [u8] = include_bytes!("data/name_prop_0x30_table.bin");
 static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("data/name_prop_mono_data_offsets.bin");
@@ -101,9 +101,7 @@ impl NamePropConfig {
     pub fn mono_data_offset_exists(&self) -> bool {
         self.mono_data_offset_idx != u16::MAX
     }
-}
 
-impl NamePropConfig {
     pub fn get(name_idx: i32) -> &'static NamePropConfig {
         &NAME_PROP_CONFIGS[name_idx as usize]
     }
@@ -114,38 +112,40 @@ impl NamePropConfig {
     }
 
     /// Copy the `name_prop_0x30_table` file into the `NamePropConfig` array.
-    pub fn read_name_prop_0x30_table(configs: &mut [NamePropConfig; NUM_NAME_PROPS]) {
+    fn read_name_prop_0x30_table(configs: &mut [NamePropConfig; NUM_NAME_PROPS]) {
+        let table = NP_0X30_TABLE;
         let ENTRY_SIZE = 0x30;
+
         for (name_idx, config) in configs.iter_mut().enumerate() {
             // it's fine
             let base = name_idx * ENTRY_SIZE + 0x8;
-
-            config.compare_vol_mult = f32::from_le_bytes(NP_0X30_TABLE[base+0x0..base+0x4].try_into().unwrap());
-            config.attach_vol_mult = f32::from_le_bytes(NP_0X30_TABLE[base+0x4..base+0x8].try_into().unwrap());
-            config.lock_pitch = u8::from_le(NP_0X30_TABLE[base+0x8]) != 0;
-            config.can_flee = u8::from_le(NP_0X30_TABLE[base+0x9]) != 0;
-            config.num_vault_pts = u8::from_le(NP_0X30_TABLE[base+0xd]);
-            config.move_speed_idx = u8::from_le(NP_0X30_TABLE[base+0xf]);
-            config.innate_motion_type = u8::from_le(NP_0X30_TABLE[base+0x10]);
-            config.cannot_wobble = u8::from_le(NP_0X30_TABLE[base+0x13]) != 0;
-            config.use_aabb_as_collision_mesh = u8::from_le(NP_0X30_TABLE[base+0x15]) != 0;
-            config.kat_proximity_aware = u8::from_le(NP_0X30_TABLE[base+0x16]) != 0;
-            config.is_fish = u8::from_le(NP_0X30_TABLE[base+0x17]) != 0;
-            config.can_be_airborne = u8::from_le(NP_0X30_TABLE[base+0x18]) != 0;
-            config.scream_sfx_idx = u8::from_le(NP_0X30_TABLE[base+0x19]);
-            config.const_parent_name_idx = u16::from_le_bytes(NP_0X30_TABLE[base+0x1a..base+0x1c].try_into().unwrap());
-            config.has_treasure_fx = u8::from_le(NP_0X30_TABLE[base+0x1c]) != 0;
-            config.is_dummy_hit = u8::from_le(NP_0X30_TABLE[base+0x1d]) != 0;
-            config.collect_from_further = u8::from_le(NP_0X30_TABLE[base+0x1e]) != 0;
-            config.is_unhatched_egg = u8::from_le(NP_0X30_TABLE[base+0x1f]) != 0;
+            config.compare_vol_mult = read_f32!(table, base + 0x8);
+            config.attach_vol_mult = read_f32!(table, base + 0xc);
+            config.lock_pitch = read_bool!(table, base + 0x10);
+            config.can_flee = read_bool!(table, base + 0x12);
+            config.num_vault_pts = read_u8!(table, base + 0x15);
+            config.move_speed_idx = read_u8!(table, base + 0x17);
+            config.innate_motion_type = read_u8!(table, base + 0x18);
+            config.cannot_wobble = read_bool!(table, base + 0x1b);
+            config.use_aabb_as_collision_mesh = read_bool!(table, base + 0x1d);
+            config.kat_proximity_aware = read_bool!(table, base + 0x1e);
+            config.is_fish = read_bool!(table, base + 0x1f);
+            config.can_be_airborne = read_bool!(table, base + 0x20);
+            config.scream_sfx_idx = read_u8!(table, base + 0x21);
+            config.const_parent_name_idx = read_u16!(table, base + 0x22);
+            config.has_treasure_fx = read_bool!(table, base + 0x24);
+            config.is_dummy_hit = read_bool!(table, base + 0x25);
+            config.collect_from_further = read_bool!(table, base + 0x26);
+            config.is_unhatched_egg = read_bool!(table, base + 0x27);
         }
     }
 
     /// Copy the `name_prop_mono_data_offsets.bin` file into the `NamePropConfig` array.
-    pub fn read_name_prop_mono_data_offsets(configs: &mut [NamePropConfig; NUM_NAME_PROPS]) {
+    fn read_name_prop_mono_data_offsets(configs: &mut [NamePropConfig; NUM_NAME_PROPS]) {
+        let table = NP_MONO_DATA_OFFSETS;
+
         for (name_idx, config) in configs.iter_mut().enumerate() {
-            let offset = name_idx * 2;
-            config.mono_data_offset_idx = u16::from_le_bytes(NP_MONO_DATA_OFFSETS[offset..offset + 2].try_into().unwrap());
+            config.mono_data_offset_idx = read_u16!(table, name_idx * 2);
         }
     }
 }
