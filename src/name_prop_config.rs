@@ -1,9 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::{
-    constants::NUM_NAME_PROPS,
-    macros::{read_bool, read_f32, read_u16, read_u8},
-};
+use crate::macros::{read_bool, read_f32, read_u16, read_u8};
 
 static NP_0X30_TABLE: &'static [u8] = include_bytes!("data/name_prop_0x30_table.bin");
 static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("data/name_prop_mono_data_offsets.bin");
@@ -152,7 +149,7 @@ impl NamePropConfig {
 }
 
 lazy_static! {
-    pub static ref NAME_PROP_CONFIGS: Vec<NamePropConfig> = unsafe {
+    pub static ref NAME_PROP_CONFIGS: Vec<NamePropConfig> = {
         let mut configs: Vec<NamePropConfig> = vec![];
         NamePropConfig::read_from_data(&mut configs);
         configs

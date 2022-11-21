@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use gl_matrix::{
     common::{Mat4, Vec3, Vec4},
@@ -7,7 +10,6 @@ use gl_matrix::{
 
 use crate::{
     gamestate::GameState,
-    global::GlobalState,
     macros::{max_to_none, new_mat4_copy, new_mat4_id},
     mono_data::MonoDataPropPtrs,
     name_prop_config::NamePropConfig,
@@ -130,10 +132,10 @@ pub struct AddPropArgs {
     pub shake_off_flag: u16,
 }
 
-pub type PropScript = fn(prop: Prop) -> ();
+pub type PropScript = fn(prop: PropRef) -> ();
 
 #[derive(Debug, Default)]
-pub struct PropNode {
+pub struct Prop {
     /// The unique id of this prop.
     /// offset: 0x0
     ctrl_idx: u16,
@@ -197,11 +199,11 @@ pub struct PropNode {
 
     /// The next sibling of this prop in its family tree.
     /// offset: 0x28
-    next_sibling: Option<Prop>,
+    next_sibling: Option<PropRef>,
 
     /// The first child of this prop in its family tree.
     /// offset: 0x30
-    first_child: Option<Prop>,
+    first_child: Option<PropRef>,
 
     /// The area in which this prop loaded.
     /// offset: 0x38
@@ -265,7 +267,7 @@ pub struct PropNode {
 
     /// The prop's parent, if it has one.
     /// offset: 0x578
-    parent_prop: Option<Prop>,
+    parent_prop: Option<PropRef>,
 
     /// (??) name taken from unity code
     /// offset: 0x580
@@ -414,11 +416,11 @@ pub struct PropNode {
 
     /// If this prop is attached, points to the prop that was attached before this (if one exists).
     /// offset: 0xa28
-    collected_before: Option<Prop>,
+    collected_before: Option<PropRef>,
 
     /// If this prop is attached, points to the prop that was attached after this (if one exists).
     /// offset: 0xa30
-    collected_next: Option<Prop>,
+    collected_next: Option<PropRef>,
 
     mono_data_ptrs: MonoDataPropPtrs,
 
@@ -431,7 +433,7 @@ pub struct PropNode {
 
     /// If this prop has a Gemini twin, points to the twin prop.
     /// offset: 0xb18
-    twin_prop: Option<Prop>,
+    twin_prop: Option<PropRef>,
 
     /// The transform matrix of this prop when it was loaded.
     /// offset: 0xb24
@@ -442,10 +444,16 @@ pub struct PropNode {
     init_rotation_vec: Vec4,
 }
 
-pub type Prop = Rc<RefCell<PropNode>>;
+pub type PropRef = Rc<RefCell<Prop>>;
+pub type WeakPropRef = Weak<RefCell<Prop>>;
 
-impl PropNode {
-    pub fn new(state: &mut GameState, args: &AddPropArgs) -> Self {
+impl Prop {
+    pub fn new(state: &mut GameState, args: &AddPropArgs) -> PropRef {
+        let node = Prop::new_node(state, args);
+        Rc::new(RefCell::new(node))
+    }
+
+    pub fn new_node(state: &mut GameState, args: &AddPropArgs) -> Self {
         let config = NamePropConfig::get(args.name_idx.into());
 
         // initialize rotation matrix to identity
@@ -480,7 +488,7 @@ impl PropNode {
             .unwrap()
             .clone();
 
-        PropNode {
+        Prop {
             ctrl_idx: state.global.get_next_ctrl_idx().try_into().unwrap(),
             name_idx: args.name_idx,
             flags: 0,
@@ -658,7 +666,7 @@ impl PropNode {
         self.force_disabled = force_disabled != 0;
     }
 
-    pub fn set_parent(&mut self, parent: Option<Box<Prop>>) {
+    pub fn set_parent(&mut self, _parent: Option<Box<PropRef>>) {
         // if let Some(parent_box) = parent {
         //     self.flags |= 0x2;
         //     self.parent_prop = *parent;

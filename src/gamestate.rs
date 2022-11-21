@@ -1,6 +1,7 @@
 use crate::{
     camera::Camera,
     constants::MAX_PLAYERS,
+    debug_log,
     delegates::Delegates,
     ending::EndingState,
     global::GlobalState,
@@ -10,7 +11,7 @@ use crate::{
     mono_data::MonoData,
     preclear::PreclearState,
     prince::Prince,
-    prop::{AddPropArgs, Prop},
+    prop::{AddPropArgs, Prop, PropRef},
 };
 
 #[derive(Debug, Default)]
@@ -20,7 +21,7 @@ pub struct GameState {
     pub princes: [Prince; MAX_PLAYERS],
     pub cameras: [Camera; MAX_PLAYERS],
     pub inputs: [Input; MAX_PLAYERS],
-    pub props: Vec<Prop>,
+    pub props: Vec<PropRef>,
     pub preclear: PreclearState,
     pub ending: EndingState,
     pub delegates: Delegates,
@@ -28,7 +29,7 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn read_katamari(&self, player: i32) -> &Katamari {
+    pub fn borrow_katamari(&self, player: i32) -> &Katamari {
         &self.katamaris[player as usize]
     }
 
@@ -36,7 +37,7 @@ impl GameState {
         &mut self.katamaris[player as usize]
     }
 
-    pub fn read_prince(&self, player: i32) -> &Prince {
+    pub fn borrow_prince(&self, player: i32) -> &Prince {
         &self.princes[player as usize]
     }
 
@@ -48,11 +49,11 @@ impl GameState {
         &self.cameras[player as usize]
     }
 
-    pub fn write_camera(&mut self, player: i32) -> &mut Camera {
+    pub fn borrow_mut_camera(&mut self, player: i32) -> &mut Camera {
         &mut self.cameras[player as usize]
     }
 
-    pub fn read_input(&self, player: i32) -> &Input {
+    pub fn borrow_input(&self, player: i32) -> &Input {
         &self.inputs[player as usize]
     }
 
@@ -60,11 +61,11 @@ impl GameState {
         &mut self.inputs[player as usize]
     }
 
-    pub fn read_prop(&self, ctrl_idx: i32) -> &Prop {
+    pub fn read_prop_ref(&self, ctrl_idx: i32) -> &PropRef {
         &self.props[ctrl_idx as usize]
     }
 
-    pub fn write_prop(&mut self, ctrl_idx: i32) -> &mut Prop {
+    pub fn write_prop_ref(&mut self, ctrl_idx: i32) -> &mut PropRef {
         &mut self.props[ctrl_idx as usize]
     }
 
@@ -105,13 +106,13 @@ impl GameState {
         hit_water: &mut i32,
         map_loop_rate: &mut f32,
     ) {
-        let prince = self.read_prince(player);
+        let prince = self.borrow_prince(player);
         prince.get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz);
         *view_mode = prince.get_view_mode() as i32;
 
         // TODO: update `face_mode`
 
-        let katamari = self.read_katamari(player);
+        let katamari = self.borrow_katamari(player);
         katamari.get_alarm(alarm_mode, alarm_type);
         *hit_water = katamari.is_in_water() as i32;
 
@@ -141,7 +142,7 @@ impl GameState {
 
     /// Mimicks the `GetRadiusTargetPercent` API function.
     pub fn get_radius_target_percent(&self, player: i32) -> f32 {
-        let kat = self.read_katamari(player);
+        let kat = self.borrow_katamari(player);
         let init_rad = kat.get_init_radius();
         let curr_rad = kat.get_radius();
 
@@ -154,10 +155,11 @@ impl GameState {
     /// Mimicks the `GetPropAttached` API function.
     /// Returns the number of 3-byte prop statuses written to `out`.
     pub unsafe fn get_props_attach_status(&self, out: *mut u8) -> i32 {
-        let kat_diam_int = self.read_katamari(0).get_diam_int();
+        let kat_diam_int = self.borrow_katamari(0).get_diam_int();
         let mut num_props = 0;
 
-        for (ctrl_idx, prop) in self.props.iter().enumerate() {
+        for (ctrl_idx, prop_ref) in self.props.iter().enumerate() {
+            let prop = prop_ref.borrow();
             if !prop.is_initialized() {
                 break;
             }
@@ -198,16 +200,16 @@ impl GameState {
     // Mimicks the `MonoInitAddProp` API function.
     pub fn add_prop(&mut self, args: AddPropArgs) -> i32 {
         let prop = Prop::new(self, &args);
-        let result = prop.get_ctrl_idx().into();
+        let result = prop.borrow().get_ctrl_idx().into();
         self.props.push(prop);
         result
     }
 
     // Mimicks the `MonoInitAddPropSetParent` API function.
-    pub fn add_prop_set_parent(&mut self, ctrl_idx: i32, parent_ctrl_idx: i32) {
-        let child = self.props.get(ctrl_idx as usize).unwrap();
+    pub fn add_prop_set_parent(&mut self, _ctrl_idx: i32, parent_ctrl_idx: i32) {
+        // let child = self.props.get(ctrl_idx as usize).unwrap();
 
-        if (parent_ctrl_idx < 0) {
+        if parent_ctrl_idx < 0 {
             self.global.num_root_props += 1;
         }
     }

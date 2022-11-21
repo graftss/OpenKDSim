@@ -57,22 +57,22 @@ pub unsafe extern "C" fn GetKatamariCatchCountB() -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariRadius(player: i32) -> f32 {
     // this is divided by 100 for no reason (the 100 is immediately multiplied back in unity).
-    STATE.with(|state| state.borrow().read_katamari(player).get_radius() / 100.0)
+    STATE.with(|state| state.borrow().borrow_katamari(player).get_radius() / 100.0)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariDiameterInt(player: i32) -> i32 {
-    STATE.with(|state| state.borrow().read_katamari(player).get_diam_int())
+    STATE.with(|state| state.borrow().borrow_katamari(player).get_diam_int())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariVolume(player: i32) -> f32 {
-    STATE.with(|state| state.borrow().read_katamari(player).get_vol())
+    STATE.with(|state| state.borrow().borrow_katamari(player).get_vol())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariDisplayRadius(player: i32) -> f32 {
-    STATE.with(|state| state.borrow().read_katamari(player).get_display_radius())
+    STATE.with(|state| state.borrow().borrow_katamari(player).get_display_radius())
 }
 
 #[no_mangle]
@@ -117,7 +117,7 @@ pub unsafe extern "C" fn GetKatamariTranslation(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .read_katamari(player)
+            .borrow_katamari(player)
             .get_translation(x, y, z, sx, sy, sz);
     })
 }
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn GetKatamariMatrix(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .read_katamari(player)
+            .borrow_katamari(player)
             .get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
     })
 }
@@ -444,7 +444,14 @@ pub unsafe extern "C" fn SetTriggerState(
 
 #[no_mangle]
 pub unsafe extern "C" fn GetSubObjectCount(ctrl_idx: i32) -> i32 {
-    STATE.with(|state| state.borrow().read_prop(ctrl_idx).count_subobjects())
+    STATE.with(|state| {
+        state
+            .borrow()
+            .read_prop_ref(ctrl_idx)
+            .clone()
+            .borrow()
+            .count_subobjects()
+    })
 }
 
 #[no_mangle]
@@ -460,7 +467,9 @@ pub unsafe extern "C" fn GetSubObjectPosition(
 ) {
     STATE.with(|state| {
         state
-            .read_prop(ctrl_idx)
+            .borrow()
+            .read_prop_ref(ctrl_idx)
+            .borrow()
             .get_subobject_position(subobj_idx, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z);
     })
 }
@@ -468,19 +477,25 @@ pub unsafe extern "C" fn GetSubObjectPosition(
 /// Passes the bounding sphere radius of the prop with control index `ctrl_idx` to Unity.
 #[no_mangle]
 pub unsafe extern "C" fn GetPropSize(ctrl_idx: i32, radius: &mut f32) {
-    *radius = STATE.with(|state| state.borrow().read_prop(ctrl_idx).get_radius());
+    *radius = STATE.with(|state| state.borrow().read_prop_ref(ctrl_idx).borrow().get_radius());
 }
 
 /// Reads whether the prop `ctrl_idx` is attached to a katamari.
 #[no_mangle]
 pub unsafe extern "C" fn IsAttached(ctrl_idx: i32) -> bool {
-    state.borrow().read_prop(ctrl_idx).is_attached()
+    STATE.with(|state| {
+        state
+            .borrow()
+            .read_prop_ref(ctrl_idx)
+            .borrow()
+            .is_attached()
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MonoGetPlacementDataFloat(ctrl_idx: i32, data_type: i32) -> f32 {
     if data_type == 0xf {
-        state.borrow().read_prop(ctrl_idx).get_radius()
+        STATE.with(|state| state.borrow().read_prop_ref(ctrl_idx).borrow().get_radius())
     } else {
         panic!("unexpected `data_type` in `MonOGetPlacementDataFloat`.");
     }
@@ -488,30 +503,36 @@ pub unsafe extern "C" fn MonoGetPlacementDataFloat(ctrl_idx: i32, data_type: i32
 
 #[no_mangle]
 pub unsafe extern "C" fn GetPropMatrix(ctrl_idx: i32, out: *mut Mat4) {
-    state
-        .borrow()
-        .read_prop(ctrl_idx)
-        .unsafe_copy_transform(out);
+    STATE.with(|state| {
+        state
+            .borrow()
+            .read_prop_ref(ctrl_idx)
+            .borrow()
+            .unsafe_copy_transform(out);
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) {
     let mut next_mat = out;
 
-    for prop in &state.borrow().props {
-        if !prop.is_initialized() {
-            break;
+    STATE.with(|state| {
+        for prop_ref in &state.borrow().props {
+            let prop = prop_ref.borrow();
+            if !prop.is_initialized() {
+                break;
+            }
+
+            // Convert the `f32` pointer into `out` to a matrix pointer.
+            let mat: &mut Mat4 = slice::from_raw_parts_mut(next_mat, 16).try_into().unwrap();
+
+            // Copy the next prop's matrix into `out`.
+            prop.unsafe_copy_transform(mat);
+
+            // Increment the pointer into `out` to the next matrix.
+            next_mat = next_mat.offset(16);
         }
-
-        // Convert the `f32` pointer into `out` to a matrix pointer.
-        let mat: &mut Mat4 = slice::from_raw_parts_mut(next_mat, 16).try_into().unwrap();
-
-        // Copy the next prop's matrix into `out`.
-        prop.unsafe_copy_transform(mat);
-
-        // Increment the pointer into `out` to the next matrix.
-        next_mat = next_mat.offset(16);
-    }
+    })
 }
 
 #[no_mangle]
@@ -536,7 +557,8 @@ pub unsafe extern "C" fn MonoGetVolume(ctrl_idx: i32, volume: &mut f32, collect_
     STATE.with(|state| {
         state
             .borrow_mut()
-            .read_prop(ctrl_idx)
+            .read_prop_ref(ctrl_idx)
+            .borrow()
             .get_volume(volume, collect_diam);
     })
 }
@@ -546,7 +568,8 @@ pub unsafe extern "C" fn SetPropStopFlag(ctrl_idx: i32, flag: i32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_mut_prop(ctrl_idx)
+            .write_prop_ref(ctrl_idx)
+            .borrow_mut()
             .set_disabled(flag);
     })
 }
@@ -574,12 +597,18 @@ pub unsafe extern "C" fn SetMapChangeMode(map_change_mode: i32) {
 
 #[no_mangle]
 pub unsafe extern "C" fn KataVsGet_AttackCount(player: i32) -> i32 {
-    STATE.with(|state| state.borrow().read_katamari(player).vs_attack_count.into())
+    STATE.with(|state| {
+        state
+            .borrow()
+            .borrow_katamari(player)
+            .vs_attack_count
+            .into()
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn KataVsGet_CatchCount(player: i32) -> i32 {
-    STATE.with(|state| state.borrow().read_katamari(player).vs_catch_count.into())
+    STATE.with(|state| state.borrow().borrow_katamari(player).vs_catch_count.into())
 }
 
 #[no_mangle]

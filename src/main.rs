@@ -1,32 +1,32 @@
 //! A doubly-linked list in 50 LOCs of stable and safe Rust.
 // Backup-fork of https://play.rust-lang.org/?gist=c3db81ec94bf231b721ef483f58deb35
 use std::cell::RefCell;
-use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
-type Prop = Rc<RefCell<InnerProp>>;
+type WeakPropRef = Weak<RefCell<InnerProp>>;
+type PropRef = Rc<RefCell<InnerProp>>;
 
 #[derive(Debug)]
 struct InnerProp {
     ctrl_idx: i32,
-    parent: Option<Prop>,
-    child: Option<Prop>,
-    next_sibling: Option<Prop>,
+    parent: Option<WeakPropRef>,
+    child: Option<WeakPropRef>,
+    next_sibling: Option<WeakPropRef>,
 }
 
 impl InnerProp {
-    pub fn new(ctrl_idx: i32) -> Prop {
+    pub fn new(ctrl_idx: i32) -> PropRef {
         Rc::new(RefCell::new(Self {
-            ctrl_idx: ctrl_idx,
+            ctrl_idx,
             parent: None,
             child: None,
             next_sibling: None,
         }))
     }
 
-    pub fn display_link(link: &Option<Prop>) -> String {
+    pub fn display_link(link: &Option<WeakPropRef>) -> String {
         match link {
-            Some(p) => format!("{}", p.borrow().ctrl_idx),
+            Some(p) => format!("{}", p.upgrade().unwrap().borrow().ctrl_idx),
             None => format!("None"),
         }
     }
@@ -42,12 +42,12 @@ impl InnerProp {
     }
 }
 
-fn set_child_link(child: &Prop, parent: &Prop) {
+fn set_child_link(child: &PropRef, parent: &PropRef) {
     let mut child_ref = child.borrow_mut();
-    child_ref.parent = Some(parent.clone());
+    child_ref.parent = Some(Rc::<RefCell<InnerProp>>::downgrade(parent));
 
     let mut x = parent.borrow_mut();
-    x.child = Some(child.clone());
+    x.child = Some(Rc::<RefCell<InnerProp>>::downgrade(parent));
 }
 
 fn main() {
