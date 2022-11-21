@@ -1,3 +1,5 @@
+use std::{fs::OpenOptions, path::Path};
+
 use gl_matrix::common::{Mat4, Vec4};
 
 use crate::constants::{TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE};
@@ -16,4 +18,20 @@ pub fn vec4_from_le_bytes(out: &mut Vec4, bytes: &[u8], offset: usize) {
         let val_offset = offset + i * 4;
         *val = f32::from_le_bytes(bytes[val_offset..val_offset + 4].try_into().unwrap());
     }
+}
+
+pub fn debug_log(str: &str) {
+    use std::io::Write;
+
+    let path = Path::new(
+        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log",
+    );
+
+    let mut file = OpenOptions::new()
+        .read(true)
+        .append(true)
+        .open(path)
+        .unwrap();
+
+    if let Err(_e) = writeln!(file, "{}", str) {}
 }

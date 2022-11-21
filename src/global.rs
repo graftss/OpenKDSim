@@ -2,7 +2,10 @@ use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 
-use crate::mission::{GameMode, Mission, Stage};
+use crate::{
+    mission::{GameMode, Mission, Stage},
+    util::debug_log,
+};
 
 /// Miscellaneous global game state.
 #[derive(Debug, Default)]
@@ -65,7 +68,7 @@ pub struct GlobalState {
 
     /// The control index of the next prop
     /// offset: 0xd35325
-    pub next_ctrl_idx: i32,
+    pub next_ctrl_idx: u16,
 
     /// The "theme object" score in constellation levels (e.g. number of crabs in Make Cancer).
     pub catch_count_b: i32,
@@ -188,9 +191,10 @@ impl GlobalState {
         self.next_ctrl_idx = 0;
     }
 
-    pub fn get_next_ctrl_idx(&mut self) -> i32 {
+    pub fn get_next_ctrl_idx(&mut self) -> u16 {
         let result = self.next_ctrl_idx;
         self.next_ctrl_idx += 1;
+        debug_log(&format!("next ctrl idx: {}", self.next_ctrl_idx));
         result
     }
 }

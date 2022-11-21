@@ -1,10 +1,14 @@
 use lazy_static::lazy_static;
 
-use crate::macros::{read_bool, read_f32, read_u16, read_u8};
+use crate::{
+    constants::NUM_NAME_PROPS,
+    macros::{read_bool, read_f32, read_u16, read_u8},
+};
 
 static NP_0X30_TABLE: &'static [u8] = include_bytes!("data/name_prop_0x30_table.bin");
 static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("data/name_prop_mono_data_offsets.bin");
 
+#[derive(Debug, Default, Clone)]
 pub struct NamePropConfig {
     ///////////////////////////////////////////
     // Begin `name_prop_0x30_table.bin` fields.
@@ -115,8 +119,7 @@ impl NamePropConfig {
         let ENTRY_SIZE = 0x30;
 
         for (name_idx, config) in configs.iter_mut().enumerate() {
-            // it's fine
-            let base = name_idx * ENTRY_SIZE + 0x8;
+            let base = name_idx * ENTRY_SIZE;
             config.compare_vol_mult = read_f32!(table, base + 0x8);
             config.attach_vol_mult = read_f32!(table, base + 0xc);
             config.lock_pitch = read_bool!(table, base + 0x10);
@@ -150,7 +153,7 @@ impl NamePropConfig {
 
 lazy_static! {
     pub static ref NAME_PROP_CONFIGS: Vec<NamePropConfig> = {
-        let mut configs: Vec<NamePropConfig> = vec![];
+        let mut configs: Vec<NamePropConfig> = vec![NamePropConfig::default(); NUM_NAME_PROPS];
         NamePropConfig::read_from_data(&mut configs);
         configs
     };

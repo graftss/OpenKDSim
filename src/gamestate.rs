@@ -1,7 +1,6 @@
 use crate::{
     camera::Camera,
     constants::MAX_PLAYERS,
-    debug_log,
     delegates::Delegates,
     ending::EndingState,
     global::GlobalState,
@@ -12,6 +11,7 @@ use crate::{
     preclear::PreclearState,
     prince::Prince,
     prop::{AddPropArgs, Prop, PropRef},
+    util::debug_log,
 };
 
 #[derive(Debug, Default)]
@@ -199,9 +199,13 @@ impl GameState {
 
     // Mimicks the `MonoInitAddProp` API function.
     pub fn add_prop(&mut self, args: AddPropArgs) -> i32 {
+        debug_log("A");
         let prop = Prop::new(self, &args);
+        debug_log("B");
         let result = prop.borrow().get_ctrl_idx().into();
+        debug_log("C");
         self.props.push(prop);
+        debug_log("D");
         result
     }
 

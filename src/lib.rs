@@ -27,26 +27,10 @@ use name_prop_config::NamePropConfig;
 use prince::OujiState;
 use prop::AddPropArgs;
 use std::cell::RefCell;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use std::path::Path;
+use util::debug_log;
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());
-}
-
-pub fn debug_log(str: &str) {
-    let path = Path::new(
-        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log",
-    );
-
-    let mut file = OpenOptions::new()
-        .read(true)
-        .append(true)
-        .open(path)
-        .unwrap();
-
-    if let Err(_e) = writeln!(file, "{}", str) {}
 }
 
 #[no_mangle]
@@ -666,6 +650,7 @@ pub unsafe extern "C" fn MonoInitAddProp(
     twin_id: u16,
     shake_off_flag: u16,
 ) -> i32 {
+    debug_log("starting MonoInitAddProp from rust");
     let args = AddPropArgs {
         pos_x: pos_x,
         pos_y: pos_y,
@@ -692,6 +677,8 @@ pub unsafe extern "C" fn MonoInitAddProp(
         twin_id: twin_id,
         shake_off_flag: shake_off_flag,
     };
+
+    debug_log(&format!("args: {:#?}", args));
 
     STATE.with(|state| state.borrow_mut().add_prop(args))
 }

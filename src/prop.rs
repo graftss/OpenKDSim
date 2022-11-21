@@ -13,7 +13,7 @@ use crate::{
     macros::{max_to_none, new_mat4_copy, new_mat4_id},
     mono_data::MonoDataPropPtrs,
     name_prop_config::NamePropConfig,
-    util::scale_sim_transform,
+    util::{debug_log, scale_sim_transform},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,11 +167,11 @@ pub struct Prop {
     /// offset: 0x14
     alpha: f32,
 
-    move_type: u16,
+    move_type: Option<u16>,
 
     /// (??) The prop is intangible until the player loads this area.
     /// offset: 0x1a
-    hit_on_area: u8,
+    hit_on_area: Option<u16>,
 
     /// (??) encodes the behavior of this prop relative to its child/parent
     /// offset: 0x1b
@@ -179,7 +179,7 @@ pub struct Prop {
 
     /// Encodes motion behavior innate to this prop's name index.
     /// offset: 0x1c
-    innate_motion_type: u8,
+    innate_motion_type: Option<u8>,
 
     /// The state index of the innate motion action.
     /// offset: 0x1d
@@ -280,7 +280,7 @@ pub struct Prop {
 
     /// The area at which this prop is destroyed.
     /// offset: 0x582
-    display_off_area: u16,
+    display_off_area: Option<u16>,
 
     /// (??)
     /// offset: 0x583
@@ -467,6 +467,8 @@ impl Prop {
         new_mat4_copy!(unattached_transform, rotation_mat);
         new_mat4_copy!(init_transform, unattached_transform);
 
+        debug_log("new node A");
+
         // TODO
         // lines 104-107 of `prop_init` (init comment)
         // lines 108-149 of `prop_init` (init motion)
@@ -488,19 +490,21 @@ impl Prop {
             .unwrap()
             .clone();
 
-        Prop {
-            ctrl_idx: state.global.get_next_ctrl_idx().try_into().unwrap(),
-            name_idx: args.name_idx,
+        debug_log(&format!("new node B {:?}", mono_data_ptrs));
+
+        let result = Prop {
+            ctrl_idx: state.global.get_next_ctrl_idx(),
+            name_idx: args.name_idx.into(),
             flags: 0,
             global_state: PropGlobalState::Unattached,
             flags2: 0,
             force_disabled: false,
             display_off: false,
             alpha: 1.0,
-            move_type: args.mono_move_type,
-            hit_on_area: args.mono_hit_on_area.try_into().unwrap(),
+            move_type: max_to_none!(u16, args.mono_move_type),
+            hit_on_area: max_to_none!(u16, args.mono_hit_on_area),
             link_action: max_to_none!(u16, args.link_action),
-            innate_motion_type: config.innate_motion_type,
+            innate_motion_type: max_to_none!(u8, config.innate_motion_type),
             innate_motion_state: 0,
             has_path_motion_action: false,
             disable_wobble: args.shake_off_flag != 0,
@@ -522,13 +526,12 @@ impl Prop {
             motion_transform: [0.0; 16],
             extra_action_type: max_to_none!(u16, args.extra_action_type),
             unique_name_id: max_to_none!(u16, args.unique_name_id),
-            display_off_area: args.disp_off_area_no,
+            display_off_area: max_to_none!(u16, args.disp_off_area_no),
             vs_drop_flag: args.vs_drop_flag != 0,
             unattached_state: PropUnattachedState::Normal,
             animation_type: PropAnimationType::Waiting,
             comment_id: max_to_none!(u16, args.comment_id),
             comment_group_id: max_to_none!(u16, args.comment_group_id),
-            tree_group_id: None, // TODO
             stationary: true,
             force_no_wobble: false,
             onattach_added_vol: 0.0,
@@ -554,6 +557,7 @@ impl Prop {
             motion_script: None,   // TODO
             innate_script: None,
             parent_prop: None,            // TODO
+            tree_group_id: None,          // TODO
             motion_action_type: None,     // TODO
             behavior_type: None,          // TODO
             alt_motion_action_type: None, // TODO
@@ -566,7 +570,9 @@ impl Prop {
             aabb_size: [0.0; 3],
             collision_mesh: (),
             twin_prop: None,
-        }
+        };
+
+        result
     }
 
     pub fn get_ctrl_idx(&self) -> u16 {

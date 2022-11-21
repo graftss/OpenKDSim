@@ -1,68 +1,83 @@
-//! A doubly-linked list in 50 LOCs of stable and safe Rust.
-// Backup-fork of https://play.rust-lang.org/?gist=c3db81ec94bf231b721ef483f58deb35
+#![feature(vec_into_raw_parts)]
+#![allow(non_snake_case, dead_code)]
+
 use std::cell::RefCell;
-use std::rc::{Rc, Weak};
 
-type WeakPropRef = Weak<RefCell<InnerProp>>;
-type PropRef = Rc<RefCell<InnerProp>>;
+use gamestate::GameState;
+use prop::AddPropArgs;
 
-#[derive(Debug)]
-struct InnerProp {
-    ctrl_idx: i32,
-    parent: Option<WeakPropRef>,
-    child: Option<WeakPropRef>,
-    next_sibling: Option<WeakPropRef>,
+// reference this first so it's available to all other modules
+mod macros;
+
+mod camera;
+mod constants;
+mod delegates;
+mod ending;
+mod gamestate;
+mod global;
+mod input;
+mod katamari;
+mod mission;
+mod mono_data;
+mod name_prop_config;
+mod preclear;
+mod prince;
+mod prop;
+mod util;
+
+thread_local! {
+    static STATE: RefCell<GameState> = RefCell::new(GameState::default());
 }
 
-impl InnerProp {
-    pub fn new(ctrl_idx: i32) -> PropRef {
-        Rc::new(RefCell::new(Self {
-            ctrl_idx,
-            parent: None,
-            child: None,
-            next_sibling: None,
-        }))
-    }
+static MAS1_MONO_DATA: &'static [u8] = include_bytes!("data/mono_data_MAS1.bin");
 
-    pub fn display_link(link: &Option<WeakPropRef>) -> String {
-        match link {
-            Some(p) => format!("{}", p.upgrade().unwrap().borrow().ctrl_idx),
-            None => format!("None"),
-        }
-    }
+const ADD_PROP_ARGS: AddPropArgs = AddPropArgs {
+    pos_x: 1.0,
+    pos_y: 2.0,
+    pos_z: 3.0,
+    rot_x: 4.0,
+    rot_y: 5.0,
+    rot_z: 5.0,
+    rot_w: 5.0,
+    scale_x: 6.0,
+    scale_y: 6.0,
+    scale_z: 6.0,
+    name_idx: 1251,
+    loc_pos_type: u16::MAX,
+    random_group_id: u16::MAX,
+    mono_move_type: u16::MAX,
+    mono_hit_on_area: u16::MAX,
+    link_action: 1,
+    extra_action_type: 2,
+    unique_name_id: u16::MAX,
+    disp_off_area_no: 9,
+    vs_drop_flag: 12,
+    comment_id: 1,
+    comment_group_id: u16::MAX,
+    twin_id: u16::MAX,
+    shake_off_flag: 1,
+};
 
-    pub fn display(&self) -> String {
-        format!(
-            "Prop(id={}, parent={}, child={}, next_sib={})",
-            self.ctrl_idx,
-            InnerProp::display_link(&self.parent),
-            InnerProp::display_link(&self.child),
-            InnerProp::display_link(&self.next_sibling),
-        )
-    }
-}
+unsafe fn test() {
+    let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
 
-fn set_child_link(child: &PropRef, parent: &PropRef) {
-    let mut child_ref = child.borrow_mut();
-    child_ref.parent = Some(Rc::<RefCell<InnerProp>>::downgrade(parent));
+    STATE.with(|state| {
+        let mut s = state.borrow_mut();
 
-    let mut x = parent.borrow_mut();
-    x.child = Some(Rc::<RefCell<InnerProp>>::downgrade(parent));
+        s.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
+
+        s.add_prop(ADD_PROP_ARGS);
+        s.add_prop(ADD_PROP_ARGS);
+
+        let prop_ref = s.read_prop_ref(0).clone();
+        let new_prop = prop_ref.borrow_mut();
+        println!("{new_prop:?}");
+    })
 }
 
 fn main() {
-    let a = InnerProp::new(0);
-    let b = InnerProp::new(1);
-    let c = InnerProp::new(3);
-
-    println!("a={}", a.borrow().display());
-    println!("b={}", b.borrow().display());
-    println!("c={}\n\n", c.borrow().display());
-
-    set_child_link(&a, &b);
-    set_child_link(&b, &c);
-
-    println!("a={}", a.borrow().display());
-    println!("b={}", b.borrow().display());
-    println!("c={}\n\n", c.borrow().display());
+    println!("start");
+    unsafe {
+        test();
+    }
 }
