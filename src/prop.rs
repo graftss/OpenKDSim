@@ -1,11 +1,12 @@
 use std::{
     cell::RefCell,
+    fmt::{Debug, Display},
     rc::{Rc, Weak},
 };
 
 use gl_matrix::{
     common::{Mat4, Vec3, Vec4},
-    mat4,
+    mat4, vec4,
 };
 
 use crate::{
@@ -13,8 +14,11 @@ use crate::{
     macros::{max_to_none, new_mat4_copy, new_mat4_id},
     mono_data::MonoDataPropPtrs,
     name_prop_config::NamePropConfig,
-    util::{debug_log, scale_sim_transform},
+    util::scale_sim_transform,
 };
+
+const FLAG_HAS_PARENT: u8 = 0x2;
+const FLAG_INTANGIBLE_CHILD: u8 = 0x4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PropGlobalState {
@@ -35,7 +39,45 @@ impl Default for PropGlobalState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PropLinkAction {}
+enum PropLinkAction {
+    /// No special link action.
+    None = 0,
+
+    /// (???)
+    MaybeFollowParent = 1,
+
+    /// A child prop with this `LinkAction` destroys itself when its
+    /// parent prop is attached.
+    DestroyWhenParentAttached = 2,
+
+    /// A child prop with this `LinkAction` is intangible.
+    IntangibleChild = 3,
+
+    /// (??)
+    MaybeIgnoreParent = 4,
+
+    /// (???)
+    MaybeUseParent = 5,
+
+    /// A child prop with this `LinkAction` switches to its alt motion action
+    /// after its parent is attached.
+    ReactWhenParentAttached = 6,
+}
+
+impl From<u16> for PropLinkAction {
+    fn from(value: u16) -> Self {
+        match value {
+            0 => PropLinkAction::None,
+            1 => PropLinkAction::MaybeFollowParent,
+            2 => PropLinkAction::DestroyWhenParentAttached,
+            3 => PropLinkAction::IntangibleChild,
+            4 => PropLinkAction::MaybeIgnoreParent,
+            5 => PropLinkAction::MaybeUseParent,
+            6 => PropLinkAction::ReactWhenParentAttached,
+            _ => panic!("unknown link action: {}", value),
+        }
+    }
+}
 
 #[derive(Debug, Default)]
 struct PropSubobject {
@@ -134,7 +176,7 @@ pub struct AddPropArgs {
 
 pub type PropScript = fn(prop: PropRef) -> ();
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Prop {
     /// The unique id of this prop.
     /// offset: 0x0
@@ -175,7 +217,7 @@ pub struct Prop {
 
     /// (??) encodes the behavior of this prop relative to its child/parent
     /// offset: 0x1b
-    link_action: Option<u16>,
+    link_action: Option<PropLinkAction>,
 
     /// Encodes motion behavior innate to this prop's name index.
     /// offset: 0x1c
@@ -199,11 +241,11 @@ pub struct Prop {
 
     /// The next sibling of this prop in its family tree.
     /// offset: 0x28
-    next_sibling: Option<PropRef>,
+    pub next_sibling: Option<PropRef>,
 
     /// The first child of this prop in its family tree.
     /// offset: 0x30
-    first_child: Option<PropRef>,
+    pub first_child: Option<PropRef>,
 
     /// The area in which this prop loaded.
     /// offset: 0x38
@@ -267,7 +309,7 @@ pub struct Prop {
 
     /// The prop's parent, if it has one.
     /// offset: 0x578
-    parent_prop: Option<PropRef>,
+    pub parent: Option<WeakPropRef>,
 
     /// (??) name taken from unity code
     /// offset: 0x580
@@ -319,7 +361,7 @@ pub struct Prop {
 
     /// The unique ID of this prop's tree. All props in the same tree have the same ID.
     /// offset: 0x58c
-    tree_group_id: Option<u16>,
+    tree_id: Option<u16>,
 
     /// True if the prop isn't moving.
     /// offset: 0x58e
@@ -416,11 +458,11 @@ pub struct Prop {
 
     /// If this prop is attached, points to the prop that was attached before this (if one exists).
     /// offset: 0xa28
-    collected_before: Option<PropRef>,
+    collected_before: Option<WeakPropRef>,
 
     /// If this prop is attached, points to the prop that was attached after this (if one exists).
     /// offset: 0xa30
-    collected_next: Option<PropRef>,
+    collected_next: Option<WeakPropRef>,
 
     mono_data_ptrs: MonoDataPropPtrs,
 
@@ -433,7 +475,7 @@ pub struct Prop {
 
     /// If this prop has a Gemini twin, points to the twin prop.
     /// offset: 0xb18
-    twin_prop: Option<PropRef>,
+    twin_prop: Option<WeakPropRef>,
 
     /// The transform matrix of this prop when it was loaded.
     /// offset: 0xb24
@@ -446,6 +488,33 @@ pub struct Prop {
 
 pub type PropRef = Rc<RefCell<Prop>>;
 pub type WeakPropRef = Weak<RefCell<Prop>>;
+
+impl Display for Prop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Prop(ctrl={})", self.ctrl_idx)
+    }
+}
+
+impl Debug for Prop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Prop")
+            .field("ctrl_idx", &self.ctrl_idx)
+            .finish()
+    }
+}
+
+impl Prop {
+    pub fn print_links(&self, label: &str) {
+        println!(
+            "{} (tree={:?}):\n  child: {:?}\n  next_sibling: {:?}\n  parent: {:?}",
+            label,
+            self.tree_id,
+            self.first_child,
+            self.next_sibling,
+            self.parent.as_ref().map(|p| p.upgrade().unwrap())
+        );
+    }
+}
 
 impl Prop {
     pub fn new(state: &mut GameState, args: &AddPropArgs) -> PropRef {
@@ -466,8 +535,6 @@ impl Prop {
         // initialize unattached transform to the initial rotation mat
         new_mat4_copy!(unattached_transform, rotation_mat);
         new_mat4_copy!(init_transform, unattached_transform);
-
-        debug_log("new node A");
 
         // TODO
         // lines 104-107 of `prop_init` (init comment)
@@ -490,8 +557,6 @@ impl Prop {
             .unwrap()
             .clone();
 
-        debug_log(&format!("new node B {:?}", mono_data_ptrs));
-
         let result = Prop {
             ctrl_idx: state.global.get_next_ctrl_idx(),
             name_idx: args.name_idx.into(),
@@ -503,7 +568,7 @@ impl Prop {
             alpha: 1.0,
             move_type: max_to_none!(u16, args.mono_move_type),
             hit_on_area: max_to_none!(u16, args.mono_hit_on_area),
-            link_action: max_to_none!(u16, args.link_action),
+            link_action: max_to_none!(u16, args.link_action).map(|v| v.into()),
             innate_motion_type: max_to_none!(u8, config.innate_motion_type),
             innate_motion_state: 0,
             has_path_motion_action: false,
@@ -556,8 +621,8 @@ impl Prop {
             script_0x560: None,    // TODO
             motion_script: None,   // TODO
             innate_script: None,
-            parent_prop: None,            // TODO
-            tree_group_id: None,          // TODO
+            parent: None,                 // TODO
+            tree_id: None,                // TODO
             motion_action_type: None,     // TODO
             behavior_type: None,          // TODO
             alt_motion_action_type: None, // TODO
@@ -644,6 +709,10 @@ impl Prop {
         self.global_state == PropGlobalState::Attached
     }
 
+    pub fn get_pos(&self, out: &mut Vec4) {
+        vec4::copy(out, &self.pos);
+    }
+
     pub fn get_radius(&self) -> f32 {
         self.radius
     }
@@ -672,16 +741,44 @@ impl Prop {
         self.force_disabled = force_disabled != 0;
     }
 
-    pub fn set_parent(&mut self, _parent: Option<Box<PropRef>>) {
-        // if let Some(parent_box) = parent {
-        //     self.flags |= 0x2;
-        //     self.parent_prop = *parent;
-        //     parent_box.disable_wobble = true;
-        // } else {
-        //     self.flags &= 0xfd;
-        //     self.parent_prop = None;
-        //     self.tree_group_id = None;
-        // }
+    pub fn set_no_parent(&mut self) {
+        self.flags &= 0xfd;
+        self.parent = None;
+        self.tree_id = None;
+    }
+
+    pub fn set_parent(&mut self, parent: WeakPropRef, tree_group_id: u16) {
+        self.flags |= FLAG_HAS_PARENT;
+        self.parent = Some(parent.clone());
+
+        if self.link_action == Some(PropLinkAction::IntangibleChild) {
+            self.flags |= FLAG_INTANGIBLE_CHILD;
+        }
+
+        self.tree_id = Some(tree_group_id);
+
+        // TODO: line 53: `prop_update_rotation_from_parent(self)`
+
+        mat4::identity(&mut self.motion_transform);
+    }
+
+    /// Add `child` as a child of this prop by add it to the end
+    /// of the sibling list.
+    pub fn add_child(&mut self, child: PropRef) {
+        if let Some(first_child) = &self.first_child {
+            first_child.clone().borrow_mut().add_sibling(child);
+        } else {
+            self.first_child = Some(child);
+        }
+    }
+
+    /// Traverse this prop's sibling list, adding `sibling` to the end.
+    pub fn add_sibling(&mut self, sibling: PropRef) {
+        if let Some(next_sibling) = &self.next_sibling {
+            next_sibling.clone().borrow_mut().add_sibling(sibling);
+        } else {
+            self.next_sibling = Some(sibling);
+        }
     }
 
     /// Used by the `GetPropAttached` API function.

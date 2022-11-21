@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     camera::Camera,
     constants::MAX_PLAYERS,
@@ -210,11 +212,26 @@ impl GameState {
     }
 
     // Mimicks the `MonoInitAddPropSetParent` API function.
-    pub fn add_prop_set_parent(&mut self, _ctrl_idx: i32, parent_ctrl_idx: i32) {
-        // let child = self.props.get(ctrl_idx as usize).unwrap();
+    pub fn add_prop_set_parent(&mut self, ctrl_idx: i32, parent_ctrl_idx: i32) {
+        let child_rc = self.props.get(ctrl_idx as usize).unwrap_or_else(|| {
+            panic!("called `add_prop_set_parent` on a nonexistent prop: {ctrl_idx}")
+        });
+        if let Some(parent_rc) = self.props.get(parent_ctrl_idx as usize) {
+            // adding a parent prop to the child
+            let weak_parent_ref = Rc::<RefCell<Prop>>::downgrade(&parent_rc);
 
-        if parent_ctrl_idx < 0 {
-            self.global.num_root_props += 1;
+            let area: u16 = self.global.area.unwrap().into();
+            let tree_id: u16 = 1000 * area + self.global.num_root_props;
+
+            // declare that the child has a parent
+            child_rc
+                .clone()
+                .borrow_mut()
+                .set_parent(weak_parent_ref, tree_id);
+            parent_rc.clone().borrow_mut().add_child(child_rc.clone());
+        } else {
+            // declaring that the child prop has no parent
+            child_rc.clone().borrow_mut().set_no_parent();
         }
     }
 }

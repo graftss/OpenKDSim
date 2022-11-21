@@ -691,9 +691,8 @@ pub unsafe extern "C" fn MonoInitAddPropSetParent(ctrl_idx: i32, parent_ctrl_idx
             .add_prop_set_parent(ctrl_idx, parent_ctrl_idx);
     })
 }
+
 /*
-[DllImport("PS2KatamariSimulation")]
-public static extern void MonoInitAddPropSetParent(int placementIndex, int parentPlacementIndex);
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
 
