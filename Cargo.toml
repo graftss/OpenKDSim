@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-#[allow(non_snake_case)]
 [lib]
 name="openkdsim"
 crate-type=["cdylib"]
+
+[[bin]]
+name = "openkdsim_test"
+path = "src/main.rs"
 
 [dependencies]
 static_init = "1.0.3"

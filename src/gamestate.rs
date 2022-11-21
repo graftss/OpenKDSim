@@ -1,45 +1,21 @@
 use crate::{
-    camera::Camera,
-    constants::{MAX_PLAYERS, MAX_PROPS},
-    debug_log,
-    delegates::Delegates,
-    ending::EndingState,
-    global::GlobalState,
-    input::Input,
-    katamari::Katamari,
-    mission::MissionConfig,
-    preclear::PreclearState,
-    prince::Prince,
-    prop::Prop,
+    camera::Camera, constants::MAX_PLAYERS, delegates::Delegates, ending::EndingState,
+    global::GlobalState, input::Input, katamari::Katamari, mission::MissionConfig,
+    mono_data::MonoData, preclear::PreclearState, prince::Prince, prop::Prop,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GameState {
     pub global: GlobalState,
     pub katamaris: [Katamari; MAX_PLAYERS],
     pub princes: [Prince; MAX_PLAYERS],
     pub cameras: [Camera; MAX_PLAYERS],
     pub inputs: [Input; MAX_PLAYERS],
-    pub props: [Prop; MAX_PROPS],
+    pub props: Vec<Prop>,
     pub preclear: PreclearState,
     pub ending: EndingState,
     pub delegates: Delegates,
-}
-
-impl Default for GameState {
-    fn default() -> Self {
-        Self {
-            global: Default::default(),
-            katamaris: Default::default(),
-            princes: Default::default(),
-            cameras: Default::default(),
-            preclear: Default::default(),
-            ending: Default::default(),
-            delegates: Default::default(),
-            inputs: Default::default(),
-            props: { unsafe { std::mem::zeroed() } },
-        }
-    }
+    pub mono_data: MonoData,
 }
 
 impl GameState {
@@ -183,5 +159,29 @@ impl GameState {
         }
 
         num_props
+    }
+
+    pub unsafe fn mono_init_start(
+        &mut self,
+        mono_data: *const u8,
+        mission: i32,
+        area: i32,
+        stage: i32,
+        _kadaiFlag: i32,
+        _clearFlag: i32,
+        _endFlag: i32,
+    ) {
+        self.global.mono_init_start(
+            mission.try_into().unwrap(),
+            area.try_into().unwrap(),
+            stage.try_into().unwrap(),
+        );
+
+        self.mono_data.init(mono_data);
+
+        // TODO: init subobjects
+        // TODO: init comment prop groups
+        // TODO: init random prop groups
+        // TODO: init generated props
     }
 }

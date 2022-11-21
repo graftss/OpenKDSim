@@ -12,6 +12,7 @@ mod global;
 mod input;
 mod katamari;
 mod mission;
+mod mono_data;
 mod name_prop_config;
 mod preclear;
 mod prince;
@@ -22,7 +23,7 @@ use core::{panic, slice};
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
-use name_prop_config::{NamePropConfig, NAME_PROP_CONFIGS};
+use name_prop_config::NamePropConfig;
 use prince::OujiState;
 use static_init::dynamic;
 use std::fs::OpenOptions;
@@ -36,15 +37,14 @@ pub fn debug_log(str: &str) {
     let path = Path::new(
         "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log",
     );
+
     let mut file = OpenOptions::new()
         .write(true)
         .append(true)
         .open(path)
         .unwrap();
 
-    if let Err(_e) = writeln!(file, "{}", str) {
-        eprintln!("oopsie");
-    }
+    if let Err(_e) = writeln!(file, "{}", str) {}
 }
 
 #[no_mangle]
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn GetKatamariTranslation(
     sz: &mut f32,
 ) {
     STATE
-        .read()
+        .write()
         .read_katamari(player)
         .get_translation(x, y, z, sx, sy, sz);
 }
@@ -130,7 +130,7 @@ pub unsafe extern "C" fn GetKatamariMatrix(
     zz: &mut f32,
 ) {
     STATE
-        .read()
+        .write()
         .read_katamari(player)
         .get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
 }
@@ -153,7 +153,7 @@ pub unsafe extern "C" fn GetMapRollMatrix(
     zz: &mut f32,
 ) {
     STATE
-        .read()
+        .write()
         .ending
         .get_map_roll_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
 }
@@ -289,7 +289,7 @@ pub unsafe extern "C" fn GetCamera(
     offset: &mut f32,
 ) {
     STATE
-        .read()
+        .write()
         .read_camera(player)
         .get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz, offset);
 }
@@ -400,7 +400,7 @@ pub unsafe extern "C" fn GetSubObjectPosition(
     rot_z: &mut f32,
 ) {
     STATE
-        .read()
+        .write()
         .read_prop(ctrl_idx)
         .get_subobject_position(subobj_idx, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z);
 }
@@ -471,7 +471,7 @@ pub unsafe extern "C" fn GetMonoDataOffsetExist(name_idx: i32) -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn MonoGetVolume(ctrl_idx: i32, volume: &mut f32, collect_diam: &mut i32) {
     STATE
-        .read()
+        .write()
         .read_prop(ctrl_idx)
         .get_volume(volume, collect_diam);
 }
@@ -518,9 +518,18 @@ pub unsafe extern "C" fn GetPropAttached(out: *mut u8) -> i32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn TestCrap(name_idx: i32, compare_vol: &mut f32, x: &mut i32) {
-    *compare_vol = NamePropConfig::get(name_idx).compare_vol_mult;
-    *x = NamePropConfig::get(name_idx).innate_motion_type.into();
+pub unsafe extern "C" fn MonoInitStart(
+    mono_data: *const u8,
+    mission: i32,
+    area: i32,
+    stage: i32,
+    kadaiFlag: i32,
+    clearFlag: i32,
+    endFlag: i32,
+) {
+    STATE.write().mono_init_start(
+        mono_data, mission, area, stage, kadaiFlag, clearFlag, endFlag,
+    );
 }
 
 /*
@@ -544,10 +553,6 @@ public static extern void DoPropPlacementFinalisation();
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetTutorialA(int page, int value);
-
-
-[DllImport("PS2KatamariSimulation")]
-private static extern void MonoInitStart(IntPtr monoData, int mission, int area, int stage, int kadaiFlag, int clearFlag, int endFlag);
 
 [DllImport("PS2KatamariSimulation")]
 private static extern int MonoInitAddProp(float posX, float posY, float posZ, float rotX, float rotY, float rotZ, float rotW, float sclX, float sclY, float sclZ, ushort u16MonoNameIdx, ushort u8LocPosType, short s8RandomLocGroupNo, short s16MonoMoveTypeNo, short s8MonoHitOnAreaNo, ushort u8MonoLinkActNo, ushort u8MonoExActTypeNo, ushort u8MonoIdNameNo, short s8MonoDispOffAreaNo, ushort u8VsMonoDropFlag, short s8MonoCommentNo, short s8MonoCommentGroupNo, short s8MonoTwinsNo, ushort u8MonoShakeOffFlag);

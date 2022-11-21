@@ -2,33 +2,70 @@ use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 
-use crate::mission::{GameMode, Mission};
+use crate::mission::{GameMode, Mission, Stage};
 
 /// Miscellaneous global game state.
 #[derive(Debug, Default)]
 pub struct GlobalState {
+    /// Set to true after `MonoInitStart` is called.
+    /// offset: 0xff0f0
+    pub did_init_start: bool,
+
     /// The current mission.
+    /// offset: 0xff104
     pub mission: Option<Mission>,
+
+    /// The current stage (which is the map - house, town, world, etc.)
+    /// offset: 0xff108
+    pub stage: Option<Stage>,
+
+    /// The current area.
+    /// offset: 0xff109
+    pub area: Option<u8>,
+
+    /// If true, the current mission is in VS mode.
+    /// offset: 0xff0f1
+    pub is_vs_mode: bool,
+
+    /// The number of ticks before the mission timer expires.
+    /// offset: 0xff120
+    pub remain_time_ticks: i32,
+
+    /// The current game time (in *real time*, not ticks).
+    /// offset: 0xff12c
+    pub game_time_ms: i32,
 
     /// The current game mode.
     pub gamemode: Option<GameMode>,
+
+    /// If true, ticking the physics engine has no effect (it's "frozen").
+    /// offset: 0x10daea
+    pub freeze: bool,
 
     /// (??) true when map is being changed (i.e. during a new area load).
     /// Presumably nothing should be moving while this is on.
     /// offset: 0x10daec
     pub map_change_mode: bool,
 
-    /// The current game time (in *real time*, not ticks).
-    /// offset: 0xff12c
-    pub game_time_ms: i32,
+    /// (??) too lazy to document this right now
+    /// offset: 0x10daf9
+    pub vs_mission_idx: u8,
 
-    /// The number of ticks before the mission timer expires.
-    /// offset: 0xff120
-    pub remain_time_ticks: i32,
+    /// The number of loaded theme props.
+    /// offset: 0x153198
+    pub num_theme_props: u16,
 
-    /// If true, ticking the physics engine has no effect (it's "frozen").
-    /// offset: 0x10daea
-    pub freeze: bool,
+    /// The number of loaded twin props.
+    /// offset: 0x155290
+    pub num_twin_props: u16,
+
+    /// The number of loaded tree root props.
+    /// offset: 0x155294
+    pub num_root_props: u16,
+
+    /// The control index of the next prop
+    /// offset: 0xd35325
+    pub next_ctrl_idx: i32,
 
     /// The "theme object" score in constellation levels (e.g. number of crabs in Make Cancer).
     pub catch_count_b: i32,
@@ -130,5 +167,24 @@ impl GlobalState {
 
     pub fn set_gamemode(&mut self, gamemode: i32) {
         self.gamemode = Some(gamemode.try_into().unwrap());
+    }
+
+    pub fn mono_init_start(&mut self, mission: u8, area: u8, stage: i32) {
+        self.stage = Some(stage.into());
+        self.did_init_start = true;
+
+        self.is_vs_mode = Mission::is_vs_mode(mission);
+        if self.is_vs_mode {
+            self.vs_mission_idx = mission - Mission::MIN_VS_MODE;
+        }
+
+        self.mission = Some(mission.into());
+        self.area = Some(area);
+        self.stage = Some(stage.into());
+
+        self.num_theme_props = 0;
+        self.num_twin_props = 0;
+        self.num_root_props = 0;
+        self.next_ctrl_idx = 0;
     }
 }

@@ -21,4 +21,4 @@ pub const NUM_MISSIONS: usize = 37;
 pub const MAX_PLAYERS: usize = 2;
 
 /// The maximum number of props in a mission.
-pub const MAX_PROPS: usize = 199;
+pub const MAX_PROPS: usize = 4000;
