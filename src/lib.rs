@@ -25,6 +25,7 @@ use gamestate::GameState;
 use gl_matrix::common::Mat4;
 use name_prop_config::NamePropConfig;
 use prince::OujiState;
+use prop::AddPropArgs;
 use static_init::dynamic;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
@@ -532,15 +533,72 @@ pub unsafe extern "C" fn MonoInitStart(
     );
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn MonoInitAddProp(
+    pos_x: f32,
+    pos_y: f32,
+    pos_z: f32,
+    rot_x: f32,
+    rot_y: f32,
+    rot_z: f32,
+    rot_w: f32,
+    scale_x: f32,
+    scale_y: f32,
+    scale_z: f32,
+    name_idx: u16,
+    loc_pos_type: u16,
+    random_group_id: u16,
+    mono_move_type: u16,
+    mono_hit_on_area: u16,
+    link_action: u16,
+    extra_action_type: u16,
+    unique_name_id: u16,
+    disp_off_area_no: u16,
+    vs_drop_flag: u16,
+    comment_id: u16,
+    comment_group_id: u16,
+    twin_id: u16,
+    shake_off_flag: u16,
+) {
+    let args = AddPropArgs {
+        pos_x: pos_x,
+        pos_y: pos_y,
+        pos_z: pos_z,
+        rot_x: rot_x,
+        rot_y: rot_y,
+        rot_z: rot_z,
+        rot_w: rot_w,
+        scale_x: scale_x,
+        scale_y: scale_y,
+        scale_z: scale_z,
+        name_idx: name_idx,
+        loc_pos_type: loc_pos_type,
+        random_group_id: random_group_id,
+        mono_move_type: mono_move_type,
+        mono_hit_on_area: mono_hit_on_area,
+        link_action: link_action,
+        extra_action_type: extra_action_type,
+        unique_name_id: unique_name_id,
+        disp_off_area_no: disp_off_area_no,
+        vs_drop_flag: vs_drop_flag,
+        comment_id: comment_id,
+        comment_group_id: comment_group_id,
+        twin_id: twin_id,
+        shake_off_flag: shake_off_flag,
+    };
+
+    STATE.write().add_prop(args);
+}
+
+// [DllImport("PS2KatamariSimulation")]
+// private static extern int MonoInitAddProp(short s8MonoTwinsNo, ushort u8MonoShakeOffFlag);
+
 /*
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjNum, bool isInit);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void Init(int playerIndex, float overRideSize, int mission);
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void ChangeNextArea();
@@ -553,10 +611,6 @@ public static extern void DoPropPlacementFinalisation();
 
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetTutorialA(int page, int value);
-
-[DllImport("PS2KatamariSimulation")]
-private static extern int MonoInitAddProp(float posX, float posY, float posZ, float rotX, float rotY, float rotZ, float rotW, float sclX, float sclY, float sclZ, ushort u16MonoNameIdx, ushort u8LocPosType, short s8RandomLocGroupNo, short s16MonoMoveTypeNo, short s8MonoHitOnAreaNo, ushort u8MonoLinkActNo, ushort u8MonoExActTypeNo, ushort u8MonoIdNameNo, short s8MonoDispOffAreaNo, ushort u8VsMonoDropFlag, short s8MonoCommentNo, short s8MonoCommentGroupNo, short s8MonoTwinsNo, ushort u8MonoShakeOffFlag);
-
 [DllImport("PS2KatamariSimulation")]
 public static extern void MonoInitAddPropSetParent(int placementIndex, int parentPlacementIndex);
 

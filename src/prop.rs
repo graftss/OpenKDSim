@@ -3,7 +3,14 @@ use gl_matrix::{
     mat4,
 };
 
-use crate::util::scale_sim_transform;
+use crate::{
+    gamestate::GameState,
+    global::GlobalState,
+    macros::{max_to_none, new_mat4_copy, new_mat4_id},
+    mono_data::MonoDataPropPtrs,
+    name_prop_config::NamePropConfig,
+    util::scale_sim_transform,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PropGlobalState {
@@ -92,6 +99,35 @@ impl Into<u8> for PropAnimationType {
     }
 }
 
+// holy cannoli what were they thinking
+#[derive(Debug)]
+pub struct AddPropArgs {
+    pub pos_x: f32,
+    pub pos_y: f32,
+    pub pos_z: f32,
+    pub rot_x: f32,
+    pub rot_y: f32,
+    pub rot_z: f32,
+    pub rot_w: f32,
+    pub scale_x: f32,
+    pub scale_y: f32,
+    pub scale_z: f32,
+    pub name_idx: u16,
+    pub loc_pos_type: u16,
+    pub random_group_id: u16,
+    pub mono_move_type: u16,
+    pub mono_hit_on_area: u16,
+    pub link_action: u16,
+    pub extra_action_type: u16,
+    pub unique_name_id: u16,
+    pub disp_off_area_no: u16,
+    pub vs_drop_flag: u16,
+    pub comment_id: u16,
+    pub comment_group_id: u16,
+    pub twin_id: u16,
+    pub shake_off_flag: u16,
+}
+
 pub type PropScript = fn(prop: Prop) -> ();
 
 #[derive(Debug, Default)]
@@ -127,7 +163,7 @@ pub struct Prop {
     /// offset: 0x14
     alpha: f32,
 
-    mono_move_type_no: u16,
+    move_type: u16,
 
     /// (??) The prop is intangible until the player loads this area.
     /// offset: 0x1a
@@ -135,7 +171,7 @@ pub struct Prop {
 
     /// (??) encodes the behavior of this prop relative to its child/parent
     /// offset: 0x1b
-    link_action: Option<PropLinkAction>,
+    link_action: Option<u16>,
 
     /// Encodes motion behavior innate to this prop's name index.
     /// offset: 0x1c
@@ -231,34 +267,34 @@ pub struct Prop {
 
     /// (??) name taken from unity code
     /// offset: 0x580
-    extra_action_type: u8,
+    extra_action_type: Option<u16>,
 
     /// The unique name id of this prop, if it has one.
     /// This can either be from being a "named" object, or from being a twinned object in Gemini.
     /// offset: 0x581
-    unique_name_id: u8,
+    unique_name_id: Option<u16>,
 
     /// The area at which this prop is destroyed.
     /// offset: 0x582
-    display_off_area: u8,
+    display_off_area: u16,
 
     /// (??)
     /// offset: 0x583
-    vs_drop_flag: u8,
+    vs_drop_flag: bool,
 
     /// The prop's concrete motion action.
     /// offset: 0x584
-    motion_action_type: u8,
+    motion_action_type: Option<u16>,
 
     /// (??) The prop's behavior type, which encodes the primary motion action, the alternate motion
     /// action, and the (???)
     /// offset: 0x585
-    behavior_type: u8,
+    behavior_type: Option<u16>,
 
     /// The prop's alternate concrete motion action, which can be triggered by various events
     /// (e.g. katamari gets close, or katamari collects this prop's parent, etc.)
     /// offset: 0x586
-    alt_motion_action_type: u8,
+    alt_motion_action_type: Option<u16>,
 
     /// (??) The prop's state while it's unattached.
     /// offset: 0x588
@@ -270,12 +306,12 @@ pub struct Prop {
 
     /// The ID of the king message that's played when this prop is collected, if any.
     /// offset: 0x58a
-    comment_id: Option<u8>,
+    comment_id: Option<u16>,
 
     /// The ID of the king message that's played when all props sharing this group ID are
     /// collected, if any.
     /// offset: 0x58b
-    comment_group_id: Option<u8>,
+    comment_group_id: Option<u16>,
 
     /// The unique ID of this prop's tree. All props in the same tree have the same ID.
     /// offset: 0x58c
@@ -382,12 +418,14 @@ pub struct Prop {
     /// offset: 0xa30
     collected_next: Option<Box<Prop>>,
 
+    mono_data_ptrs: MonoDataPropPtrs,
+
     /// True if this prop has a twin prop on the Gemini mission.
     /// offset: 0xb10
     has_twin: bool,
 
     /// The twin ID of this prop, if any. Both twins should have the same unique ID.
-    twin_id: Option<u8>,
+    twin_id: Option<u16>,
 
     /// If this prop has a Gemini twin, points to the twin prop.
     /// offset: 0xb18
@@ -403,6 +441,122 @@ pub struct Prop {
 }
 
 impl Prop {
+    pub fn new(state: &mut GameState, args: &AddPropArgs) -> Self {
+        let config = NamePropConfig::get(args.name_idx.into());
+
+        // initialize rotation matrix to identity
+        new_mat4_id!(rotation_mat);
+        // TODO: rotate `rotation_mat` by rotation angles in `args`
+
+        // save the initial rotation
+        new_mat4_copy!(init_rotation_mat, rotation_mat);
+
+        // initialize unattached transform to the initial rotation mat
+        new_mat4_copy!(unattached_transform, rotation_mat);
+        new_mat4_copy!(init_transform, unattached_transform);
+
+        // TODO
+        // lines 104-107 of `prop_init` (init comment)
+        // lines 108-149 of `prop_init` (init motion)
+        // lines 150-162 of `prop_init` (init random group)
+        // lines 163-190 of `prop_init` (init twin)
+        // lines 348-349 (find first subobject)
+        // lines 350-357 (init motion scripts)
+        // lines 358-364 (init aabb)
+        // lines 365-367 (init links to other props)
+        // lines 368-371, 392-401 (init wobble state)
+        // lines 373-384 (init generated prop??)
+        // line 385
+        // lines 386-391 (init fish)
+
+        let mono_data_ptrs = state
+            .mono_data
+            .props
+            .get(args.name_idx as usize)
+            .unwrap()
+            .clone();
+
+        Prop {
+            ctrl_idx: state.global.get_next_ctrl_idx().try_into().unwrap(),
+            name_idx: args.name_idx,
+            flags: 0,
+            global_state: PropGlobalState::Unattached,
+            flags2: 0,
+            force_disabled: false,
+            display_off: false,
+            alpha: 1.0,
+            move_type: args.mono_move_type,
+            hit_on_area: args.mono_hit_on_area.try_into().unwrap(),
+            link_action: max_to_none!(u16, args.link_action),
+            innate_motion_type: config.innate_motion_type,
+            innate_motion_state: 0,
+            has_path_motion_action: false,
+            disable_wobble: args.shake_off_flag != 0,
+            has_moving_motion: false,
+            next_sibling: None,
+            first_child: None,
+            init_area: state.global.area.unwrap(),
+            init_pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
+            rotation_mat: rotation_mat,
+            pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
+            rotation_vec: [args.rot_x, args.rot_y, args.rot_z, args.rot_w],
+            scale: [1.0, 1.0, 1.0, 1.0],
+            last_pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
+            last_rotation_vec: [args.rot_x, args.rot_y, args.rot_z, args.rot_w],
+            init_rotation_vec: [args.rot_x, args.rot_y, args.rot_z, args.rot_w],
+            unattached_transform: unattached_transform,
+            init_rotation_mat: init_rotation_mat,
+            init_transform: init_transform,
+            motion_transform: [0.0; 16],
+            extra_action_type: max_to_none!(u16, args.extra_action_type),
+            unique_name_id: max_to_none!(u16, args.unique_name_id),
+            display_off_area: args.disp_off_area_no,
+            vs_drop_flag: args.vs_drop_flag != 0,
+            unattached_state: PropUnattachedState::Normal,
+            animation_type: PropAnimationType::Waiting,
+            comment_id: max_to_none!(u16, args.comment_id),
+            comment_group_id: max_to_none!(u16, args.comment_group_id),
+            tree_group_id: None, // TODO
+            stationary: true,
+            force_no_wobble: false,
+            onattach_added_vol: 0.0,
+            onattach_remain_ticks: 0,
+            onattach_game_time_ms: 0,
+            attached_transform: [0.0; 16],
+            kat_center_offset: [0.0; 4],
+            kat_collision_vel: [0.0; 4],
+            last_dist_to_p0: 0.0,
+            last_dist_to_p1: 0.0,
+            dist_to_p0: 0.0,
+            dist_to_p1: 0.0,
+            remain_knockoff_volume: 0.0,
+            collected_before: None,
+            collected_next: None,
+            has_twin: args.twin_id != u16::MAX,
+            twin_id: max_to_none!(u16, args.twin_id),
+            mono_data_ptrs: mono_data_ptrs,
+
+            // TODO
+            first_subobject: None, // TODO
+            script_0x560: None,    // TODO
+            motion_script: None,   // TODO
+            innate_script: None,
+            parent_prop: None,            // TODO
+            motion_action_type: None,     // TODO
+            behavior_type: None,          // TODO
+            alt_motion_action_type: None, // TODO
+            radius: 0.0,
+            aabb_vol_m3: 0.0,
+            compare_vol_m3: 0.0,
+            added_vol_m3: 0.0,
+            exact_collect_diam_cm: 0.0,
+            collect_diam_mm: 0,
+            aabb_size: [0.0; 3],
+            collision_mesh: (),
+            twin_prop: None,
+        }
+    }
+
     pub fn is_initialized(&self) -> bool {
         self.name_idx != u16::MAX
     }

@@ -187,4 +187,10 @@ impl GlobalState {
         self.num_root_props = 0;
         self.next_ctrl_idx = 0;
     }
+
+    pub fn get_next_ctrl_idx(&mut self) -> i32 {
+        let result = self.next_ctrl_idx;
+        self.next_ctrl_idx += 1;
+        result
+    }
 }

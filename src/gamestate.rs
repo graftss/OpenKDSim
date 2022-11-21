@@ -1,7 +1,16 @@
 use crate::{
-    camera::Camera, constants::MAX_PLAYERS, delegates::Delegates, ending::EndingState,
-    global::GlobalState, input::Input, katamari::Katamari, mission::MissionConfig,
-    mono_data::MonoData, preclear::PreclearState, prince::Prince, prop::Prop,
+    camera::Camera,
+    constants::MAX_PLAYERS,
+    delegates::Delegates,
+    ending::EndingState,
+    global::GlobalState,
+    input::Input,
+    katamari::Katamari,
+    mission::MissionConfig,
+    mono_data::MonoData,
+    preclear::PreclearState,
+    prince::Prince,
+    prop::{AddPropArgs, Prop},
 };
 
 #[derive(Debug, Default)]
@@ -183,5 +192,9 @@ impl GameState {
         // TODO: init comment prop groups
         // TODO: init random prop groups
         // TODO: init generated props
+    }
+
+    pub fn add_prop(&mut self, args: AddPropArgs) {
+        let ctrl_idx = self.global.get_next_ctrl_idx();
     }
 }

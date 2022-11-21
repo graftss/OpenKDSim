@@ -33,7 +33,34 @@ macro_rules! read_f32 {
     };
 }
 
+macro_rules! max_to_none {
+    ($ty: ty, $value: expr) => {
+        if ($value) == <$ty>::MAX {
+            None
+        } else {
+            Some($value)
+        }
+    };
+}
+
+macro_rules! new_mat4_id {
+    ($ident: ident) => {
+        let mut $ident = [0.0; 16];
+        mat4::identity(&mut $ident);
+    };
+}
+
+macro_rules! new_mat4_copy {
+    ($ident: ident, $src: expr) => {
+        let mut $ident = [0.0; 16];
+        mat4::copy(&mut $ident, &$src);
+    };
+}
+
 pub(crate) use {
+    max_to_none,
+    new_mat4_copy,
+    new_mat4_id,
     read_bool,
     read_f32,
     // read_i32,
