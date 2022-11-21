@@ -32,7 +32,7 @@ impl GameState {
         &self.katamaris[player as usize]
     }
 
-    pub fn write_katamari(&mut self, player: i32) -> &mut Katamari {
+    pub fn borrow_mut_katamari(&mut self, player: i32) -> &mut Katamari {
         &mut self.katamaris[player as usize]
     }
 
@@ -40,11 +40,11 @@ impl GameState {
         &self.princes[player as usize]
     }
 
-    pub fn write_prince(&mut self, player: i32) -> &mut Prince {
+    pub fn borrow_mut_prince(&mut self, player: i32) -> &mut Prince {
         &mut self.princes[player as usize]
     }
 
-    pub fn read_camera(&self, player: i32) -> &Camera {
+    pub fn borrow_camera(&self, player: i32) -> &Camera {
         &self.cameras[player as usize]
     }
 
@@ -56,7 +56,7 @@ impl GameState {
         &self.inputs[player as usize]
     }
 
-    pub fn write_input(&mut self, player: i32) -> &mut Input {
+    pub fn borrow_mut_input(&mut self, player: i32) -> &mut Input {
         &mut self.inputs[player as usize]
     }
 
@@ -123,15 +123,15 @@ impl GameState {
     pub fn set_game_start(&mut self, player: i32, _area: i32) {
         self.global.freeze = false;
         self.global.map_change_mode = false;
-        self.write_prince(player).set_ignore_input_timer(0);
+        self.borrow_mut_prince(player).set_ignore_input_timer(0);
     }
 
     /// Mimicks the `SetAreaChange` API function.
     pub fn set_area_change(&mut self, player: i32) {
         self.global.freeze = true;
         self.global.map_change_mode = true;
-        self.write_prince(player).set_ignore_input_timer(-1);
-        self.write_katamari(player).set_immobile();
+        self.borrow_mut_prince(player).set_ignore_input_timer(-1);
+        self.borrow_mut_katamari(player).set_immobile();
     }
 
     /// Mimicks the `SetMapChangeMode` API function.
@@ -170,6 +170,7 @@ impl GameState {
         num_props
     }
 
+    // Mimicks the `MonoInitStart` API function.
     pub unsafe fn mono_init_start(
         &mut self,
         mono_data: *const u8,
@@ -194,7 +195,20 @@ impl GameState {
         // TODO: init generated props
     }
 
-    pub fn add_prop(&mut self, args: AddPropArgs) {
-        let ctrl_idx = self.global.get_next_ctrl_idx();
+    // Mimicks the `MonoInitAddProp` API function.
+    pub fn add_prop(&mut self, args: AddPropArgs) -> i32 {
+        let prop = Prop::new(self, &args);
+        let result = prop.get_ctrl_idx().into();
+        self.props.push(prop);
+        result
+    }
+
+    // Mimicks the `MonoInitAddPropSetParent` API function.
+    pub fn add_prop_set_parent(&mut self, ctrl_idx: i32, parent_ctrl_idx: i32) {
+        let child = self.props.get(ctrl_idx as usize).unwrap();
+
+        if (parent_ctrl_idx < 0) {
+            self.global.num_root_props += 1;
+        }
     }
 }

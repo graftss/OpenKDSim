@@ -107,13 +107,13 @@ impl NamePropConfig {
         &NAME_PROP_CONFIGS[name_idx as usize]
     }
 
-    pub fn read_from_data(configs: &mut [NamePropConfig; NUM_NAME_PROPS]) {
+    pub fn read_from_data(configs: &mut Vec<NamePropConfig>) {
         Self::read_name_prop_0x30_table(configs);
         Self::read_name_prop_mono_data_offsets(configs);
     }
 
     /// Copy the `name_prop_0x30_table` file into the `NamePropConfig` array.
-    fn read_name_prop_0x30_table(configs: &mut [NamePropConfig; NUM_NAME_PROPS]) {
+    fn read_name_prop_0x30_table(configs: &mut Vec<NamePropConfig>) {
         let table = NP_0X30_TABLE;
         let ENTRY_SIZE = 0x30;
 
@@ -142,7 +142,7 @@ impl NamePropConfig {
     }
 
     /// Copy the `name_prop_mono_data_offsets.bin` file into the `NamePropConfig` array.
-    fn read_name_prop_mono_data_offsets(configs: &mut [NamePropConfig; NUM_NAME_PROPS]) {
+    fn read_name_prop_mono_data_offsets(configs: &mut Vec<NamePropConfig>) {
         let table = NP_MONO_DATA_OFFSETS;
 
         for (name_idx, config) in configs.iter_mut().enumerate() {
@@ -152,8 +152,8 @@ impl NamePropConfig {
 }
 
 lazy_static! {
-    pub static ref NAME_PROP_CONFIGS: [NamePropConfig; NUM_NAME_PROPS] = unsafe {
-        let mut configs: [NamePropConfig; NUM_NAME_PROPS] = std::mem::zeroed();
+    pub static ref NAME_PROP_CONFIGS: Vec<NamePropConfig> = unsafe {
+        let mut configs: Vec<NamePropConfig> = vec![];
         NamePropConfig::read_from_data(&mut configs);
         configs
     };

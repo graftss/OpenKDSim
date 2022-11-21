@@ -1,51 +1,68 @@
-#![allow(non_snake_case, dead_code)]
+//! A doubly-linked list in 50 LOCs of stable and safe Rust.
+// Backup-fork of https://play.rust-lang.org/?gist=c3db81ec94bf231b721ef483f58deb35
+use std::cell::RefCell;
+use std::fmt::Display;
+use std::rc::{Rc, Weak};
 
-use crate::gamestate::GameState;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use std::path::Path;
+type Prop = Rc<RefCell<InnerProp>>;
 
-// reference this first so it's available to all other modules
-mod macros;
+#[derive(Debug)]
+struct InnerProp {
+    ctrl_idx: i32,
+    parent: Option<Prop>,
+    child: Option<Prop>,
+    next_sibling: Option<Prop>,
+}
 
-mod camera;
-mod constants;
-mod delegates;
-mod ending;
-mod gamestate;
-mod global;
-mod input;
-mod katamari;
-mod mission;
-mod mono_data;
-mod name_prop_config;
-mod preclear;
-mod prince;
-mod prop;
-mod util;
+impl InnerProp {
+    pub fn new(ctrl_idx: i32) -> Prop {
+        Rc::new(RefCell::new(Self {
+            ctrl_idx: ctrl_idx,
+            parent: None,
+            child: None,
+            next_sibling: None,
+        }))
+    }
 
-thread_local! { static STATE: GameState = GameState::default(); }
+    pub fn display_link(link: &Option<Prop>) -> String {
+        match link {
+            Some(p) => format!("{}", p.borrow().ctrl_idx),
+            None => format!("None"),
+        }
+    }
 
-pub fn debug_log(str: &str) {
-    let path = Path::new(
-        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log",
-    );
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open(path)
-        .unwrap();
-
-    if let Err(_e) = writeln!(file, "{}", str) {
-        eprintln!("oopsie");
+    pub fn display(&self) -> String {
+        format!(
+            "Prop(id={}, parent={}, child={}, next_sib={})",
+            self.ctrl_idx,
+            InnerProp::display_link(&self.parent),
+            InnerProp::display_link(&self.child),
+            InnerProp::display_link(&self.next_sibling),
+        )
     }
 }
 
-pub fn main() {
-    println!("hi");
+fn set_child_link(child: &Prop, parent: &Prop) {
+    let mut child_ref = child.borrow_mut();
+    child_ref.parent = Some(parent.clone());
 
-    STATE.with(|state| {
-        let prop = &state.props.get(2000).unwrap();
-        println!("radius: {:?}", prop.get_radius());
-    });
+    let mut x = parent.borrow_mut();
+    x.child = Some(child.clone());
+}
+
+fn main() {
+    let a = InnerProp::new(0);
+    let b = InnerProp::new(1);
+    let c = InnerProp::new(3);
+
+    println!("a={}", a.borrow().display());
+    println!("b={}", b.borrow().display());
+    println!("c={}\n\n", c.borrow().display());
+
+    set_child_link(&a, &b);
+    set_child_link(&b, &c);
+
+    println!("a={}", a.borrow().display());
+    println!("b={}", b.borrow().display());
+    println!("c={}\n\n", c.borrow().display());
 }

@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use gl_matrix::{
     common::{Mat4, Vec3, Vec4},
     mat4,
@@ -131,7 +133,7 @@ pub struct AddPropArgs {
 pub type PropScript = fn(prop: Prop) -> ();
 
 #[derive(Debug, Default)]
-pub struct Prop {
+pub struct PropNode {
     /// The unique id of this prop.
     /// offset: 0x0
     ctrl_idx: u16,
@@ -195,11 +197,11 @@ pub struct Prop {
 
     /// The next sibling of this prop in its family tree.
     /// offset: 0x28
-    next_sibling: Option<Box<Prop>>,
+    next_sibling: Option<Prop>,
 
     /// The first child of this prop in its family tree.
     /// offset: 0x30
-    first_child: Option<Box<Prop>>,
+    first_child: Option<Prop>,
 
     /// The area in which this prop loaded.
     /// offset: 0x38
@@ -263,7 +265,7 @@ pub struct Prop {
 
     /// The prop's parent, if it has one.
     /// offset: 0x578
-    parent_prop: Option<Box<Prop>>,
+    parent_prop: Option<Prop>,
 
     /// (??) name taken from unity code
     /// offset: 0x580
@@ -412,11 +414,11 @@ pub struct Prop {
 
     /// If this prop is attached, points to the prop that was attached before this (if one exists).
     /// offset: 0xa28
-    collected_before: Option<Box<Prop>>,
+    collected_before: Option<Prop>,
 
     /// If this prop is attached, points to the prop that was attached after this (if one exists).
     /// offset: 0xa30
-    collected_next: Option<Box<Prop>>,
+    collected_next: Option<Prop>,
 
     mono_data_ptrs: MonoDataPropPtrs,
 
@@ -429,7 +431,7 @@ pub struct Prop {
 
     /// If this prop has a Gemini twin, points to the twin prop.
     /// offset: 0xb18
-    twin_prop: Option<Box<Prop>>,
+    twin_prop: Option<Prop>,
 
     /// The transform matrix of this prop when it was loaded.
     /// offset: 0xb24
@@ -440,7 +442,9 @@ pub struct Prop {
     init_rotation_vec: Vec4,
 }
 
-impl Prop {
+pub type Prop = Rc<RefCell<PropNode>>;
+
+impl PropNode {
     pub fn new(state: &mut GameState, args: &AddPropArgs) -> Self {
         let config = NamePropConfig::get(args.name_idx.into());
 
@@ -476,7 +480,7 @@ impl Prop {
             .unwrap()
             .clone();
 
-        Prop {
+        PropNode {
             ctrl_idx: state.global.get_next_ctrl_idx().try_into().unwrap(),
             name_idx: args.name_idx,
             flags: 0,
@@ -555,6 +559,10 @@ impl Prop {
             collision_mesh: (),
             twin_prop: None,
         }
+    }
+
+    pub fn get_ctrl_idx(&self) -> u16 {
+        self.ctrl_idx
     }
 
     pub fn is_initialized(&self) -> bool {
@@ -648,6 +656,18 @@ impl Prop {
 
     pub fn set_disabled(&mut self, force_disabled: i32) {
         self.force_disabled = force_disabled != 0;
+    }
+
+    pub fn set_parent(&mut self, parent: Option<Box<Prop>>) {
+        // if let Some(parent_box) = parent {
+        //     self.flags |= 0x2;
+        //     self.parent_prop = *parent;
+        //     parent_box.disable_wobble = true;
+        // } else {
+        //     self.flags &= 0xfd;
+        //     self.parent_prop = None;
+        //     self.tree_group_id = None;
+        // }
     }
 
     /// Used by the `GetPropAttached` API function.
