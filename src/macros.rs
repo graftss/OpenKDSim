@@ -1,3 +1,18 @@
+/// Log a formatted strings.
+macro_rules! log {
+    ($($y: expr),+) => {
+        crate::util::debug_log(&format!($($y),+));
+    }
+}
+
+/// Log a formatted string, then panic.
+macro_rules! panic_log {
+    ($($y: expr),+) => {
+        crate::util::debug_log(&format!($($y),+));
+        panic!();
+    }
+}
+
 /// Read a `bool` value from a `$table` expression at the offset `$offset`.
 macro_rules! read_bool {
     ($table: ident, $offset: expr) => {
@@ -58,9 +73,11 @@ macro_rules! new_mat4_copy {
 }
 
 pub(crate) use {
+    log,
     max_to_none,
     new_mat4_copy,
     new_mat4_id,
+    panic_log,
     read_bool,
     read_f32,
     // read_i32,

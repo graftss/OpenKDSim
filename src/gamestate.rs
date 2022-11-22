@@ -8,6 +8,7 @@ use crate::{
     global::GlobalState,
     input::Input,
     katamari::Katamari,
+    macros::panic_log,
     mission::MissionConfig,
     mono_data::MonoData,
     name_prop_config::NamePropConfig,
@@ -212,7 +213,7 @@ impl GameState {
     // Mimicks the `MonoInitAddPropSetParent` API function.
     pub fn add_prop_set_parent(&mut self, ctrl_idx: i32, parent_ctrl_idx: i32) {
         let child_rc = self.props.get(ctrl_idx as usize).unwrap_or_else(|| {
-            panic!("called `add_prop_set_parent` on a nonexistent prop: {ctrl_idx}")
+            panic_log!("called `add_prop_set_parent` on a nonexistent prop: {ctrl_idx}");
         });
         if let Some(parent_rc) = self.props.get(parent_ctrl_idx as usize) {
             // adding a parent prop to the child
@@ -250,7 +251,5 @@ impl GameState {
         NamePropConfig::get(name_idx.into()).internal_name.as_ptr()
     }
 
-    pub fn tick(&mut self) {
-        
-    }
+    pub fn tick(&mut self) {}
 }

@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     constants::{MAX_PLAYERS, NUM_MISSIONS},
-    macros::{read_bool, read_f32, read_u16, read_u8},
+    macros::{panic_log, read_bool, read_f32, read_u16, read_u8},
     util::vec4_from_le_bytes,
 };
 
@@ -20,15 +20,17 @@ pub enum Stage {
 }
 
 impl From<i32> for Stage {
-    fn from(val: i32) -> Self {
-        match val {
+    fn from(value: i32) -> Self {
+        match value {
             1 => Self::House,
             2 => Self::Town,
             3 => Self::World,
             9 => Self::Ending,
             10 => Self::VsMode,
             12 => Self::Tutorial,
-            _ => panic!("invalid stage number"),
+            _ => {
+                panic_log!("encountered unknown `Stage` value: {}", value);
+            }
         }
     }
 }
@@ -66,21 +68,21 @@ pub enum GameType {
     Eternal = 8,
 }
 
-impl TryFrom<u8> for GameType {
-    type Error = ();
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+impl From<u8> for GameType {
+    fn from(value: u8) -> Self {
         match value {
-            0 => Ok(Self::ClearSize),
-            1 => Ok(Self::ClearProps),
-            2 => Ok(Self::NumThemeProps),
-            3 => Ok(Self::ClearNumProps),
-            4 => Ok(Self::GameTypeD),
-            5 => Ok(Self::NorthStar),
-            6 => Ok(Self::GameTypeF),
-            7 => Ok(Self::GameTypeS),
-            8 => Ok(Self::Eternal),
-            _ => panic!("unrecognized `GameType`"),
+            0 => Self::ClearSize,
+            1 => Self::ClearProps,
+            2 => Self::NumThemeProps,
+            3 => Self::ClearNumProps,
+            4 => Self::GameTypeD,
+            5 => Self::NorthStar,
+            6 => Self::GameTypeF,
+            7 => Self::GameTypeS,
+            8 => Self::Eternal,
+            _ => {
+                panic_log!("encountered unknown `GameType` value: {}", value);
+            }
         }
     }
 }
@@ -146,8 +148,8 @@ impl Mission {
 }
 
 impl From<u8> for Mission {
-    fn from(val: u8) -> Self {
-        match val {
+    fn from(value: u8) -> Self {
+        match value {
             0 => Self::None,               // king talking???
             1 => Self::MAS1,               // MAS1
             2 => Self::MAS2,               // MAS2
@@ -193,7 +195,9 @@ impl From<u8> for Mission {
             42 => Self::Test2,    // nothing loads
             43 => Self::Test3,    // nothing loads
             44 => Self::Test4,    // nothing loads
-            _ => panic!("invalid mission id"),
+            _ => {
+                panic_log!("encountered unknown `Mission` value: {}", value);
+            }
         }
     }
 }
@@ -207,17 +211,17 @@ pub enum GameMode {
     Load = 4,
 }
 
-impl TryFrom<i32> for GameMode {
-    type Error = ();
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
+impl From<i32> for GameMode {
+    fn from(value: i32) -> Self {
         match value {
-            0 => Ok(Self::Normal),
-            1 => Ok(Self::Tutorial),
-            2 => Ok(Self::TutorialB),
-            3 => Ok(Self::Ending),
-            4 => Ok(Self::Load),
-            _ => panic!("unrecognized gamemode"),
+            0 => Self::Normal,
+            1 => Self::Tutorial,
+            2 => Self::TutorialB,
+            3 => Self::Ending,
+            4 => Self::Load,
+            _ => {
+                panic_log!("encountered unknown `GameMode` value: {}", value);
+            }
         }
     }
 }

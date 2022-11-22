@@ -27,8 +27,10 @@ use gl_matrix::common::Mat4;
 use name_prop_config::NamePropConfig;
 use prince::OujiState;
 use prop::AddPropArgs;
-use util::debug_log;
 use std::cell::RefCell;
+use util::debug_log;
+
+use crate::macros::panic_log;
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());
@@ -482,7 +484,7 @@ pub unsafe extern "C" fn MonoGetPlacementDataFloat(ctrl_idx: i32, data_type: i32
     if data_type == 0xf {
         STATE.with(|state| state.borrow().read_prop_ref(ctrl_idx).borrow().get_radius())
     } else {
-        panic!("unexpected `data_type` in `MonOGetPlacementDataFloat`.");
+        panic_log!("unexpected `data_type` in `MonOGetPlacementDataFloat`.");
     }
 }
 

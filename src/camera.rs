@@ -1,5 +1,48 @@
 use gl_matrix::common::{Mat4, Vec4};
 
+use crate::macros::log;
+
+enum CameraMode {
+    Normal,
+    JumpR1,
+    LookL1,
+    HitByProp,
+    Clear,
+    Shoot,
+    ShootRet,
+    Ending1,
+    Ending2,
+    Ending3,
+    AreaChange,
+    ClearGoalProp,
+    VsResult,
+    Unknown(i32),
+}
+
+impl From<i32> for CameraMode {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => CameraMode::Normal,
+            1 => CameraMode::JumpR1,
+            2 => CameraMode::LookL1,
+            3 => CameraMode::HitByProp,
+            4 => CameraMode::Clear,
+            5 => CameraMode::Shoot,
+            6 => CameraMode::ShootRet,
+            7 => CameraMode::Ending1,
+            8 => CameraMode::Ending2,
+            9 => CameraMode::Ending3,
+            10 => CameraMode::AreaChange,
+            11 => CameraMode::ClearGoalProp,
+            12 => CameraMode::VsResult,
+            _ => {
+                log!("encountered unknown `CameraMode` value: {}", value);
+                CameraMode::Unknown(value)
+            }
+        }
+    }
+}
+
 /// General camera state.
 /// offset: 0x192ee0
 /// width: 0x980
