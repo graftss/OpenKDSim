@@ -24,6 +24,7 @@ mod preclear;
 mod prince;
 mod prop;
 mod prop_motion;
+mod tutorial;
 mod util;
 
 thread_local! {

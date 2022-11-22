@@ -18,6 +18,7 @@ mod preclear;
 mod prince;
 mod prop;
 mod prop_motion;
+mod tutorial;
 mod util;
 
 use core::{panic, slice};
@@ -28,7 +29,6 @@ use name_prop_config::NamePropConfig;
 use prince::OujiState;
 use prop::AddPropArgs;
 use std::cell::RefCell;
-use util::debug_log;
 
 use crate::macros::panic_log;
 
@@ -680,8 +680,6 @@ pub unsafe extern "C" fn MonoInitAddProp(
         shake_off_flag,
     };
 
-    debug_log(&format!("{:#?}", args));
-
     STATE.with(|state| state.borrow_mut().add_prop(args))
 }
 
@@ -714,11 +712,6 @@ pub unsafe extern "C" fn MonoGetHitOffsetGround(_ctrl_idx: f32) -> f32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn Tick(_delta: f32) {
-    // TODO, obviously
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn SetCameraMode(player: i32, mode: i32) {
     STATE.with(|state| state.borrow_mut().set_camera_mode(player, mode));
 }
@@ -732,19 +725,46 @@ pub unsafe extern "C" fn SetCameraCheckScaleUp(player: i32, flag: i32) {
     });
 }
 
-/*
-    [DllImport("PS2KatamariSimulation")]
-    public static extern void SetPreclearMode(int mode);
+#[no_mangle]
+pub unsafe extern "C" fn SetPreclearMode(mode: i32) {
+    STATE.with(|state| {
+        state.borrow_mut().preclear.set_mode(mode != 0);
+    });
+}
 
-    [DllImport("PS2KatamariSimulation")]
-    public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjNum, bool isInit);
+#[no_mangle]
+pub unsafe extern "C" fn SetTutorialA(page: i32, page_step: i32) {
+    STATE.with(|state| state.borrow_mut().tutorial.set_page(page, page_step));
+}
 
-    [DllImport("PS2KatamariSimulation")]
-    public static extern void ChangeNextArea();
+#[no_mangle]
+pub unsafe extern "C" fn SetStoreFlag(flag: i32) {
+    STATE.with(|state| state.borrow_mut().set_store_flag(flag != 0));
+}
 
-    [DllImport("PS2KatamariSimulation")]
-    public static extern void SetTutorialA(int page, int value);
+#[no_mangle]
+pub unsafe extern "C" fn ChangeNextArea() {
+    STATE.with(|state| state.borrow_mut().change_next_area());
+}
 
-    [DllImport("PS2KatamariSimulation")]
-    public static extern void SetStoreFlag(int flag);
-*/
+#[no_mangle]
+pub unsafe extern "C" fn Tick(delta: f32) {
+    STATE.with(|state| state.borrow_mut().tick(delta));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Init() {
+    STATE.with(|state| state.borrow_mut().init());
+}
+
+/// This seems to be what simulates a single object in the collection UI and the names UI.
+/// Not a priority.
+#[no_mangle]
+pub unsafe extern "C" fn ProcMonoCtrl(
+    _ctrl_idx: i32,
+    _name_idx: i32,
+    _subobj_nm: i32,
+    _is_init: i32,
+) {
+    // TODO
+}

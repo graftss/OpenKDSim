@@ -22,4 +22,8 @@ impl PreclearState {
     pub fn get_alpha(&self) -> f32 {
         self.fog_alpha
     }
+
+    pub fn set_mode(&mut self, _flag: bool) {
+        // TODO: implement `SetPreclearMode`
+    }
 }

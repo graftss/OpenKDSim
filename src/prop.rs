@@ -832,4 +832,14 @@ impl Prop {
         // `out[2]` if the prop alpha (quantized to a `u8` value)
         *out.offset(2) = (self.alpha * 255.0) as u8;
     }
+
+    /// Returns `true` if this prop should be destroyed when the area `area` loads.
+    pub fn check_destroy_on_area_load(&self, area: u8) -> bool {
+        let should_destroy = self.display_off_area.map_or(false, |a| a == area.into())
+            && self.global_state != PropGlobalState::Attached;
+
+        // TODO: if `should_destroy` is true, call `prop_destroy`
+
+        should_destroy
+    }
 }

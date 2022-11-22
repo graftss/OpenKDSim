@@ -16,6 +16,7 @@ use crate::{
     prince::Prince,
     prop::{AddPropArgs, Prop, PropRef},
     prop_motion::GlobalPathState,
+    tutorial::TutorialState,
 };
 
 #[derive(Debug, Default)]
@@ -28,6 +29,7 @@ pub struct GameState {
     pub props: Vec<PropRef>,
     pub global_paths: Vec<GlobalPathState>,
     pub preclear: PreclearState,
+    pub tutorial: TutorialState,
     pub ending: EndingState,
     pub delegates: Delegates,
     pub mono_data: MonoData,
@@ -258,12 +260,43 @@ impl GameState {
         }
     }
 
+    /// Mimicks the `SetCameraCheckScaleUp` API function.
     pub fn set_camera_check_scale_up(&mut self, player: i32, flag: bool) {
         if let Some(camera) = self.cameras.get_mut(player as usize) {
             camera.check_scale_up(flag);
         }
     }
 
+    /// Mimicks the `SetStoreFlag` API function.
+    pub fn set_store_flag(&mut self, _flag: bool) {
+        // TODO
+    }
+
+    /// Mimicks the `ChangeNextArea` API function.
+    pub fn change_next_area(&mut self) {
+        let old_updating_player = self.global.updating_player;
+
+        self.global.area.map(|v| v + 1);
+        self.global.stage_area += 1;
+        let new_area = self.global.area.unwrap();
+
+        if self.global.is_vs_mode {
+            // TODO: vs mode crap
+        } else {
+            // destroy props which have the new area as their "display off" area.
+            self.props.retain(|prop_ref| {
+                let prop_cell = prop_ref.clone();
+                let prop = prop_cell.borrow_mut();
+                prop.check_destroy_on_area_load(new_area)
+            });
+        }
+
+        self.global.updating_player = old_updating_player;
+    }
+
+    /// Mimicks the `Init` API function.
+    pub fn init(&mut self) {}
+
     /// Mimicks the `Tick` API function.
-    pub fn tick(&mut self) {}
+    pub fn tick(&mut self, _delta: f32) {}
 }

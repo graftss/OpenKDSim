@@ -11,15 +11,25 @@ pub struct GlobalState {
     /// offset: 0xff0f0
     pub did_init_start: bool,
 
+    /// The player whose state is being updated.
+    /// offset: 0xff0f4
+    pub updating_player: u8,
+
     /// The current mission.
     /// offset: 0xff104
     pub mission: Option<Mission>,
+
+    /// The *unique* id of the currently loaded area among all other areas in the game.
+    /// The House stage has ids 0-4, Town has 5-8, and World has 9+.
+    /// offset: 0xff106
+    pub stage_area: u8,
 
     /// The current stage (which is the map - house, town, world, etc.)
     /// offset: 0xff108
     pub stage: Option<Stage>,
 
-    /// The current area.
+    /// The current loaded area of the current stage, where the smallest
+    /// area of each stage is 0.
     /// offset: 0xff109
     pub area: Option<u8>,
 
