@@ -23,6 +23,7 @@ mod name_prop_config;
 mod preclear;
 mod prince;
 mod prop;
+mod prop_motion;
 mod util;
 
 thread_local! {

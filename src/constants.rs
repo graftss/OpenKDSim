@@ -22,3 +22,33 @@ pub const MAX_PLAYERS: usize = 2;
 
 /// The maximum number of props in a mission.
 pub const MAX_PROPS: usize = 4000;
+
+pub struct PhysicsConstants {
+    /// The ratio of vertical velocity a prop keeps after bouncing off of a surface while airborne.
+    /// offset: 0x155230
+    prop_vertical_vel_decay_after_bounce: f32,
+
+    /// The ratio of lateral velocity a prop keeps after bouncing off of a surface while airborne.
+    /// offset: 0x155234
+    prop_lateral_vel_decay_after_bounce: f32,
+
+    /// The number of ticks a prop spends spinning on the ground after finishing airborne bouncing.
+    /// offset: 0x155240
+    prop_spin_after_landing_ticks: i32,
+
+    /// When a katamari and prop collide, this is the minimum angle difference in their movement
+    /// directions which can cause the prop to wobble.
+    /// offset: 0x155244
+    prop_min_hit_angle_for_wobble_deg: f32,
+}
+
+impl Default for PhysicsConstants {
+    fn default() -> Self {
+        Self {
+            prop_vertical_vel_decay_after_bounce: 0.46,
+            prop_lateral_vel_decay_after_bounce: 0.46,
+            prop_spin_after_landing_ticks: 60,
+            prop_min_hit_angle_for_wobble_deg: 70.0,
+        }
+    }
+}

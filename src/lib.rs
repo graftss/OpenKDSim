@@ -17,6 +17,7 @@ mod name_prop_config;
 mod preclear;
 mod prince;
 mod prop;
+mod prop_motion;
 mod util;
 
 use core::{panic, slice};
@@ -692,7 +693,15 @@ pub unsafe extern "C" fn MonoInitAddPropSetParent(ctrl_idx: i32, parent_ctrl_idx
     })
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn MonoInitEnd() {
+    STATE.with(|state| {
+        state.borrow_mut().mono_init_end();
+    });
+}
+
 /*
+
 [DllImport("PS2KatamariSimulation")]
 public static extern void SetPreclearMode(int mode);
 
@@ -706,13 +715,8 @@ public static extern void ChangeNextArea();
 public static extern void Tick(float delta);
 
 [DllImport("PS2KatamariSimulation")]
-public static extern void DoPropPlacementFinalisation();
-
-[DllImport("PS2KatamariSimulation")]
 public static extern void SetTutorialA(int page, int value);
 
-[DllImport("PS2KatamariSimulation")]
-private static extern void MonoInitEnd();
 
     [DllImport("PS2KatamariSimulation")]
     private static extern float MonoGetHitOffsetGround(int placementIndex);

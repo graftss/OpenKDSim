@@ -50,6 +50,11 @@ pub struct GlobalState {
     /// offset: 0x10daec
     pub map_change_mode: bool,
 
+    /// (??) Set to true after `MonoInitEnd` is finished to signify that all
+    /// props have been initialized.
+    /// offset: 0x10daed
+    pub props_initialized: bool,
+
     /// (??) too lazy to document this right now
     /// offset: 0x10daf9
     pub vs_mission_idx: u8,

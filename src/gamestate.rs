@@ -13,6 +13,7 @@ use crate::{
     preclear::PreclearState,
     prince::Prince,
     prop::{AddPropArgs, Prop, PropRef},
+    prop_motion::GlobalPathState,
     util::debug_log,
 };
 
@@ -24,6 +25,7 @@ pub struct GameState {
     pub cameras: [Camera; MAX_PLAYERS],
     pub inputs: [Input; MAX_PLAYERS],
     pub props: Vec<PropRef>,
+    pub global_paths: Vec<GlobalPathState>,
     pub preclear: PreclearState,
     pub ending: EndingState,
     pub delegates: Delegates,
@@ -233,5 +235,12 @@ impl GameState {
             // declaring that the child prop has no parent
             child_rc.clone().borrow_mut().set_no_parent();
         }
+    }
+
+    /// Mimicks the `MonoInitEnd` API function.
+    pub fn mono_init_end(&mut self) {
+        // TODO: init_cache_gemini_twins();
+        GlobalPathState::init(&mut self.global_paths);
+        self.global.props_initialized = true;
     }
 }
