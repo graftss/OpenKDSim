@@ -41,27 +41,29 @@ impl Default for PropGlobalState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PropLinkAction {
     /// No special link action.
-    None = 0,
+    None,
 
     /// (???)
-    MaybeFollowParent = 1,
+    MaybeFollowParent,
 
     /// A child prop with this `LinkAction` destroys itself when its
     /// parent prop is attached.
-    DestroyWhenParentAttached = 2,
+    DestroyWhenParentAttached,
 
     /// A child prop with this `LinkAction` is intangible.
-    IntangibleChild = 3,
+    IntangibleChild,
 
     /// (??)
-    MaybeIgnoreParent = 4,
+    MaybeIgnoreParent,
 
     /// (???)
-    MaybeUseParent = 5,
+    MaybeUseParent,
 
     /// A child prop with this `LinkAction` switches to its alt motion action
     /// after its parent is attached.
-    ReactWhenParentAttached = 6,
+    ReactWhenParentAttached,
+
+    Unknown(u16),
 }
 
 impl From<u16> for PropLinkAction {
@@ -74,7 +76,7 @@ impl From<u16> for PropLinkAction {
             4 => PropLinkAction::MaybeIgnoreParent,
             5 => PropLinkAction::MaybeUseParent,
             6 => PropLinkAction::ReactWhenParentAttached,
-            _ => panic!("unknown link action: {}", value),
+            _ => PropLinkAction::Unknown(value),
         }
     }
 }

@@ -56,6 +56,10 @@ pub struct GlobalState {
     /// offset: 0x10daf9
     pub vs_mission_idx: u8,
 
+    /// The number of ticks that have been completed.
+    /// offset: 0x10ea50
+    pub ticks: u32,
+
     /// The number of loaded theme props.
     /// offset: 0x153198
     pub num_theme_props: u16,

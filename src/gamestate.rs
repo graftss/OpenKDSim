@@ -240,6 +240,7 @@ impl GameState {
         self.global.props_initialized = true;
     }
 
+    /// Mimicks the `MonoGetPlacementMonoDataName` API function.
     pub unsafe fn get_internal_prop_name(&self, ctrl_idx: i32) -> *const u8 {
         let name_idx = self
             .props
@@ -247,5 +248,9 @@ impl GameState {
             .map_or(0, |prop| prop.clone().borrow().get_name_idx());
 
         NamePropConfig::get(name_idx.into()).internal_name.as_ptr()
+    }
+
+    pub fn tick(&mut self) {
+        
     }
 }

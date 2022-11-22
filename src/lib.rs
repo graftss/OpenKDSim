@@ -27,6 +27,7 @@ use gl_matrix::common::Mat4;
 use name_prop_config::NamePropConfig;
 use prince::OujiState;
 use prop::AddPropArgs;
+use util::debug_log;
 use std::cell::RefCell;
 
 thread_local! {
@@ -651,31 +652,33 @@ pub unsafe extern "C" fn MonoInitAddProp(
     shake_off_flag: u16,
 ) -> i32 {
     let args = AddPropArgs {
-        pos_x: pos_x,
-        pos_y: pos_y,
-        pos_z: pos_z,
-        rot_x: rot_x,
-        rot_y: rot_y,
-        rot_z: rot_z,
-        rot_w: rot_w,
-        scale_x: scale_x,
-        scale_y: scale_y,
-        scale_z: scale_z,
-        name_idx: name_idx,
-        loc_pos_type: loc_pos_type,
-        random_group_id: random_group_id,
-        mono_move_type: mono_move_type,
-        mono_hit_on_area: mono_hit_on_area,
-        link_action: link_action,
-        extra_action_type: extra_action_type,
-        unique_name_id: unique_name_id,
-        disp_off_area_no: disp_off_area_no,
-        vs_drop_flag: vs_drop_flag,
-        comment_id: comment_id,
-        comment_group_id: comment_group_id,
-        twin_id: twin_id,
-        shake_off_flag: shake_off_flag,
+        pos_x,
+        pos_y,
+        pos_z,
+        rot_x,
+        rot_y,
+        rot_z,
+        rot_w,
+        scale_x,
+        scale_y,
+        scale_z,
+        name_idx,
+        loc_pos_type,
+        random_group_id,
+        mono_move_type,
+        mono_hit_on_area,
+        link_action,
+        extra_action_type,
+        unique_name_id,
+        disp_off_area_no,
+        vs_drop_flag,
+        comment_id,
+        comment_group_id,
+        twin_id,
+        shake_off_flag,
     };
+
+    debug_log(&format!("{:#?}", args));
 
     STATE.with(|state| state.borrow_mut().add_prop(args))
 }
