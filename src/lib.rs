@@ -718,6 +718,20 @@ pub unsafe extern "C" fn Tick(_delta: f32) {
     // TODO, obviously
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn SetCameraMode(player: i32, mode: i32) {
+    STATE.with(|state| state.borrow_mut().set_camera_mode(player, mode));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetCameraCheckScaleUp(player: i32, flag: i32) {
+    STATE.with(|state| {
+        state
+            .borrow_mut()
+            .set_camera_check_scale_up(player, flag != 0)
+    });
+}
+
 /*
     [DllImport("PS2KatamariSimulation")]
     public static extern void SetPreclearMode(int mode);
@@ -730,12 +744,6 @@ pub unsafe extern "C" fn Tick(_delta: f32) {
 
     [DllImport("PS2KatamariSimulation")]
     public static extern void SetTutorialA(int page, int value);
-
-    [DllImport("PS2KatamariSimulation")]
-    public static extern void SetCameraCheckScaleUp(int player, int flag);
-
-    [DllImport("PS2KatamariSimulation")]
-    public static extern void SetCameraMode(int player, int mode);
 
     [DllImport("PS2KatamariSimulation")]
     public static extern void SetStoreFlag(int flag);

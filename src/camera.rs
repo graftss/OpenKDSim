@@ -2,7 +2,8 @@ use gl_matrix::common::{Mat4, Vec4};
 
 use crate::macros::log;
 
-enum CameraMode {
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum CameraMode {
     Normal,
     JumpR1,
     LookL1,
@@ -43,6 +44,26 @@ impl From<i32> for CameraMode {
     }
 }
 
+#[derive(Debug)]
+pub struct CameraParams {
+    /// (??) A duration when the camera is zooming out.
+    /// offset: 0x7a0b4
+    pub scale_up_duration_long: i32,
+
+    /// (??) A duration when the camera is zooming out.
+    /// offset: 0x7a0b8
+    pub scale_up_duration_short: i32,
+}
+
+impl Default for CameraParams {
+    fn default() -> Self {
+        Self {
+            scale_up_duration_long: 100,
+            scale_up_duration_short: 60,
+        }
+    }
+}
+
 /// General camera state.
 /// offset: 0x192ee0
 /// width: 0x980
@@ -75,9 +96,19 @@ pub struct CameraTransform {
 pub struct Camera {
     state: CameraState,
     transform: CameraTransform,
+    params: CameraParams,
 }
 
 impl Camera {
+    pub fn set_mode(&mut self, mode: i32) {
+        // TODO: reimplement `camera_set_mode` function at 0xad40
+        log!("set camera mode: {mode:?}");
+    }
+
+    pub fn check_scale_up(&mut self, _flag: bool) {
+        // TODO: reimplement `SetCameraCheckScaleUp`
+    }
+
     pub fn set_cam_eff_1P(&mut self, cam_eff_1P: i32) {
         self.state.cam_eff_1P = cam_eff_1P > 0;
     }

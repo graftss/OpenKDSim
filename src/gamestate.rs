@@ -251,5 +251,19 @@ impl GameState {
         NamePropConfig::get(name_idx.into()).internal_name.as_ptr()
     }
 
+    /// Mimicks the `SetCameraMode` API function.
+    pub fn set_camera_mode(&mut self, player: i32, mode: i32) {
+        if let Some(camera) = self.cameras.get_mut(player as usize) {
+            camera.set_mode(mode);
+        }
+    }
+
+    pub fn set_camera_check_scale_up(&mut self, player: i32, flag: bool) {
+        if let Some(camera) = self.cameras.get_mut(player as usize) {
+            camera.check_scale_up(flag);
+        }
+    }
+
+    /// Mimicks the `Tick` API function.
     pub fn tick(&mut self) {}
 }
