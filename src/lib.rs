@@ -28,7 +28,6 @@ use name_prop_config::NamePropConfig;
 use prince::OujiState;
 use prop::AddPropArgs;
 use std::cell::RefCell;
-use util::debug_log;
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());
@@ -651,7 +650,6 @@ pub unsafe extern "C" fn MonoInitAddProp(
     twin_id: u16,
     shake_off_flag: u16,
 ) -> i32 {
-    debug_log("starting MonoInitAddProp from rust");
     let args = AddPropArgs {
         pos_x: pos_x,
         pos_y: pos_y,
@@ -679,8 +677,6 @@ pub unsafe extern "C" fn MonoInitAddProp(
         shake_off_flag: shake_off_flag,
     };
 
-    debug_log(&format!("args: {:#?}", args));
-
     STATE.with(|state| state.borrow_mut().add_prop(args))
 }
 
@@ -700,30 +696,35 @@ pub unsafe extern "C" fn MonoInitEnd() {
     });
 }
 
+/// Returns a pointer to the "internal name" string of the prop with control index `ctrl_idx`.
+#[no_mangle]
+pub unsafe extern "C" fn MonoGetPlacementMonoDataName(ctrl_idx: i32) -> *const u8 {
+    STATE.with(|state| state.borrow().get_internal_prop_name(ctrl_idx))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn MonoGetHitOffsetGround(_ctrl_idx: f32) -> f32 {
+    // TODO (need to compute prop aabb's)
+    0.0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Tick(_delta: f32) {
+    // TODO, obviously
+}
+
 /*
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetPreclearMode(int mode);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjNum, bool isInit);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void ChangeNextArea();
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void Tick(float delta);
-
-[DllImport("PS2KatamariSimulation")]
-public static extern void SetTutorialA(int page, int value);
-
+    [DllImport("PS2KatamariSimulation")]
+    public static extern void SetPreclearMode(int mode);
 
     [DllImport("PS2KatamariSimulation")]
-    private static extern float MonoGetHitOffsetGround(int placementIndex);
+    public static extern void ProcMonoCtrl(int ctrlIndex, int nameIndex, int subObjNum, bool isInit);
 
     [DllImport("PS2KatamariSimulation")]
-    private static extern IntPtr MonoGetPlacementMonoDataName(int placementIndex);
+    public static extern void ChangeNextArea();
 
+    [DllImport("PS2KatamariSimulation")]
+    public static extern void SetTutorialA(int page, int value);
 
     [DllImport("PS2KatamariSimulation")]
     public static extern void SetCameraCheckScaleUp(int player, int flag);

@@ -640,6 +640,10 @@ impl Prop {
         result
     }
 
+    pub fn get_name_idx(&self) -> u16 {
+        self.name_idx
+    }
+
     pub fn get_ctrl_idx(&self) -> u16 {
         self.ctrl_idx
     }

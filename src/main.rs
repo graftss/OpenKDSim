@@ -105,9 +105,9 @@ const SIB_PROP_ARGS: AddPropArgs = AddPropArgs {
     link_action: 1,
     extra_action_type: 2,
     unique_name_id: u16::MAX,
-    disp_off_area_no: 9,
+    disp_off_area_no: u16::MAX,
     vs_drop_flag: 12,
-    comment_id: 1,
+    comment_id: u16::MAX,
     comment_group_id: u16::MAX,
     twin_id: u16::MAX,
     shake_off_flag: 1,
@@ -136,7 +136,7 @@ unsafe fn test() {
         state.read_prop_ref(2).clone().borrow_mut().print_links("2");
         state.read_prop_ref(3).clone().borrow_mut().print_links("3");
         state.read_prop_ref(4).clone().borrow_mut().print_links("4");
-    })
+    });
 }
 
 fn main() {

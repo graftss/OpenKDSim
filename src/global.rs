@@ -2,10 +2,7 @@ use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 
-use crate::{
-    mission::{GameMode, Mission, Stage},
-    util::debug_log,
-};
+use crate::mission::{GameMode, Mission, Stage};
 
 /// Miscellaneous global game state.
 #[derive(Debug, Default)]
@@ -199,7 +196,6 @@ impl GlobalState {
     pub fn get_next_ctrl_idx(&mut self) -> u16 {
         let result = self.next_ctrl_idx;
         self.next_ctrl_idx += 1;
-        debug_log(&format!("next ctrl idx: {}", self.next_ctrl_idx));
         result
     }
 }

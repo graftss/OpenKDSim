@@ -7,12 +7,14 @@ use crate::{
 
 static NP_0X30_TABLE: &'static [u8] = include_bytes!("data/name_prop_0x30_table.bin");
 static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("data/name_prop_mono_data_offsets.bin");
+static NP_INTERNAL_NAMES: &'static str = include_str!("data/name_prop_internal_names.bin");
 
 #[derive(Debug, Default, Clone)]
 pub struct NamePropConfig {
     ///////////////////////////////////////////
     // Begin `name_prop_0x30_table.bin` fields.
     ///////////////////////////////////////////
+    pub internal_name: &'static str,
 
     // Offsets are relative to each prop's 0x30-width entry in that table.
     /// (??)
@@ -111,6 +113,7 @@ impl NamePropConfig {
     pub fn read_from_data(configs: &mut Vec<NamePropConfig>) {
         Self::read_name_prop_0x30_table(configs);
         Self::read_name_prop_mono_data_offsets(configs);
+        Self::read_name_prop_internal_names(configs);
     }
 
     /// Copy the `name_prop_0x30_table` file into the `NamePropConfig` array.
@@ -147,6 +150,12 @@ impl NamePropConfig {
 
         for (name_idx, config) in configs.iter_mut().enumerate() {
             config.mono_data_offset_idx = read_u16!(table, name_idx * 2);
+        }
+    }
+
+    fn read_name_prop_internal_names(configs: &mut Vec<NamePropConfig>) {
+        for (config, name) in Iterator::zip(configs.iter_mut(), NP_INTERNAL_NAMES.split("\0")) {
+            config.internal_name = name;
         }
     }
 }

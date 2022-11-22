@@ -10,11 +10,11 @@ use crate::{
     katamari::Katamari,
     mission::MissionConfig,
     mono_data::MonoData,
+    name_prop_config::NamePropConfig,
     preclear::PreclearState,
     prince::Prince,
     prop::{AddPropArgs, Prop, PropRef},
     prop_motion::GlobalPathState,
-    util::debug_log,
 };
 
 #[derive(Debug, Default)]
@@ -203,13 +203,9 @@ impl GameState {
 
     // Mimicks the `MonoInitAddProp` API function.
     pub fn add_prop(&mut self, args: AddPropArgs) -> i32 {
-        debug_log("A");
         let prop = Prop::new(self, &args);
-        debug_log("B");
         let result = prop.borrow().get_ctrl_idx().into();
-        debug_log("C");
         self.props.push(prop);
-        debug_log("D");
         result
     }
 
@@ -242,5 +238,14 @@ impl GameState {
         // TODO: init_cache_gemini_twins();
         GlobalPathState::init(&mut self.global_paths);
         self.global.props_initialized = true;
+    }
+
+    pub unsafe fn get_internal_prop_name(&self, ctrl_idx: i32) -> *const u8 {
+        let name_idx = self
+            .props
+            .get(ctrl_idx as usize)
+            .map_or(0, |prop| prop.clone().borrow().get_name_idx());
+
+        NamePropConfig::get(name_idx.into()).internal_name.as_ptr()
     }
 }
