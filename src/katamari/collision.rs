@@ -81,5 +81,7 @@ impl KatCollisionRay {
 }
 
 impl Katamari {
+    pub fn init_collision_rays(&mut self) {}
+
     pub fn reset_collision_rays(&mut self) {}
 }

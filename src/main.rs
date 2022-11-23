@@ -152,18 +152,9 @@ unsafe fn test() {
 fn main() {
     println!("start");
 
-    let mut a = Test {
-        x: [0.0, 1.0, 2.0, 3.0],
-        y: [1, 2, 3, 4],
-    };
+    katamari::mesh::KatMesh::init_builtin_meshes();
 
-    let mut b = a;
-
-    a.x[0] = 300.0;
-    b.y[1] = 100;
-
-    println!("a={:?}, b={:?}", a, b);
     unsafe {
-        test();
+        // test();
     }
 }

@@ -1,4 +1,5 @@
 mod collision;
+pub mod mesh;
 
 use gl_matrix::{
     common::{Mat4, Vec4},
@@ -631,6 +632,10 @@ pub struct Katamari {
     /// The katamari's collision rays on the previous tick.
     /// offset: 0x20d0
     last_collision_rays: Vec<KatCollisionRay>,
+
+    /// The number of mesh collision rays. (The default mesh has 18)
+    /// offset: 0x38d0
+    num_mesh_rays: u16,
 
     /// (??) The maximum allowed length of any collision ray.
     /// offset: 0x39ac
