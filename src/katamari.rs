@@ -1,3 +1,5 @@
+mod collision;
+
 use gl_matrix::{
     common::{Mat4, Vec4},
     mat4, vec4,
@@ -11,6 +13,8 @@ use crate::{
     prop::PropRef,
     simulation_params::SimulationParams,
 };
+
+use self::collision::{KatCollisionRay, KatRay, ShellRay};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KatPushDir {
@@ -44,33 +48,6 @@ pub enum AlarmType {
     Closest,
     Closer,
     Close,
-}
-
-/// The extra "shell" collision rays which extend along the top half of the katamari.
-/// (see https://discord.com/channels/232268612285497345/805240416894713866/842591732229996544)
-#[derive(Debug, Clone, Copy)]
-pub enum ShellRay {
-    TopCenter = 1,
-    Left = 2,
-    Right = 3,
-    Bottom = 4,
-    TopLeft = 5,
-    TopRight = 6,
-}
-
-/// The different types of rays making up the katamari's collision.
-/// `Bottom`: the single ray extending directly downwards from the katamari's center.
-///           this ray is used to make sure the katamari moves smoothly along the ground
-///           when nothing has been picked up to make the katamari's shape oblong.
-/// `Mesh`: one of the normal rays comprising the katamari's boundary mesh.
-///         picking up an object will extend the mesh ray nearest to where the object was attached.
-/// `Prop`: if a prop with a vault point is collected, the katamari will gain a collision ray
-///         corresponding to that prop in the direction of one of its vault points.
-#[derive(Debug, Clone, Copy)]
-pub enum KatRay {
-    Bottom = 0,
-    Mesh = 1,
-    Prop = 2,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -195,6 +172,8 @@ pub struct KatPhysicsFlags {
     pub moved_more_than_rad_0x1d: bool,
 }
 
+/// A group of flags which mostly record if the katamari is contacting certain special types of surfaces
+/// with non-standard `HitAttribute` values.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct KatHitFlags {
     /// If true, ignores "pushing downward" incline effect (e.g. on park entrance steps)
@@ -241,6 +220,125 @@ pub struct KatHitFlags {
     /// (??) True when contacting a "MapSemiTranslucent" surface.
     /// offset: 0xa
     pub map_semi_translucent: bool,
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct KatVelocity {
+    /// Current velocity
+    /// offset: 0x0
+    pub velocity: Vec4,
+
+    /// Current unit velocity
+    /// offset: 0x10
+    pub velocity_unit: Vec4,
+
+    /// (??)
+    /// offset: 0x20
+    pub speed_orth_on_floor: Vec4,
+
+    /// (??)
+    /// offset: 0x30
+    pub speed_proj_on_floor: Vec4,
+
+    /// (??)
+    /// offset: 0x40
+    pub last_vel_accel: Vec4,
+
+    /// (??) Velocity + player acceleration
+    /// offset: 0x50
+    pub vel_accel: Vec4,
+
+    /// Unit vector of `vel_accel`.
+    /// offset: 0x60
+    pub vel_accel_unit: Vec4,
+
+    /// (??) Velocity + player accel + gravity
+    /// offset: 0x70
+    pub vel_accel_grav: Vec4,
+
+    /// Unit vector of `vel_accel_grav`.
+    /// offset: 0x80
+    pub vel_accel_grav_unit: Vec4,
+
+    /// (??)
+    /// offset: 0x90
+    pub push_vel_on_floor_unit: Vec4,
+
+    /// Acceleration from gravity
+    /// offset: 0xa0
+    pub accel_gravity: Vec4,
+
+    /// Acceleration from the contacted floor incline
+    /// offset: 0xb0
+    pub accel_incline: Vec4,
+
+    /// (??) Acceleration from the contacted floor friction (or some kind of similar force)
+    /// offset: 0xc0
+    pub accel_ground_friction: Vec4,
+}
+
+/// Katamari parameters which vary based on the katamari's current size.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct KatScaledParams {
+    /// Base max speed which acts as a multiplier on the speeds of all movement types.
+    pub base_max_speed: f32,
+
+    /// Downward acceleration from gravity.
+    pub gravity_accel: f32,
+
+    /// (??) The force exerted when braking with forwards movement.
+    pub brake_forwards_force: f32,
+
+    /// (??) The force exerted when braking with backwards movement.
+    pub brake_backwards_force: f32,
+
+    /// (??) The force exerted when braking with sideways movement.
+    pub brake_sideways_force: f32,
+
+    /// (??) The force exerted when braking boost movement.
+    pub brake_boost_force: f32,
+
+    /// Max speed with forwards movement.
+    pub max_forwards_speed: f32,
+
+    /// Max speed with backwards movement.
+    pub max_backwards_speed: f32,
+
+    /// Max speed with sideways movement.
+    pub max_sideways_speed: f32,
+
+    /// Max speed with boost movement.
+    pub max_boost_speed: f32,
+
+    /// (??)
+    pub push_uphill_accel: f32,
+
+    /// (??)
+    pub not_push_uphill_accel: f32,
+
+    /// Acceleration during forwards movement.
+    pub forwards_accel: f32,
+
+    /// Acceleration during backwards movement.
+    pub backwards_accel: f32,
+
+    /// Acceleration during sideways movement.
+    pub sideways_accel: f32,
+
+    /// Acceleration during boost movement.
+    pub boost_accel: f32,
+
+    /// The prince's lateral distance from the katamari center.
+    pub prince_offset: f32,
+
+    /// (??)
+    pub alarm_closest_range: f32,
+
+    /// (??)
+    pub alarm_closer_range: f32,
+
+    /// (??)
+    pub alarm_close_range: f32,
 }
 
 #[derive(Debug, Default)]
@@ -335,6 +433,18 @@ pub struct Katamari {
     /// counts down from 10 after falling from a climb; if still nonzero, can't climb again    
     /// offset: 0x118
     wallclimb_cooldown: u16,
+
+    /// Katamari velocities.
+    /// offset: 0x240
+    velocity: KatVelocity,
+
+    /// Katamari velocities on the previous tick.
+    /// offset: 0x310
+    last_velocity: KatVelocity,
+
+    /// The diameter used to compute size-based scaling params (in cm).
+    /// offset: 0x3e4
+    scaling_params_size: f32,
 
     /// (??) The unit vector that's pointing "rightwards" relative to the katamari's lateral velocity.
     /// offset: 0x440
@@ -513,6 +623,14 @@ pub struct Katamari {
     /// The cooldown period for the "splash" SFX that plays continuously while the katamari is in water.
     /// offset: 0x89e
     water_sfx_timer: u16,
+
+    /// The katamari's current collision rays.
+    /// offset: 0x8d0
+    collision_rays: Vec<KatCollisionRay>,
+
+    /// The katamari's collision rays on the previous tick.
+    /// offset: 0x20d0
+    last_collision_rays: Vec<KatCollisionRay>,
 
     /// (??) The maximum allowed length of any collision ray.
     /// offset: 0x39ac
@@ -695,7 +813,7 @@ impl Katamari {
         self.rad_cm = init_diam / 2.0;
         self.diam_trunc_mm = (init_diam * 10.0) as i32;
 
-        // TODO: `self.kat_copy_speeds_to_last_speeds()`
+        self.last_velocity = self.velocity;
 
         vec4::copy(&mut self.center, &init_pos);
 

@@ -117,6 +117,12 @@ const SIB_PROP_ARGS: AddPropArgs = AddPropArgs {
     shake_off_flag: 1,
 };
 
+#[derive(Debug, Clone, Copy)]
+struct Test {
+    x: [f32; 4],
+    y: [i32; 4],
+}
+
 unsafe fn test() {
     let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
 
@@ -145,6 +151,18 @@ unsafe fn test() {
 
 fn main() {
     println!("start");
+
+    let mut a = Test {
+        x: [0.0, 1.0, 2.0, 3.0],
+        y: [1, 2, 3, 4],
+    };
+
+    let mut b = a;
+
+    a.x[0] = 300.0;
+    b.y[1] = 100;
+
+    println!("a={:?}, b={:?}", a, b);
     unsafe {
         test();
     }

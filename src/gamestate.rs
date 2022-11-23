@@ -337,17 +337,7 @@ impl GameState {
                 self.sim_params.destroy_prop_diam_ratio_normal
             };
 
-        // TODO: `kat_init(override_init_size)`: 0x1f030
-
-        let init_diam = if override_init_size < 0.0 {
-            mission_config.init_diam_cm
-        } else {
-            override_init_size
-        };
-        let init_pos = &mission_config.init_kat_pos[player as usize];
-
-        let kat = &mut self.katamaris[0];
-        kat.init(player, init_diam, init_pos, &self.sim_params);
+        self.init_katamari(player, override_init_size, mission_config);
         // TODO: `prince_init()`: 0x52bd0
 
         self.global.map_loop_rate = 0.0;
@@ -374,6 +364,23 @@ impl GameState {
         // TODO: `camera_init()`
         // TODO: `prince_init_animation()`
         // TODO: `Init`: 21-51, initialize ending stuff
+    }
+
+    fn init_katamari(
+        &mut self,
+        player: u8,
+        override_init_size: f32,
+        mission_config: &MissionConfig,
+    ) {
+        let init_pos = &mission_config.init_kat_pos[player as usize];
+        let init_diam = if override_init_size < 0.0 {
+            mission_config.init_diam_cm
+        } else {
+            override_init_size
+        };
+
+        let kat = &mut self.katamaris[0];
+        kat.init(player, init_diam, init_pos, &self.sim_params);
     }
 
     /// Mimicks the `Tick` API function.
