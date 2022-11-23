@@ -1,3 +1,4 @@
+/// Holds all controller input that can occur in a single tick.
 #[derive(Debug, Default)]
 pub struct Input {
     // Analog input
@@ -30,6 +31,43 @@ pub struct Input {
 
     // (??)
     pub cross_click: bool,
+}
+
+/// A single analog stick's non-quantized input.
+#[derive(Debug, Default)]
+pub struct StickInput {
+    pub x: f32,
+    pub y: f32,
+}
+
+/// The possible directions a single stick can push.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StickPushDir {
+    None,
+    Up,
+    Down,
+}
+
+/// The possible directions both sticks can push.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AnalogPushDirs {
+    pub left: StickPushDir,
+    pub right: StickPushDir,
+}
+
+impl Default for AnalogPushDirs {
+    fn default() -> Self {
+        Self {
+            left: StickPushDir::None,
+            right: StickPushDir::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GachaDir {
+    Left,
+    Right,
 }
 
 impl Input {

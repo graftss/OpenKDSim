@@ -836,6 +836,7 @@ impl Katamari {
     ) {
         // extra stuff not in the original simulation
         self.max_prop_rays = sim_params.kat_max_prop_collision_rays;
+        // end extra stuff
 
         self.player = player;
         self.mesh_index = 1;
@@ -911,6 +912,6 @@ impl Katamari {
         self.wallclimb_max_height_ticks = 0;
 
         // TODO: `kat_init:284-285` (not sure what this is about)
-        // TODO: `kat_init:286-288` (compute intiial airborne prop gravity)
+        // TODO: `kat_init:286-288` (compute initial airborne prop gravity)
     }
 }
