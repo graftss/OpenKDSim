@@ -251,7 +251,7 @@ pub struct Prop {
 
     /// The area in which this prop loaded.
     /// offset: 0x38
-    init_area: u8,
+    init_area: u32,
 
     /// The position at which this prop loaded.
     /// offset: 0x40
@@ -834,8 +834,8 @@ impl Prop {
     }
 
     /// Returns `true` if this prop should be destroyed when the area `area` loads.
-    pub fn check_destroy_on_area_load(&self, area: u8) -> bool {
-        let should_destroy = self.display_off_area.map_or(false, |a| a == area.into())
+    pub fn check_destroy_on_area_load(&self, area: u32) -> bool {
+        let should_destroy = self.display_off_area.map_or(false, |a| (a as u32) == area)
             && self.global_state != PropGlobalState::Attached;
 
         // TODO: if `should_destroy` is true, call `prop_destroy`

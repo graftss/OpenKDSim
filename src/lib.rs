@@ -11,6 +11,7 @@ mod gamestate;
 mod global;
 mod input;
 mod katamari;
+mod math;
 mod mission;
 mod mono_data;
 mod name_prop_config;
@@ -18,8 +19,10 @@ mod preclear;
 mod prince;
 mod prop;
 mod prop_motion;
+mod simulation_params;
 mod tutorial;
 mod util;
+mod vsmode;
 
 use core::{panic, slice};
 use delegates::*;
@@ -158,7 +161,7 @@ pub unsafe extern "C" fn GetMapRollMatrix(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetGameMode(mode: i32) {
+pub unsafe extern "C" fn SetGameMode(mode: u32) {
     STATE.with(|state| state.borrow_mut().global.set_gamemode(mode))
 }
 
@@ -753,8 +756,12 @@ pub unsafe extern "C" fn Tick(delta: f32) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn Init() {
-    STATE.with(|state| state.borrow_mut().init());
+pub unsafe extern "C" fn Init(player: i32, override_init_size: f32, mission: i32) {
+    STATE.with(|state| {
+        state
+            .borrow_mut()
+            .init(player, override_init_size, mission.try_into().unwrap())
+    });
 }
 
 /// This seems to be what simulates a single object in the collection UI and the names UI.

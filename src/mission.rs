@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use crate::{
     constants::{MAX_PLAYERS, NUM_MISSIONS},
     macros::{panic_log, read_bool, read_f32, read_u16, read_u8},
+    math::vec4_scale,
     util::vec4_from_le_bytes,
 };
 
@@ -19,8 +20,8 @@ pub enum Stage {
     Tutorial = 12,
 }
 
-impl From<i32> for Stage {
-    fn from(value: i32) -> Self {
+impl From<u32> for Stage {
+    fn from(value: u32) -> Self {
         match value {
             1 => Self::House,
             2 => Self::Town,
@@ -139,16 +140,16 @@ pub enum Mission {
 }
 
 impl Mission {
-    pub const MIN_VS_MODE: u8 = 31;
-    pub const MAX_VS_MODE: u8 = 38;
+    pub const MIN_VS_MODE: u32 = 31;
+    pub const MAX_VS_MODE: u32 = 38;
 
-    pub fn is_vs_mode(mission: u8) -> bool {
-        mission >= Self::MIN_VS_MODE.into() && mission <= Self::MAX_VS_MODE.into()
+    pub fn is_vs_mode(mission: u32) -> bool {
+        mission >= Self::MIN_VS_MODE && mission <= Self::MAX_VS_MODE
     }
 }
 
-impl From<u8> for Mission {
-    fn from(value: u8) -> Self {
+impl From<u32> for Mission {
+    fn from(value: u32) -> Self {
         match value {
             0 => Self::None,               // king talking???
             1 => Self::MAS1,               // MAS1
@@ -202,7 +203,7 @@ impl From<u8> for Mission {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
     Normal = 0,
     Tutorial = 1,
@@ -211,8 +212,8 @@ pub enum GameMode {
     Load = 4,
 }
 
-impl From<i32> for GameMode {
-    fn from(value: i32) -> Self {
+impl From<u32> for GameMode {
+    fn from(value: u32) -> Self {
         match value {
             0 => Self::Normal,
             1 => Self::Tutorial,
@@ -232,7 +233,7 @@ impl From<i32> for GameMode {
 pub struct MissionConfig {
     /// If true, props can be smaller without being destroyed at alpha 0.
     /// offset: 0x2
-    pub keep_distant_props_alive: bool,
+    pub keep_smaller_props_alive: bool,
 
     /// The initial position of each katamari.
     /// offset: 0x8
@@ -280,10 +281,14 @@ impl MissionConfig {
         for (mission_idx, config) in configs.iter_mut().enumerate() {
             let base = mission_idx * WIDTH;
 
-            config.keep_distant_props_alive = read_bool!(table, base + 0x2);
+            config.keep_smaller_props_alive = read_bool!(table, base + 0x2);
 
             for (i, init_pos) in config.init_kat_pos.iter_mut().enumerate() {
                 vec4_from_le_bytes(init_pos, &table, base + 0x8 + i * 0x10);
+
+                // The simulation positions are negative of what Unity expects, so we negate them
+                // in advance here.
+                vec4_scale(init_pos, -1.0);
             }
 
             for (i, angle) in config.init_prince_angle.iter_mut().enumerate() {

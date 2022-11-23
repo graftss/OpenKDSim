@@ -9,14 +9,16 @@ use crate::{
     input::Input,
     katamari::Katamari,
     macros::panic_log,
-    mission::MissionConfig,
+    mission::{GameMode, GameType, Mission, MissionConfig},
     mono_data::MonoData,
     name_prop_config::NamePropConfig,
     preclear::PreclearState,
     prince::Prince,
     prop::{AddPropArgs, Prop, PropRef},
     prop_motion::GlobalPathState,
+    simulation_params::SimulationParams,
     tutorial::TutorialState,
+    vsmode::VsModeState,
 };
 
 #[derive(Debug, Default)]
@@ -30,9 +32,11 @@ pub struct GameState {
     pub global_paths: Vec<GlobalPathState>,
     pub preclear: PreclearState,
     pub tutorial: TutorialState,
+    pub vsmode: VsModeState,
     pub ending: EndingState,
     pub delegates: Delegates,
     pub mono_data: MonoData,
+    pub sim_params: SimulationParams,
 }
 
 impl GameState {
@@ -74,6 +78,11 @@ impl GameState {
 
     pub fn write_prop_ref(&mut self, ctrl_idx: i32) -> &mut PropRef {
         &mut self.props[ctrl_idx as usize]
+    }
+
+    /// The `MissionConfig` for the current mission.
+    pub fn current_mission_config(&self) -> Option<&MissionConfig> {
+        self.global.mission.map(MissionConfig::get)
     }
 
     /// Mimicks the `SetGameTime` API function.
@@ -196,6 +205,7 @@ impl GameState {
             stage.try_into().unwrap(),
         );
 
+        // read the mission's `MonoData` data from the `mono_data` raw pointer.
         self.mono_data.init(mono_data);
 
         // TODO: init subobjects
@@ -221,14 +231,14 @@ impl GameState {
             // adding a parent prop to the child
             let weak_parent_ref = Rc::<RefCell<Prop>>::downgrade(&parent_rc);
 
-            let area: u16 = self.global.area.unwrap().into();
-            let tree_id: u16 = 1000 * area + self.global.num_root_props;
+            let area: u32 = self.global.area.unwrap().into();
+            let tree_id: u32 = 1000 * area + (self.global.num_root_props as u32);
 
             // declare that the child has a parent
             child_rc
                 .clone()
                 .borrow_mut()
-                .set_parent(weak_parent_ref, tree_id);
+                .set_parent(weak_parent_ref, tree_id.try_into().unwrap());
             parent_rc.clone().borrow_mut().add_child(child_rc.clone());
         } else {
             // declaring that the child prop has no parent
@@ -268,8 +278,9 @@ impl GameState {
     }
 
     /// Mimicks the `SetStoreFlag` API function.
-    pub fn set_store_flag(&mut self, _flag: bool) {
-        // TODO
+    pub fn set_store_flag(&mut self, store_flag: bool) {
+        self.global.store_flag = store_flag;
+        self.global.kat_diam_int_on_store_flag = self.borrow_katamari(0).get_diam_int();
     }
 
     /// Mimicks the `ChangeNextArea` API function.
@@ -295,7 +306,75 @@ impl GameState {
     }
 
     /// Mimicks the `Init` API function.
-    pub fn init(&mut self) {}
+    pub fn init(&mut self, player_i32: i32, override_init_size: f32, mission: u32) {
+        let player: u8 = player_i32.try_into().unwrap();
+
+        self.global.is_vs_mode = Mission::is_vs_mode(mission);
+        if self.global.is_vs_mode {
+            self.global.vs_mission_idx = mission - Mission::MIN_VS_MODE;
+        }
+
+        // TODO: `init_simulation`:31-97, not sure what this is for
+        self.global.freeze = false;
+        self.global.mission = Some(mission.into());
+
+        // TODO: `init_simulation_subroutine_1`: 0x263c0
+
+        self.global.detaching_props_from_kat = false;
+        self.global.store_flag = false;
+
+        // TODO: `init_simulation_subroutine_2`: 0x6740
+
+        let mission_config = MissionConfig::get(self.global.mission.unwrap());
+
+        // compute how small props need to be before they're destroyed at alpha 0
+        self.global.prop_diam_ratio_destroy_when_invis =
+            if mission_config.game_type == GameType::ClearProps {
+                self.sim_params.destroy_prop_diam_ratio_clearprops
+            } else if mission_config.keep_smaller_props_alive {
+                self.sim_params.destroy_prop_diam_ratio_reduced
+            } else {
+                self.sim_params.destroy_prop_diam_ratio_normal
+            };
+
+        // TODO: `kat_init(override_init_size)`: 0x1f030
+
+        let init_diam = if override_init_size < 0.0 {
+            mission_config.init_diam_cm
+        } else {
+            override_init_size
+        };
+        let init_pos = &mission_config.init_kat_pos[player as usize];
+
+        let kat = &mut self.katamaris[0];
+        kat.init(player, init_diam, init_pos, &self.sim_params);
+        // TODO: `prince_init()`: 0x52bd0
+
+        self.global.map_loop_rate = 0.0;
+
+        // TODO: `camera_init_transforms()`: 0x57dc0
+        // TODO: `set_global_angle??(is_vs_mode ? 70.0 : 48.0): 0x59270
+        // TODO: `init_simulation`:127-277, this may be a no-op
+
+        self.global.game_time_ms = 0;
+        self.global.map_change_mode = false;
+
+        // TODO: `init_simulation`:282-284, 290-291
+        let gamemode = self.global.gamemode.unwrap();
+        if gamemode == GameMode::Tutorial {
+            // TODO: `init_simulation`: 293-325
+        }
+
+        if self.global.is_vs_mode {
+            self.vsmode.timer_0x10bf10 = 0;
+        } else {
+            // TODO: `init_simulation`:333-366, initialize somethings coming callback?
+        }
+
+        // TODO: `camera_init()`
+        // TODO: `prince_init_animation()`
+        // TODO: `Init`: 21-51, initialize ending stuff
+    }
 
     /// Mimicks the `Tick` API function.
     pub fn tick(&mut self, _delta: f32) {}

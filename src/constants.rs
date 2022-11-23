@@ -1,3 +1,5 @@
+use gl_matrix::common::Vec4;
+
 /// The rescale factor when translating Unity coordinates to simulation coordinates.
 /// (All simulation world space coordinates are 100 times bigger than equivalent Unity coordinates.)
 pub static UNITY_TO_SIM_SCALE: f32 = 100.0;
@@ -23,32 +25,27 @@ pub const MAX_PLAYERS: usize = 2;
 /// The maximum number of props in a mission.
 pub const MAX_PROPS: usize = 4000;
 
-pub struct PhysicsConstants {
-    /// The ratio of vertical velocity a prop keeps after bouncing off of a surface while airborne.
-    /// offset: 0x155230
-    pub prop_vertical_vel_decay_after_bounce: f32,
+/// The zero vector.
+pub const VEC4_ZERO: Vec4 = [0.0, 0.0, 0.0, 1.0];
 
-    /// The ratio of lateral velocity a prop keeps after bouncing off of a surface while airborne.
-    /// offset: 0x155234
-    pub prop_lateral_vel_decay_after_bounce: f32,
+/// The positive x axis unit vector.
+pub const VEC4_X_POS: Vec4 = [1.0, 0.0, 0.0, 1.0];
 
-    /// The number of ticks a prop spends spinning on the ground after finishing airborne bouncing.
-    /// offset: 0x155240
-    pub prop_spin_after_landing_ticks: i32,
+/// The negative x axis unit vector.
+pub const VEC4_X_NEG: Vec4 = [-1.0, 0.0, 0.0, 1.0];
 
-    /// When a katamari and prop collide, this is the minimum angle difference in their movement
-    /// directions which can cause the prop to wobble.
-    /// offset: 0x155244
-    pub prop_min_hit_angle_for_wobble_deg: f32,
-}
+/// The positive y axis unit vector
+pub const VEC4_Y_POS: Vec4 = [0.0, 1.0, 0.0, 1.0];
 
-impl Default for PhysicsConstants {
-    fn default() -> Self {
-        Self {
-            prop_vertical_vel_decay_after_bounce: 0.46,
-            prop_lateral_vel_decay_after_bounce: 0.46,
-            prop_spin_after_landing_ticks: 60,
-            prop_min_hit_angle_for_wobble_deg: 70.0,
-        }
-    }
-}
+/// The negative y axis unit vector.
+pub const VEC4_Y_NEG: Vec4 = [0.0, -1.0, 0.0, 1.0];
+
+/// The positive z axis unit vector.
+pub const VEC4_Z_POS: Vec4 = [0.0, 0.0, 1.0, 1.0];
+
+/// The negative z axis unit vector.
+pub const VEC4_Z_NEG: Vec4 = [0.0, 0.0, -1.0, 1.0];
+
+pub const PI: f32 = 3.141592;
+
+pub const _4PI_3: f32 = PI * 4.0 / 3.0;

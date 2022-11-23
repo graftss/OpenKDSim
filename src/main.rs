@@ -17,6 +17,7 @@ mod gamestate;
 mod global;
 mod input;
 mod katamari;
+mod math;
 mod mission;
 mod mono_data;
 mod name_prop_config;
@@ -24,8 +25,10 @@ mod preclear;
 mod prince;
 mod prop;
 mod prop_motion;
+mod simulation_params;
 mod tutorial;
 mod util;
+mod vsmode;
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());

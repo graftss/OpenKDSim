@@ -31,7 +31,7 @@ pub struct GlobalState {
     /// The current loaded area of the current stage, where the smallest
     /// area of each stage is 0.
     /// offset: 0xff109
-    pub area: Option<u8>,
+    pub area: Option<u32>,
 
     /// If true, the current mission is in VS mode.
     /// offset: 0xff0f1
@@ -47,6 +47,10 @@ pub struct GlobalState {
 
     /// The current game mode.
     pub gamemode: Option<GameMode>,
+
+    /// (??) Set by `SetStoreFlag`.
+    /// offset: 0x10dab8
+    pub kat_diam_int_on_store_flag: i32,
 
     /// If true, ticking the physics engine has no effect (it's "frozen").
     /// offset: 0x10daea
@@ -64,11 +68,26 @@ pub struct GlobalState {
 
     /// (??) too lazy to document this right now
     /// offset: 0x10daf9
-    pub vs_mission_idx: u8,
+    pub vs_mission_idx: u32,
 
     /// The number of ticks that have been completed.
     /// offset: 0x10ea50
     pub ticks: u32,
+
+    /// (??) Set by `SetStoreFlag`.
+    /// offset: 0x10eace
+    pub store_flag: bool,
+
+    /// If true, the simulation is currently in the process of detaching
+    /// props from the katamari. (It's set to true while happening, and set back
+    /// to false after everything has been detached.)
+    /// offset: 0x10eadb
+    pub detaching_props_from_kat: bool,
+
+    /// Props with a diameter ratio to the player less
+    /// than this value will be destroyed when they reach an alpha of 0.
+    /// offset: 0x1339fc
+    pub prop_diam_ratio_destroy_when_invis: f32,
 
     /// The number of loaded theme props.
     /// offset: 0x153198
@@ -184,18 +203,13 @@ impl GlobalState {
         self.neg_gravity[2] = -z;
     }
 
-    pub fn set_gamemode(&mut self, gamemode: i32) {
-        self.gamemode = Some(gamemode.try_into().unwrap());
+    pub fn set_gamemode(&mut self, gamemode: u32) {
+        self.gamemode = Some(gamemode.into());
     }
 
-    pub fn mono_init_start(&mut self, mission: u8, area: u8, stage: i32) {
+    pub fn mono_init_start(&mut self, mission: u32, area: u32, stage: u32) {
         self.stage = Some(stage.into());
         self.did_init_start = true;
-
-        self.is_vs_mode = Mission::is_vs_mode(mission);
-        if self.is_vs_mode {
-            self.vs_mission_idx = mission - Mission::MIN_VS_MODE;
-        }
 
         self.mission = Some(mission.into());
         self.area = Some(area);
