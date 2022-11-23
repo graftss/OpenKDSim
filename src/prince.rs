@@ -6,7 +6,8 @@ use gl_matrix::{
 use crate::{
     constants::VEC4_ZERO,
     input::{AnalogPushDirs, GachaDir, StickInput},
-    simulation_params::SimulationParams,
+    katamari::Katamari,
+    math::normalize_bounded_angle,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -97,9 +98,9 @@ pub struct Prince {
     /// offset: 0x0
     player: u8,
 
-    /// (??) Probably unnecessary flags.
+    /// (??) Random bit vector.
     /// offset: 0x4
-    flags: u8,
+    flags: u16,
 
     /// The current position of the prince.
     /// offset: 0xc
@@ -119,7 +120,7 @@ pub struct Prince {
 
     /// Value added to `angle` each tick.
     /// offset: 0x70
-    forced_angle_speed: f32,
+    extra_flat_angle_speed: f32,
 
     /// (??)
     /// offset: 0x74
@@ -170,14 +171,15 @@ pub struct Prince {
     ignore_input_ticks: i16,
 
     /// The transform matrix of the prince.
+    /// Note that this is only a rotation matrix; it doesn't include translation.
     /// offset: 0x138
-    transform: Mat4,
+    transform_rot: Mat4,
 
     /// The default offset of the prince from the katamari center in local katamari space.
     /// Since the prince is always facing the z+ axis, this vector is therefore always
     /// a multiple of the z- axis (since the prince is behind the katamari center)
     /// offset: 0x24c
-    base_kat_offset: Vec4,
+    kat_offset_vec: Vec4,
 
     /// (??)
     /// offset: 0x288
@@ -401,18 +403,18 @@ pub struct Prince {
 
 impl Prince {
     /// Initialize the prince at the start of a mission.
-    pub fn init(&mut self, player: u8, init_angle: f32, init_kat_offset: f32) {
+    pub fn init(&mut self, player: u8, init_angle: f32, kat: &Katamari) {
         self.player = player;
         self.no_spin_ticks = 0;
         self.huff_remain_ticks = 0;
         vec4::copy(&mut self.pos, &VEC4_ZERO);
         self.auto_rotate_right_speed = 0.0;
         self.angle = init_angle;
-        self.base_kat_offset[2] = init_kat_offset;
+        self.kat_offset_vec[2] = kat.get_prince_offset();
         self.push_dir = None;
         self.angle_speed = 0.0;
         mat4::identity(&mut self.yaw_rotation_something);
-        mat4::identity(&mut self.transform);
+        mat4::identity(&mut self.transform_rot);
         self.huff_init_speed_penalty = 0.4;
         self.huff_duration_ticks = 240; // TODO: some weird potential off-by-one issue here.
         self.init_uphill_strength = 100.0;
@@ -434,16 +436,63 @@ impl Prince {
         self.min_angle_btwn_sticks_for_fastest_turn = 0.75;
         self.min_push_angle_y = 0.363474;
 
-        // TODO: `prince_update_transform()`
-        // TODO: `camera_init(player)`
+        self.update_transform(kat);
+        // TODO: `camera_init(player)` (but put this somewhere else)
 
         self.boost_energy = self.max_boost_energy;
         self.uphill_strength = self.init_uphill_strength;
         self.view_mode = ViewMode::Normal;
         self.ignore_input_ticks = 0;
 
-        // TODO: `camera_set_mode(player, NORMAL)`
+        // TODO: `camera_set_mode(player, NORMAL)` (but put this somewhere else)
         // TODO: `prince_init:100-123` (vs mode crap)
+    }
+
+    fn update_transform(&mut self, kat: &Katamari) {
+        let kat_offset = kat.get_prince_offset();
+        let kat_center = kat.get_center();
+        self.last_pos = self.pos;
+        self.kat_offset_vec[2] = kat_offset;
+
+        // update transform differently based on if the prince is flipping
+        if self.oujistate.jump_180 != 0 {
+            self.update_flip_transform(kat_offset);
+        } else {
+            self.update_nonflip_transform(kat_offset, &kat_center);
+        }
+
+        self.flags |= 0x100;
+    }
+
+    /// TODO
+    /// offset: 0x55480
+    fn update_flip_transform(&mut self, _kat_offset: f32) {}
+
+    /// TODO
+    /// offset: 0x53650
+    fn update_nonflip_transform(&mut self, kat_offset: f32, kat_center: &Vec4) {
+        self.angle = normalize_bounded_angle(self.angle);
+        self.angle += self.extra_flat_angle_speed;
+        self.angle = normalize_bounded_angle(self.angle);
+
+        let id = mat4::create();
+        let mut local_pos = vec4::create();
+        let mut rotation_mat = [0.0; 16];
+
+        mat4::rotate_y(
+            &mut rotation_mat,
+            &id,
+            self.angle + self.auto_rotate_right_speed,
+        );
+        vec4::transform_mat4(&mut local_pos, &[0.0, 0.0, kat_offset, 1.0], &rotation_mat);
+
+        // TODO: `prince_update_nonflip_transform:141-243` (vs mode crap)
+
+        vec4::add(&mut self.pos, &local_pos, &kat_center);
+
+        // TODO: `prince_update_nonclip_transform:251-268` (handle r1 jump)
+
+        mat4::copy(&mut self.transform_rot, &rotation_mat);
     }
 
     pub fn copy_oujistate_ptr(&mut self, oujistate: &mut *mut OujiState, data_size: &mut i32) {
@@ -470,15 +519,15 @@ impl Prince {
         ty: &mut f32,
         tz: &mut f32,
     ) -> () {
-        *xx = self.transform[0];
-        *xy = self.transform[1];
-        *xz = self.transform[2];
-        *yx = self.transform[4];
-        *yy = self.transform[5];
-        *yz = self.transform[6];
-        *zx = self.transform[8];
-        *zy = self.transform[9];
-        *zz = self.transform[10];
+        *xx = self.transform_rot[0];
+        *xy = self.transform_rot[1];
+        *xz = self.transform_rot[2];
+        *yx = self.transform_rot[4];
+        *yy = self.transform_rot[5];
+        *yz = self.transform_rot[6];
+        *zx = self.transform_rot[8];
+        *zy = self.transform_rot[9];
+        *zz = self.transform_rot[10];
         *tx = self.pos[0];
         *ty = self.pos[1];
         *tz = self.pos[2];

@@ -1,8 +1,10 @@
+use std::f32::consts::PI;
+
 use gl_matrix::common::Vec4;
 use lazy_static::lazy_static;
 
 use crate::{
-    constants::{MAX_PLAYERS, NUM_MISSIONS, PI},
+    constants::{MAX_PLAYERS, NUM_MISSIONS},
     macros::{panic_log, read_bool, read_f32, read_u16, read_u8},
     math::vec4_scale_inplace,
     util::vec4_from_le_bytes,

@@ -1,6 +1,8 @@
 mod collision;
 pub mod mesh;
 
+use std::iter::Scan;
+
 use gl_matrix::{
     common::{Mat4, Vec4},
     mat4, vec4,
@@ -451,8 +453,12 @@ pub struct Katamari {
     last_velocity: KatVelocity,
 
     /// The diameter used to compute size-based scaling params (in cm).
+    /// offset: 0x3e0
+    scaled_params_size: f32,
+
+    /// Katamari params which vary continuously based on the katamari's current size.
     /// offset: 0x3e4
-    scaling_params_size: f32,
+    scaled_params: KatScaledParams,
 
     /// (??) The unit vector that's pointing "rightwards" relative to the katamari's lateral velocity.
     /// offset: 0x440
@@ -749,6 +755,14 @@ impl Katamari {
 
     pub fn get_vol(&self) -> f32 {
         self.vol_m3
+    }
+
+    pub fn get_prince_offset(&self) -> f32 {
+        self.scaled_params.prince_offset
+    }
+
+    pub fn get_center(&self) -> &Vec4 {
+        &self.center
     }
 
     pub fn get_translation(

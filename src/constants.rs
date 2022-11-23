@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use gl_matrix::common::Vec4;
 
 /// The rescale factor when translating Unity coordinates to simulation coordinates.
@@ -45,7 +47,5 @@ pub const VEC4_Z_POS: Vec4 = [0.0, 0.0, 1.0, 1.0];
 
 /// The negative z axis unit vector.
 pub const VEC4_Z_NEG: Vec4 = [0.0, 0.0, -1.0, 1.0];
-
-pub const PI: f32 = 3.141592;
 
 pub const _4PI_3: f32 = PI * 4.0 / 3.0;
