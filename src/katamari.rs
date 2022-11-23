@@ -15,7 +15,10 @@ use crate::{
     simulation_params::SimulationParams,
 };
 
-use self::collision::{KatCollisionRay, KatRay, ShellRay};
+use self::{
+    collision::{KatCollisionRayType, KatCollisionRays, ShellRay},
+    mesh::KatMesh,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KatPushDir {
@@ -125,7 +128,7 @@ pub struct KatPhysicsFlags {
 
     /// (??) The type of boundary ray currently acting as the pivot.
     /// offset: 0x11
-    pub pivot_ray: Option<KatRay>,
+    pub pivot_ray: Option<KatCollisionRayType>,
 
     /// If true, the katamari is contacting a non-flat floor (normal < 0.9999).
     /// offset: 0x12
@@ -344,6 +347,10 @@ pub struct KatScaledParams {
 
 #[derive(Debug, Default)]
 pub struct Katamari {
+    /// A reference to the vector of katamari meshes.
+    /// offset: 0x0
+    meshes: Vec<KatMesh>,
+
     /// The player who owns this katamari.
     /// offset: 0x44
     player: u8,
@@ -374,7 +381,7 @@ pub struct Katamari {
 
     /// The radius of the katamari (in cm).
     /// offset: 0x68
-    rad_cm: f32,
+    radius_cm: f32,
 
     /// The visual radius of the katamari "ball" (in cm).
     /// offset: 0x70
@@ -553,7 +560,7 @@ pub struct Katamari {
 
     /// The unit normal of the active contact floor, if one exists.
     /// offset: 0x78c
-    u_contact_floor_normal: Vec4,
+    contact_floor_normal_unit: Vec4,
 
     /// The unit normal of the active contact wall, if one exists.
     /// offset: 0x78c
@@ -627,15 +634,37 @@ pub struct Katamari {
 
     /// The katamari's current collision rays.
     /// offset: 0x8d0
-    collision_rays: Vec<KatCollisionRay>,
+    collision_rays: KatCollisionRays,
 
     /// The katamari's collision rays on the previous tick.
     /// offset: 0x20d0
-    last_collision_rays: Vec<KatCollisionRay>,
+    last_collision_rays: KatCollisionRays,
 
-    /// The number of mesh collision rays. (The default mesh has 18)
+    /// The number of mesh collision rays. (The default mesh has 18.)
     /// offset: 0x38d0
     num_mesh_rays: u16,
+
+    /// The maximum number of prop-induced collision rays. (The default value is 12.)
+    max_prop_rays: u16,
+
+    /// The katamari's transform at the beginning of a vault.
+    /// offset: 0x38d4
+    vault_init_transform: Mat4,
+
+    /// (??) Some kind of transform for when the katamari is vaulting
+    /// offset: 0x3914
+    vault_transform_unknown: Mat4,
+
+    /// (??) The vector from the katamari center to the vault contact point.
+    /// offset: 0x3954
+    vault_contact_ray: Vec4,
+
+    /// (??) The current vault contact point.
+    /// offset: 0x3964
+    vault_contact_point: Vec4,
+
+    /// The index of the collision ray being used to vault, if one exists.
+    vault_ray_idx: Option<u16>,
 
     /// (??) The maximum allowed length of any collision ray.
     /// offset: 0x39ac
@@ -643,19 +672,22 @@ pub struct Katamari {
 
     /// The average length of all collision rays.
     /// offset: 0x39b0
-    avg_ray_len: f32,
+    average_ray_len: f32,
 
     /// The number of ticks the katamari since the katamari started its current vault.
     /// offset: 0x39bc
     vault_time_ticks: u32,
 
-    /// The collision ray index of the last mesh ray. (After mesh rays is where the prop rays start).
+    /// The collision ray index of the first prop ray.
     /// offset: 0x39c0
-    max_mesh_ray_idx: u16,
+    first_prop_ray_index: u16,
 
     /// If true, collision rays induced by props are allowed (which is the default behavior).
     /// offset: 0x38c2
     enable_prop_rays: bool,
+
+    /// The collision ray vector
+    vault_ray_vec: Vec4,
 
     /// The first prop that was attached to the katamari.
     /// offset: 0x39d8
@@ -704,7 +736,7 @@ impl Katamari {
     }
 
     pub fn get_radius(&self) -> f32 {
-        self.rad_cm
+        self.radius_cm
     }
 
     pub fn get_display_radius(&self) -> f32 {
@@ -802,6 +834,9 @@ impl Katamari {
         init_pos: &Vec4,
         sim_params: &SimulationParams,
     ) {
+        // extra stuff not in the original simulation
+        self.max_prop_rays = sim_params.kat_max_prop_collision_rays;
+
         self.player = player;
         self.mesh_index = 1;
         self.input_push_dir = KatPushDir::Forwards;
@@ -815,7 +850,7 @@ impl Katamari {
 
         self.diam_cm = init_diam;
         self.init_diam_cm = init_diam;
-        self.rad_cm = init_diam / 2.0;
+        self.radius_cm = init_diam / 2.0;
         self.diam_trunc_mm = (init_diam * 10.0) as i32;
 
         self.last_velocity = self.velocity;
@@ -823,11 +858,11 @@ impl Katamari {
         vec4::copy(&mut self.center, &init_pos);
 
         vec4::copy(&mut self.bottom, &self.center);
-        self.bottom[1] -= self.rad_cm;
+        self.bottom[1] -= self.radius_cm;
 
-        self.contact_floor_ray_len = self.rad_cm;
+        self.contact_floor_ray_len = self.radius_cm;
 
-        let rad_m = self.rad_cm / 100.0;
+        let rad_m = self.radius_cm / 100.0;
         self.vol_m3 = rad_m * rad_m * rad_m * _4PI_3;
 
         vec4::copy(&mut self.u_right_of_vel, &VEC4_X_NEG);
@@ -840,14 +875,14 @@ impl Katamari {
 
         // TODO: `kat_init:148-152` (zeroing out surface contact history; continues beyond line 152).
 
-        vec4::copy(&mut self.u_contact_floor_normal, &VEC4_Y_POS);
+        vec4::copy(&mut self.contact_floor_normal_unit, &VEC4_Y_POS);
 
         self.first_attached_prop = None;
         self.last_attached_prop = None;
         self.enable_prop_rays = true;
         self.last_attached_prop_name_idx = 0;
 
-        // TODO: `self.reset_collision_rays()`
+        self.reset_collision_rays();
 
         self.prop_interaction_iframes = 0;
 

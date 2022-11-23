@@ -2,7 +2,10 @@ use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 
-use crate::mission::{GameMode, Mission, Stage};
+use crate::{
+    katamari::mesh::KatMesh,
+    mission::{GameMode, Mission, Stage},
+};
 
 /// Miscellaneous global game state.
 #[derive(Debug, Default)]
@@ -83,6 +86,10 @@ pub struct GlobalState {
     /// to false after everything has been detached.)
     /// offset: 0x10eadb
     pub detaching_props_from_kat: bool,
+
+    /// All builtin katamari meshes. The game only uses the mesh at index 1.
+    /// offset: 0x10eae8
+    pub katamari_meshes: Vec<KatMesh>,
 
     /// Props with a diameter ratio to the player less
     /// than this value will be destroyed when they reach an alpha of 0.

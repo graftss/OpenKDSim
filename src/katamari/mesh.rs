@@ -1,9 +1,14 @@
 use gl_matrix::common::Vec4;
 
-use crate::{macros::read_f32, math::vec4_scale};
+use crate::{macros::read_f32, math::vec4_scale_inplace};
 
-static KAT_MESHES: &'static [u8] = include_bytes!("../data/kat_mesh.bin");
+static KAT_MESH_BIN: &'static [u8] = include_bytes!("../data/kat_mesh.bin");
 
+lazy_static::lazy_static! {
+    pub static ref KAT_MESHES: Vec<KatMesh> = KatMesh::init_builtin_meshes();
+}
+
+#[derive(Debug, Default)]
 pub struct KatMesh {
     pub points: Vec<Vec4>,
 }
@@ -14,7 +19,7 @@ impl KatMesh {
         let mut result = vec![];
         let mut mesh_points: Vec<Vec4> = vec![];
 
-        for point_bytes in KAT_MESHES.chunks(16) {
+        for point_bytes in KAT_MESH_BIN.chunks(16) {
             let mut point = [
                 read_f32!(point_bytes, 0),
                 read_f32!(point_bytes, 4),
@@ -23,7 +28,7 @@ impl KatMesh {
             ];
 
             // make all the points negative to translate from simulation to unity coordinates
-            vec4_scale(&mut point, -1.0);
+            vec4_scale_inplace(&mut point, -1.0);
 
             println!("point={:?}", point);
 

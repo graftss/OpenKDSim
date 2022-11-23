@@ -4,6 +4,9 @@ pub struct SimulationParams {
     /// of a first climb.
     pub kat_init_wallclimb_cooldown: u16,
 
+    /// The maximum number of collision rays that can be induced by props.
+    pub kat_max_prop_collision_rays: u16,
+
     /// See `destroy_prop_diam_ratio_clearprops`. This ratio applies to normal mission.
     /// offset: 0x9eac8
     pub destroy_prop_diam_ratio_normal: f32,
@@ -44,6 +47,7 @@ impl Default for SimulationParams {
     fn default() -> Self {
         Self {
             kat_init_wallclimb_cooldown: 10,
+            kat_max_prop_collision_rays: 12,
             prop_vertical_vel_decay_after_bounce: 0.46,
             prop_lateral_vel_decay_after_bounce: 0.46,
             prop_spin_after_landing_ticks: 60,
