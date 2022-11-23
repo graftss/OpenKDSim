@@ -2,7 +2,7 @@ use gl_matrix::common::Vec4;
 use lazy_static::lazy_static;
 
 use crate::{
-    constants::{MAX_PLAYERS, NUM_MISSIONS},
+    constants::{MAX_PLAYERS, NUM_MISSIONS, PI},
     macros::{panic_log, read_bool, read_f32, read_u16, read_u8},
     math::vec4_scale_inplace,
     util::vec4_from_le_bytes,
@@ -293,6 +293,9 @@ impl MissionConfig {
 
             for (i, angle) in config.init_prince_angle.iter_mut().enumerate() {
                 *angle = read_f32!(table, base + 0x28 + i * 4);
+
+                // Again, the simulation are negative of what Unity expects, so negate the angle here.
+                *angle += PI;
             }
 
             config.init_diam_cm = read_f32!(table, base + 0x30);

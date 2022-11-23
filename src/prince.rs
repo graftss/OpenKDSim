@@ -1,6 +1,13 @@
-use gl_matrix::common::{Mat4, Vec4};
+use gl_matrix::{
+    common::{Mat4, Vec4},
+    mat4, vec4,
+};
 
-use crate::input::{AnalogPushDirs, GachaDir, StickInput};
+use crate::{
+    constants::VEC4_ZERO,
+    input::{AnalogPushDirs, GachaDir, StickInput},
+    simulation_params::SimulationParams,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct OujiState {
@@ -160,7 +167,7 @@ pub struct Prince {
     /// If <0, ignores player input forever until changed.
     /// If 0, player input is read as usual.
     /// offset: 0xf4
-    ignore_input_timer: i16,
+    ignore_input_ticks: i16,
 
     /// The transform matrix of the prince.
     /// offset: 0x138
@@ -198,7 +205,15 @@ pub struct Prince {
 
     /// The minimum angle between the two sticks necessary to cap turn speed.
     /// offset: 0x2b0
-    min_stick_angle_for_fastest_turn: f32,
+    min_angle_btwn_sticks_for_fastest_turn: f32,
+
+    /// (??)
+    /// offset: 0x2bc
+    low_stick_angle_threshold: f32,
+
+    /// (??)
+    /// offset: 0x2c0
+    high_stick_angle_threshold: f32,
 
     /// A forward push of this value or higher is scaled to 1, with lower values rescaled between [0,1].
     /// offset: 0x2c4
@@ -248,11 +263,11 @@ pub struct Prince {
 
     /// (??)
     /// offset: 0x300
-    max_hill_climb_speed: f32,
+    init_uphill_strength: f32,
 
     /// (??)
     /// offset: 0x304
-    uphill_decel: f32,
+    uphill_strength_loss: f32,
 
     /// Exact left stick analog input.
     /// offset: 0x318
@@ -369,7 +384,7 @@ pub struct Prince {
     /// The strength with which the katamari can be pushed uphill. Decreases while
     /// pushing uphill. (Seems to start at 100 and decrease from there, so maybe it's a percentage)
     /// offset: 0x488
-    push_uphill_strength: f32,
+    uphill_strength: f32,
 
     /// The direction the prince is pushing the katamari, if any.
     /// offset: 0x48c
@@ -386,8 +401,49 @@ pub struct Prince {
 
 impl Prince {
     /// Initialize the prince at the start of a mission.
-    pub fn init(&mut self, player: u8, init_angle: f32) {
+    pub fn init(&mut self, player: u8, init_angle: f32, init_kat_offset: f32) {
         self.player = player;
+        self.no_spin_ticks = 0;
+        self.huff_remain_ticks = 0;
+        vec4::copy(&mut self.pos, &VEC4_ZERO);
+        self.auto_rotate_right_speed = 0.0;
+        self.angle = init_angle;
+        self.base_kat_offset[2] = init_kat_offset;
+        self.push_dir = None;
+        self.angle_speed = 0.0;
+        mat4::identity(&mut self.yaw_rotation_something);
+        mat4::identity(&mut self.transform);
+        self.huff_init_speed_penalty = 0.4;
+        self.huff_duration_ticks = 240; // TODO: some weird potential off-by-one issue here.
+        self.init_uphill_strength = 100.0;
+        self.uphill_strength_loss = 0.7649993;
+        self.low_stick_angle_threshold = 0.8733223;
+        self.high_stick_angle_threshold = 2.270252;
+        self.forward_push_cap = 0.5;
+        self.one_stick_up_turn_speed = 0.035;
+        self.one_stick_down_turn_speed = 0.025;
+        self.quick_shift_turn_speed = 0.055;
+        self.backwards_turn_speed = 0.03;
+        self.non_backwards_turn_speed = 0.06;
+        self.max_analog_allowing_flip = 0.3;
+        self.gacha_window_ticks = 14;
+        self.max_boost_energy = 0xf0;
+        self.gachas_for_spin = 3;
+        self.boost_recharge_amount = 18;
+        self.boost_recharge_frequency = 100;
+        self.min_angle_btwn_sticks_for_fastest_turn = 0.75;
+        self.min_push_angle_y = 0.363474;
+
+        // TODO: `prince_update_transform()`
+        // TODO: `camera_init(player)`
+
+        self.boost_energy = self.max_boost_energy;
+        self.uphill_strength = self.init_uphill_strength;
+        self.view_mode = ViewMode::Normal;
+        self.ignore_input_ticks = 0;
+
+        // TODO: `camera_set_mode(player, NORMAL)`
+        // TODO: `prince_init:100-123` (vs mode crap)
     }
 
     pub fn copy_oujistate_ptr(&mut self, oujistate: &mut *mut OujiState, data_size: &mut i32) {
@@ -429,6 +485,6 @@ impl Prince {
     }
 
     pub fn set_ignore_input_timer(&mut self, value: i16) {
-        self.ignore_input_timer = value;
+        self.ignore_input_ticks = value;
     }
 }
