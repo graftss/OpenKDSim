@@ -1,10 +1,10 @@
 use std::f32::consts::{PI, TAU};
 
-use gl_matrix::common::Vec4;
+use gl_matrix::common::Vec3;
 
 /// Scale `vec` by `scale` in-place.
 #[inline]
-pub fn vec4_scale_inplace(vec: &mut Vec4, scale: f32) {
+pub fn vec3_scale_inplace(vec: &mut Vec3, scale: f32) {
     vec[0] *= scale;
     vec[1] *= scale;
     vec[2] *= scale;
@@ -12,7 +12,7 @@ pub fn vec4_scale_inplace(vec: &mut Vec4, scale: f32) {
 
 /// Zero out components of `vec` with small magnitude (less than `eps`), in-place.
 #[inline]
-pub fn vec4_zero_small_inplace(vec: &mut Vec4, eps: f32) {
+pub fn vec3_zero_small_inplace(vec: &mut Vec3, eps: f32) {
     if vec[0].abs() < eps {
         vec[0] = 0.0
     }

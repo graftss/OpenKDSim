@@ -1,13 +1,13 @@
 use std::f32::consts::PI;
 
-use gl_matrix::common::Vec4;
+use gl_matrix::common::Vec3;
 use lazy_static::lazy_static;
 
 use crate::{
     constants::{MAX_PLAYERS, NUM_MISSIONS},
     macros::{panic_log, read_bool, read_f32, read_u16, read_u8},
-    math::vec4_scale_inplace,
-    util::vec4_from_le_bytes,
+    math::vec3_scale_inplace,
+    util::vec3_from_le_bytes,
 };
 
 static MC_0X60_TABLE: &'static [u8] = include_bytes!("data/mission_config_0x60_table.bin");
@@ -239,7 +239,7 @@ pub struct MissionConfig {
 
     /// The initial position of each katamari.
     /// offset: 0x8
-    pub init_kat_pos: [Vec4; MAX_PLAYERS],
+    pub init_kat_pos: [Vec3; MAX_PLAYERS],
 
     /// The initial facing angle of each prince.
     /// offset: 0x28
@@ -286,11 +286,11 @@ impl MissionConfig {
             config.keep_smaller_props_alive = read_bool!(table, base + 0x2);
 
             for (i, init_pos) in config.init_kat_pos.iter_mut().enumerate() {
-                vec4_from_le_bytes(init_pos, &table, base + 0x8 + i * 0x10);
+                vec3_from_le_bytes(init_pos, &table, base + 0x8 + i * 0x10);
 
                 // The simulation positions are negative of what Unity expects, so we negate them
                 // in advance here.
-                vec4_scale_inplace(init_pos, -1.0);
+                vec3_scale_inplace(init_pos, -1.0);
             }
 
             for (i, angle) in config.init_prince_angle.iter_mut().enumerate() {

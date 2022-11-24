@@ -1,8 +1,8 @@
-use gl_matrix::{common::Vec4, vec4};
+use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
-    constants::VEC4_ZERO,
-    math::{vec4_scale_inplace, vec4_zero_small_inplace},
+    constants::VEC3_ZERO,
+    math::{vec3_scale_inplace, vec3_zero_small_inplace},
     prop::WeakPropRef,
 };
 
@@ -33,29 +33,30 @@ pub enum KatCollisionRayType {
     Bottom = 0,
     Mesh = 1,
     Prop = 2,
+    Vec3,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct KatCollisionRay {
     /// The endpoint relative to the katamari
     /// offset: 0x0
-    pub endpoint: Vec4,
+    pub endpoint: Vec3,
 
     /// (??)
     /// offset: 0x10
-    pub ray_local: Vec4,
+    pub ray_local: Vec3,
 
     /// The vector from the katamari center to the ray `endpoint`
-    /// offset: 0x20
-    pub kat_to_endpoint: Vec4,
+    /// offset: 0x20VEC3_ZERO
+    pub kat_to_endpoint: Vec3,
 
     /// The unit vector from the katamari center to the ray endpoint.
     /// offset: 0x30
-    pub ray_local_unit: Vec4,
+    pub ray_local_unit: Vec3,
 
     /// Zero if mesh ray, 0x30 vector if prop ray
     /// offset: 0x40
-    pub prop_ray_local_unit: Vec4,
+    pub prop_ray_local_unit: Vec3,
 
     /// If this ray is induced by a prop, points to that prop
     /// offset: 0x50
@@ -73,11 +74,11 @@ pub struct KatCollisionRay {
 impl KatCollisionRay {
     /// Reset the collision ray.
     pub fn reset(&mut self, rad_cm: f32) {
-        vec4::copy(&mut self.endpoint, &VEC4_ZERO);
-        vec4::copy(&mut self.ray_local, &VEC4_ZERO);
-        vec4::copy(&mut self.kat_to_endpoint, &VEC4_ZERO);
-        vec4::copy(&mut self.ray_local_unit, &VEC4_ZERO);
-        vec4::copy(&mut self.prop_ray_local_unit, &VEC4_ZERO);
+        vec3::copy(&mut self.endpoint, &VEC3_ZERO);
+        vec3::copy(&mut self.ray_local, &VEC3_ZERO);
+        vec3::copy(&mut self.kat_to_endpoint, &VEC3_ZERO);
+        vec3::copy(&mut self.ray_local_unit, &VEC3_ZERO);
+        vec3::copy(&mut self.prop_ray_local_unit, &VEC3_ZERO);
         self.length = rad_cm;
         self.prop = None;
         self.contacts_surface = false;
@@ -135,7 +136,7 @@ impl Katamari {
     /// Orient the bottom and mesh collision rays.
     pub fn orient_mesh_rays(&mut self) {
         let mesh_points = &KAT_MESHES[self.mesh_index as usize];
-        let mut tmp = VEC4_ZERO;
+        let mut tmp = VEC3_ZERO;
         let radius = self.radius_cm;
 
         // orient the bottom collision ray
@@ -145,26 +146,26 @@ impl Katamari {
             if !self.physics_flags.airborne {
                 // if the katamari is grounded, the bottom ray is in the direction of the
                 // contact floor surface's normal
-                vec4::copy(&mut tmp, &self.contact_floor_normal_unit);
-                vec4_scale_inplace(&mut tmp, -1.0 * radius);
-                vec4::subtract(&mut bottom_ray.endpoint, &self.center, &tmp);
+                vec3::copy(&mut tmp, &self.contact_floor_normal_unit);
+                vec3_scale_inplace(&mut tmp, -1.0 * radius);
+                vec3::subtract(&mut bottom_ray.endpoint, &self.center, &tmp);
             } else {
                 // otherwise if the katamari is airborne, the bottom ray is straight down
-                let up: Vec4 = [0.0, radius, 0.0, 0.0];
-                vec4::subtract(&mut bottom_ray.endpoint, &self.center, &up);
+                let up: Vec3 = [0.0, radius, 0.0];
+                vec3::subtract(&mut bottom_ray.endpoint, &self.center, &up);
             }
         } else {
             // else if the katamari is climbing a wall:
             // TODO: `kat_orient_mesh_rays:125-147`
         }
         bottom_ray.length = radius;
-        vec4_zero_small_inplace(&mut bottom_ray.endpoint, 0.0001);
-        vec4::subtract(
+        vec3_zero_small_inplace(&mut bottom_ray.endpoint, 0.0001);
+        vec3::subtract(
             &mut bottom_ray.kat_to_endpoint,
             &bottom_ray.endpoint,
             &self.center,
         );
-        vec4::normalize(&mut bottom_ray.ray_local_unit, &bottom_ray.kat_to_endpoint);
+        vec3::normalize(&mut bottom_ray.ray_local_unit, &bottom_ray.kat_to_endpoint);
 
         // TODO: `kat_orient_mesh_rays:164-174`
 
@@ -175,8 +176,8 @@ impl Katamari {
         // orient each mesh point using the katamari's rotation matrix
         for (i, mesh_point) in mesh_points.points.iter().enumerate() {
             let mesh_ray = &mut self.collision_rays[i];
-            vec4::transform_mat4(&mut mesh_ray.ray_local, mesh_point, &rotation_mat);
-            vec4::normalize(&mut mesh_ray.ray_local_unit, &mesh_ray.ray_local);
+            vec3::transform_mat4(&mut mesh_ray.ray_local, mesh_point, &rotation_mat);
+            vec3::normalize(&mut mesh_ray.ray_local_unit, &mesh_ray.ray_local);
             mesh_ray.length = radius;
             self.num_mesh_rays += 1;
         }

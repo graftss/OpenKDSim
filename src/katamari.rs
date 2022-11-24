@@ -2,14 +2,14 @@ mod collision;
 pub mod mesh;
 
 use gl_matrix::{
-    common::{Mat4, Vec4},
-    mat4, vec4,
+    common::{Mat4, Vec3},
+    mat4, vec3,
 };
 
 use crate::{
     constants::{
-        TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE, VEC4_X_NEG,
-        VEC4_Y_POS, VEC4_ZERO, _4PI_3,
+        TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE, VEC3_X_NEG,
+        VEC3_Y_POS, VEC3_ZERO, _4PI_3,
     },
     prop::PropRef,
     simulation_params::SimulationParams,
@@ -230,55 +230,55 @@ pub struct KatHitFlags {
 pub struct KatVelocity {
     /// Current velocity
     /// offset: 0x0
-    pub velocity: Vec4,
+    pub velocity: Vec3,
 
     /// Current unit velocity
     /// offset: 0x10
-    pub velocity_unit: Vec4,
+    pub velocity_unit: Vec3,
 
     /// (??)
     /// offset: 0x20
-    pub speed_orth_on_floor: Vec4,
+    pub speed_orth_on_floor: Vec3,
 
     /// (??)
     /// offset: 0x30
-    pub speed_proj_on_floor: Vec4,
+    pub speed_proj_on_floor: Vec3,
 
     /// (??)
     /// offset: 0x40
-    pub last_vel_accel: Vec4,
+    pub last_vel_accel: Vec3,
 
     /// (??) Velocity + player acceleration
     /// offset: 0x50
-    pub vel_accel: Vec4,
+    pub vel_accel: Vec3,
 
     /// Unit vector of `vel_accel`.
     /// offset: 0x60
-    pub vel_accel_unit: Vec4,
+    pub vel_accel_unit: Vec3,
 
     /// (??) Velocity + player accel + gravity
     /// offset: 0x70
-    pub vel_accel_grav: Vec4,
+    pub vel_accel_grav: Vec3,
 
     /// Unit vector of `vel_accel_grav`.
     /// offset: 0x80
-    pub vel_accel_grav_unit: Vec4,
+    pub vel_accel_grav_unit: Vec3,
 
     /// (??)
     /// offset: 0x90
-    pub push_vel_on_floor_unit: Vec4,
+    pub push_vel_on_floor_unit: Vec3,
 
     /// Acceleration from gravity
     /// offset: 0xa0
-    pub accel_gravity: Vec4,
+    pub accel_gravity: Vec3,
 
     /// Acceleration from the contacted floor incline
     /// offset: 0xb0
-    pub accel_incline: Vec4,
+    pub accel_incline: Vec3,
 
     /// (??) Acceleration from the contacted floor friction (or some kind of similar force)
     /// offset: 0xc0
-    pub accel_ground_friction: Vec4,
+    pub accel_ground_friction: Vec3,
 }
 
 /// Katamari parameters which vary based on the katamari's current size.
@@ -460,23 +460,23 @@ pub struct Katamari {
 
     /// (??) The unit vector that's pointing "rightwards" relative to the katamari's lateral velocity.
     /// offset: 0x440
-    u_right_of_vel: Vec4,
+    u_right_of_vel: Vec3,
 
     /// (??)
     /// offset: 0x450
-    camera_side_vector: Vec4,
+    camera_side_vector: Vec3,
 
     /// The center point of the katamari on the current tick.
     /// offset: 0x460
-    center: Vec4,
+    center: Vec3,
 
     /// The center point of the katamari on the previous tick.
     /// offset: 0x470
-    last_center: Vec4,
+    last_center: Vec3,
 
     /// (??) The vector moved the previous tick.
     /// offset: 0x480
-    delta_pos: Vec4,
+    delta_pos: Vec3,
 
     /// (??) The pitch rotation component of the transform
     /// offset: 0x520
@@ -492,39 +492,39 @@ pub struct Katamari {
 
     /// (??) Extra flat velocity??
     /// offset: 0x660
-    bonus_vel: Vec4,
+    bonus_vel: Vec3,
 
     /// The top point of the katamari sphere.
     /// offset: 0x680
-    top: Vec4,
+    top: Vec3,
 
     /// The bottom point of the katamari sphere.
     /// offset: 0x690
-    bottom: Vec4,
+    bottom: Vec3,
 
     /// The `TopCenter` shell point.
     /// offset: 0x6a0
-    shell_top_center: Vec4,
+    shell_top_center: Vec3,
 
     /// The `Bottom` shell point.
     /// offset: 0x6b0
-    shell_bottom: Vec4,
+    shell_bottom: Vec3,
 
     /// The `Left` shell point.
     /// offset: 0x6c0
-    shell_left: Vec4,
+    shell_left: Vec3,
 
     /// The `Right` shell point.
     /// offset: 0x6d0
-    shell_right: Vec4,
+    shell_right: Vec3,
 
     /// The `TopLeft` shell point.
     /// offset: 0x6e0
-    shell_top_left: Vec4,
+    shell_top_left: Vec3,
 
     /// The `TopRight` shell point.
     /// offset: 0x6f0
-    shell_top_right: Vec4,
+    shell_top_right: Vec3,
 
     /// The katamari's transform matrix.
     /// offset: 0x710
@@ -544,7 +544,7 @@ pub struct Katamari {
 
     /// The unit normal of the wall being climbed.
     /// offset: 0x774
-    wallclimb_wall_unorm: Vec4,
+    wallclimb_wall_unorm: Vec3,
 
     /// The number of ticks since the katamari started climbing a wall.
     /// offset: 0x784
@@ -564,11 +564,11 @@ pub struct Katamari {
 
     /// The unit normal of the active contact floor, if one exists.
     /// offset: 0x78c
-    contact_floor_normal_unit: Vec4,
+    contact_floor_normal_unit: Vec3,
 
     /// The unit normal of the active contact wall, if one exists.
     /// offset: 0x78c
-    u_contact_wall_normal: Vec4,
+    u_contact_wall_normal: Vec3,
 
     /// The length of the collision ray contacting the floor.
     /// offset: 0x7fc
@@ -598,11 +598,11 @@ pub struct Katamari {
     /// When the katamari is underwater, the point on the water surface that's directly
     /// above the katamari center.
     /// offset: 0x85c
-    water_surface_hit: Vec4,
+    water_surface_hit: Vec3,
 
     /// (??) The point on a surface directly below the katamari where the shadow should be drawn.
     /// offset: 0x86c
-    shadow_pos: Vec4,
+    shadow_pos: Vec3,
 
     /// (??) The number of ticks the katamari has been stuck between walls.
     /// offset: 0x87c
@@ -661,11 +661,11 @@ pub struct Katamari {
 
     /// (??) The vector from the katamari center to the vault contact point.
     /// offset: 0x3954
-    vault_contact_ray: Vec4,
+    vault_contact_ray: Vec3,
 
     /// (??) The current vault contact point.
     /// offset: 0x3964
-    vault_contact_point: Vec4,
+    vault_contact_point: Vec3,
 
     /// The index of the collision ray being used to vault, if one exists.
     vault_ray_idx: Option<u16>,
@@ -691,7 +691,7 @@ pub struct Katamari {
     enable_prop_rays: bool,
 
     /// The collision ray vector
-    vault_ray_vec: Vec4,
+    vault_ray_vec: Vec3,
 
     /// The first prop that was attached to the katamari.
     /// offset: 0x39d8
@@ -763,7 +763,7 @@ impl Katamari {
         self.scaled_params.prince_offset
     }
 
-    pub fn get_center(&self) -> &Vec4 {
+    pub fn get_center(&self) -> &Vec3 {
         &self.center
     }
 
@@ -794,11 +794,11 @@ impl Katamari {
 
     pub fn set_translation(&mut self, x: f32, y: f32, z: f32) {
         let K = UNITY_TO_SIM_SCALE;
-        let trans = [x * K, y * K, z * K, 1.0];
+        let trans = [x * K, y * K, z * K];
 
         // set the center and last center points
-        vec4::copy(&mut self.center, &trans);
-        vec4::copy(&mut self.last_center, &trans);
+        vec3::copy(&mut self.center, &trans);
+        vec3::copy(&mut self.last_center, &trans);
 
         // set the translation component of the transform matrix
         self.transform[TRANSFORM_X_POS] = trans[0];
@@ -845,7 +845,7 @@ impl Katamari {
         &mut self,
         player: u8,
         init_diam: f32,
-        init_pos: &Vec4,
+        init_pos: &Vec3,
         sim_params: &SimulationParams,
     ) {
         // extra stuff not in the original simulation
@@ -870,9 +870,9 @@ impl Katamari {
 
         self.last_velocity = self.velocity;
 
-        vec4::copy(&mut self.center, &init_pos);
+        vec3::copy(&mut self.center, &init_pos);
 
-        vec4::copy(&mut self.bottom, &self.center);
+        vec3::copy(&mut self.bottom, &self.center);
         self.bottom[1] -= self.radius_cm;
 
         self.contact_floor_ray_len = self.radius_cm;
@@ -880,17 +880,17 @@ impl Katamari {
         let rad_m = self.radius_cm / 100.0;
         self.vol_m3 = rad_m * rad_m * rad_m * _4PI_3;
 
-        vec4::copy(&mut self.u_right_of_vel, &VEC4_X_NEG);
+        vec3::copy(&mut self.u_right_of_vel, &VEC3_X_NEG);
         mat4::identity(&mut self.transform);
         mat4::identity(&mut self.turntable_rotation_mat);
         mat4::identity(&mut self.rotation_mat);
         mat4::identity(&mut self.pitch_rotation_mat);
         mat4::identity(&mut self.spin_rotation_mat);
-        vec4::copy(&mut self.bonus_vel, &VEC4_ZERO);
+        vec3::copy(&mut self.bonus_vel, &VEC3_ZERO);
 
         // TODO: `kat_init:148-152` (zeroing out surface contact history; continues beyond line 152).
 
-        vec4::copy(&mut self.contact_floor_normal_unit, &VEC4_Y_POS);
+        vec3::copy(&mut self.contact_floor_normal_unit, &VEC3_Y_POS);
 
         self.first_attached_prop = None;
         self.last_attached_prop = None;

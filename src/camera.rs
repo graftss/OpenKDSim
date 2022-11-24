@@ -1,6 +1,14 @@
-use gl_matrix::common::{Mat4, Vec4};
+use gl_matrix::{
+    common::{Mat4, Vec3},
+    vec3,
+};
 
-use crate::{katamari::Katamari, macros::log};
+use crate::{
+    constants::{VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
+    katamari::Katamari,
+    macros::log,
+    prince::Prince,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CameraMode {
@@ -65,6 +73,14 @@ pub struct CameraParams {
 
     /// (??) The initial timer when changing to Shootret mode.
     pub shoot_ret_timer_init: u16,
+
+    /// (??)
+    /// offset: 0xd345e8
+    pub param_0xd345e8: f32,
+
+    /// (??)
+    /// offset: 0xd345ec
+    pub param_0xd345ec: f32,
 }
 
 impl Default for CameraParams {
@@ -74,6 +90,8 @@ impl Default for CameraParams {
             scale_up_duration_short: 60,
             shoot_timer_init: 0x3c,
             shoot_ret_timer_init: 0x14,
+            param_0xd345e8: f32::from_bits(0xff027d4b),
+            param_0xd345ec: 0.0,
         }
     }
 }
@@ -87,10 +105,10 @@ pub struct CameraControlPt {
     pub diam_cm: f32,
 
     /// The control point's camera position (relative to katamari center).
-    pub pos: Vec4,
+    pub pos: Vec3,
 
     /// The control point's camera target (relative to katamari center).
-    pub target: Vec4,
+    pub target: Vec3,
 
     /// The max height that the prince reaches after an R1 jump.
     pub jump_r1_height: f32,
@@ -103,19 +121,19 @@ pub struct CameraControlPt {
 pub struct CameraState {
     /// The camera position's offset from the katamari center position.
     /// offset: 0x0
-    kat_to_pos: Vec4,
+    kat_to_pos: Vec3,
 
     /// The camera target's offset from the katamari center position.
     /// offset: 0x10
-    kat_to_target: Vec4,
+    kat_to_target: Vec3,
 
     /// The camera position's velocity (i.e. how much it moves each tick).
     /// offset: 0x40
-    pos_velocity: Vec4,
+    pos_velocity: Vec3,
 
     /// The camera target's velocity (i.e. how much it moves each tick).
     /// offset: 0x50
-    target_velocity: Vec4,
+    target_velocity: Vec3,
 
     /// The current mission's camera control points.
     /// offset: 0x60
@@ -155,19 +173,19 @@ pub struct CameraState {
 
     /// The camera position in world space on the previous tick.
     /// offset: 0x80
-    last_pos: Vec4,
+    last_pos: Vec3,
 
     /// The camera position in world space.
     /// offset: 0x90
-    pos: Vec4,
+    pos: Vec3,
 
     /// The camera target in world space on the previous tick.
     /// offset: 0xa0
-    last_target: Vec4,
+    last_target: Vec3,
 
     /// The camera target in world space.
     /// offset: 0xb0
-    target: Vec4,
+    target: Vec3,
 
     /// (??) Some kind of timer for vs mode shooting.
     /// offset: 0x918
@@ -175,7 +193,7 @@ pub struct CameraState {
 
     /// (??) Some kind of position for vs mode shooting.
     /// offset: 0x91c
-    shoot_pos: Vec4,
+    shoot_pos: Vec3,
 
     /// If true, applies the `clear_rot` rotation about the y axis to
     /// the final camera transform.
@@ -210,9 +228,25 @@ pub struct CameraTransform {
     /// offset: 0x0
     transform: Mat4,
 
+    /// The rotation component of `transform`
+    /// offset: 0xc0
+    transform_rot: Mat4,
+
+    /// The camera's "up" vector (which should always be the y+ axis unit vector)
+    /// offset: 0x140
+    up: Vec3,
+
+    /// (??) The camera's rotation expressed as Euler angles
+    /// offset: 0x150
+    euler_angles: Vec3,
+
+    /// The target of the camera.
+    /// offset: 0x160
+    target: Vec3,
+
     /// The position of the camera.
     /// offset: 0x170
-    pos: Vec4,
+    pos: Vec3,
 
     /// The extra zoom out distance as the timer expires at the end of MAS4.
     /// offset: 0x180
@@ -227,6 +261,42 @@ pub struct Camera {
 }
 
 impl Camera {
+    /// Initialize the `CameraState` struct.
+    pub fn init_state(&mut self, kat: &Katamari, prince: &Prince) {
+        let mut pos = vec3::create();
+        let mut target = vec3::create();
+
+        self.compute_normal_pos_and_target(kat, prince, &mut pos, &mut target);
+        self.state.pos = pos;
+        self.state.last_pos = pos;
+        self.state.target = target;
+        self.state.last_target = target;
+    }
+
+    /// TODO
+    /// offset: 0xd4a0
+    pub fn compute_normal_pos_and_target(
+        &self,
+        kat: &Katamari,
+        prince: &Prince,
+        pos: &mut Vec3,
+        target: &mut Vec3,
+    ) {
+        let mut prince_to_kat = vec3::create();
+        vec3::subtract(&mut prince_to_kat, &kat.get_center(), &prince.get_pos());
+        prince_to_kat[1] = 0.0;
+        // vec3::normalize(&mut prince_to_kat, a);
+    }
+
+    /// Initialize the `CameraTransform` struct
+    pub fn init_transform(&mut self) {
+        self.transform.pos = VEC3_ZERO;
+        self.transform.euler_angles = VEC3_ZERO;
+        self.transform.target = VEC3_Z_POS;
+        self.transform.up = VEC3_Y_POS;
+        self.transform.mas4_preclear_offset = 0.0;
+    }
+
     pub fn set_mode(&mut self, kat: &mut Katamari, mode: CameraMode) {
         if self.state.mode == CameraMode::LookL1 {
             kat.set_look_l1(true);

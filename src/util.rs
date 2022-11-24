@@ -1,6 +1,6 @@
 use std::{fs::OpenOptions, path::Path};
 
-use gl_matrix::common::{Mat4, Vec4};
+use gl_matrix::common::{Mat4, Vec3, Vec4};
 
 use crate::constants::{TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE};
 
@@ -14,6 +14,14 @@ pub fn scale_sim_transform(transform: &mut Mat4) {
 
 /// Read a `Vec4` from offset `offset` of a `u8` slice.
 pub fn vec4_from_le_bytes(out: &mut Vec4, bytes: &[u8], offset: usize) {
+    for (i, val) in out.iter_mut().enumerate() {
+        let val_offset = offset + i * 4;
+        *val = f32::from_le_bytes(bytes[val_offset..val_offset + 4].try_into().unwrap());
+    }
+}
+
+/// Read a `Vec3` from offset `offset` of a `u8` slice.
+pub fn vec3_from_le_bytes(out: &mut Vec3, bytes: &[u8], offset: usize) {
     for (i, val) in out.iter_mut().enumerate() {
         let val_offset = offset + i * 4;
         *val = f32::from_le_bytes(bytes[val_offset..val_offset + 4].try_into().unwrap());

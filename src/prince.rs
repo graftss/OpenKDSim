@@ -1,10 +1,10 @@
 use gl_matrix::{
-    common::{Mat4, Vec4},
-    mat4, vec4,
+    common::{Mat4, Vec3},
+    mat4, vec3,
 };
 
 use crate::{
-    constants::VEC4_ZERO,
+    constants::VEC3_ZERO,
     input::{AnalogPushDirs, GachaDir, StickInput},
     katamari::Katamari,
     math::normalize_bounded_angle,
@@ -104,15 +104,15 @@ pub struct Prince {
 
     /// The current position of the prince.
     /// offset: 0xc
-    pos: Vec4,
+    pos: Vec3,
 
     /// The position of the prince on the previous tick.
     /// offset: 0x1c
-    last_pos: Vec4,
+    last_pos: Vec3,
 
     /// The prince's offset from the katamari at the start of a flip.
     /// offset: 0x5c
-    flip_init_kat_offset: Vec4,
+    flip_init_kat_offset: Vec3,
 
     /// The prince's angle around the katamari.
     /// offset: 0x6c
@@ -179,7 +179,7 @@ pub struct Prince {
     /// Since the prince is always facing the z+ axis, this vector is therefore always
     /// a multiple of the z- axis (since the prince is behind the katamari center)
     /// offset: 0x24c
-    kat_offset_vec: Vec4,
+    kat_offset_vec: Vec3,
 
     /// (??)
     /// offset: 0x288
@@ -402,12 +402,18 @@ pub struct Prince {
 }
 
 impl Prince {
+    pub fn get_pos(&self) -> &Vec3 {
+        &self.pos
+    }
+}
+
+impl Prince {
     /// Initialize the prince at the start of a mission.
     pub fn init(&mut self, player: u8, init_angle: f32, kat: &Katamari) {
         self.player = player;
         self.no_spin_ticks = 0;
         self.huff_remain_ticks = 0;
-        vec4::copy(&mut self.pos, &VEC4_ZERO);
+        vec3::copy(&mut self.pos, &VEC3_ZERO);
         self.auto_rotate_right_speed = 0.0;
         self.angle = init_angle;
         self.kat_offset_vec[2] = kat.get_prince_offset();
@@ -469,13 +475,13 @@ impl Prince {
 
     /// Update the prince's transform matrix while not flipping.
     /// offset: 0x53650
-    fn update_nonflip_transform(&mut self, kat_offset: f32, kat_center: &Vec4) {
+    fn update_nonflip_transform(&mut self, kat_offset: f32, kat_center: &Vec3) {
         self.angle = normalize_bounded_angle(self.angle);
         self.angle += self.extra_flat_angle_speed;
         self.angle = normalize_bounded_angle(self.angle);
 
         let id = mat4::create();
-        let mut local_pos = vec4::create();
+        let mut local_pos = vec3::create();
         let mut rotation_mat = [0.0; 16];
 
         mat4::rotate_y(
@@ -483,11 +489,11 @@ impl Prince {
             &id,
             self.angle + self.auto_rotate_right_speed,
         );
-        vec4::transform_mat4(&mut local_pos, &[0.0, 0.0, kat_offset, 1.0], &rotation_mat);
+        vec3::transform_mat4(&mut local_pos, &[0.0, 0.0, kat_offset], &rotation_mat);
 
         // TODO: `prince_update_nonflip_transform:141-243` (vs mode crap)
 
-        vec4::add(&mut self.pos, &local_pos, &kat_center);
+        vec3::add(&mut self.pos, &local_pos, &kat_center);
 
         // TODO: `prince_update_nonclip_transform:251-268` (handle r1 jump)
 
