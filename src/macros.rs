@@ -58,13 +58,6 @@ macro_rules! max_to_none {
     };
 }
 
-macro_rules! new_mat4_id {
-    ($ident: ident) => {
-        let mut $ident = [0.0; 16];
-        mat4::identity(&mut $ident);
-    };
-}
-
 macro_rules! new_mat4_copy {
     ($ident: ident, $src: expr) => {
         let mut $ident = [0.0; 16];
@@ -76,7 +69,6 @@ pub(crate) use {
     log,
     max_to_none,
     new_mat4_copy,
-    new_mat4_id,
     panic_log,
     read_bool,
     read_f32,

@@ -11,7 +11,7 @@ use gl_matrix::{
 
 use crate::{
     gamestate::GameState,
-    macros::{max_to_none, new_mat4_copy, new_mat4_id},
+    macros::{max_to_none, new_mat4_copy},
     mono_data::MonoDataPropPtrs,
     name_prop_config::NamePropConfig,
     util::scale_sim_transform,
@@ -524,19 +524,26 @@ impl Prop {
         Rc::new(RefCell::new(node))
     }
 
+    /// Create a new `Prop` object.
+    /// Mostly follows the function `prop_init`.
+    /// offset: 0x4e950
     pub fn new_node(state: &mut GameState, args: &AddPropArgs) -> Self {
         let config = NamePropConfig::get(args.name_idx.into());
+        let ctrl_idx = state.global.get_next_ctrl_idx();
 
-        // initialize rotation matrix to identity
-        new_mat4_id!(rotation_mat);
-        // TODO: rotate `rotation_mat` by rotation angles in `args`
+        // initialize rotation matrix
+        let id = mat4::create();
+        let mut rotation_mat = mat4::create();
+        let rot_axis = [args.rot_x, args.rot_y, args.rot_z];
+        let rot_angle = args.rot_w;
+        mat4::rotate(&mut rotation_mat, &id, -rot_angle, &rot_axis);
 
         // save the initial rotation
         new_mat4_copy!(init_rotation_mat, rotation_mat);
 
         // initialize unattached transform to the initial rotation mat
         new_mat4_copy!(unattached_transform, rotation_mat);
-        new_mat4_copy!(init_transform, unattached_transform);
+        new_mat4_copy!(init_transform, rotation_mat);
 
         // TODO
         // lines 104-107 of `prop_init` (init comment)
@@ -560,7 +567,7 @@ impl Prop {
             .clone();
 
         let result = Prop {
-            ctrl_idx: state.global.get_next_ctrl_idx(),
+            ctrl_idx,
             name_idx: args.name_idx.into(),
             flags: 0,
             global_state: PropGlobalState::Unattached,

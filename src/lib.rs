@@ -503,10 +503,11 @@ pub unsafe extern "C" fn GetPropMatrix(ctrl_idx: i32, out: *mut Mat4) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) {
+pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) -> i32 {
     let mut next_mat = out;
 
     STATE.with(|state| {
+        let mut result = 0;
         for prop_ref in &state.borrow().props {
             let prop = prop_ref.borrow();
             if !prop.is_initialized() {
@@ -521,7 +522,10 @@ pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) {
 
             // Increment the pointer into `out` to the next matrix.
             next_mat = next_mat.offset(16);
+            result += 1;
         }
+
+        result
     })
 }
 

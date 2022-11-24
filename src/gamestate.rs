@@ -395,5 +395,8 @@ impl GameState {
     }
 
     /// Mimicks the `Tick` API function.
-    pub fn tick(&mut self, _delta: f32) {}
+    pub fn tick(&mut self, _delta: f32) {
+        self.global.ticks += 1;
+        // log!("tick {}", self.global.ticks);
+    }
 }

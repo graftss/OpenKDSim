@@ -154,7 +154,7 @@ fn main() {
 
     katamari::mesh::KatMesh::init_builtin_meshes();
 
-    unsafe {
-        // test();
-    }
+    // unsafe {
+    // test();
+    // }
 }
