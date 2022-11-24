@@ -1,3 +1,5 @@
+mod aabb;
+
 use std::{
     cell::RefCell,
     fmt::{Debug, Display},
@@ -12,7 +14,6 @@ use gl_matrix::{
 use crate::{
     gamestate::GameState,
     macros::{max_to_none, new_mat4_copy},
-    mono_data::MonoDataPropPtrs,
     name_prop_config::NamePropConfig,
     util::scale_sim_transform,
 };
@@ -466,8 +467,6 @@ pub struct Prop {
     /// offset: 0xa30
     collected_next: Option<WeakPropRef>,
 
-    mono_data_ptrs: MonoDataPropPtrs,
-
     /// True if this prop has a twin prop on the Gemini mission.
     /// offset: 0xb10
     has_twin: bool,
@@ -559,13 +558,6 @@ impl Prop {
         // line 385
         // lines 386-391 (init fish)
 
-        let mono_data_ptrs = state
-            .mono_data
-            .props
-            .get(args.name_idx as usize)
-            .unwrap()
-            .clone();
-
         let result = Prop {
             ctrl_idx,
             name_idx: args.name_idx.into(),
@@ -623,7 +615,6 @@ impl Prop {
             collected_next: None,
             has_twin: args.twin_id != u16::MAX,
             twin_id: max_to_none!(u16, args.twin_id),
-            mono_data_ptrs: mono_data_ptrs,
 
             // TODO
             first_subobject: None, // TODO

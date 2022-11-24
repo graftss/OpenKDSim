@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 
+use crate::mono_data::MonoData;
 use gamestate::GameState;
 use prop::AddPropArgs;
 
@@ -130,31 +131,13 @@ unsafe fn test() {
         let mut state = state.borrow_mut();
 
         state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
-
-        state.add_prop(CHILD_PROP_ARGS);
-        state.add_prop(PARENT_PROP_ARGS);
-        state.add_prop(SIB_PROP_ARGS);
-        state.add_prop(PARENT_PROP_ARGS);
-        state.add_prop(PARENT_PROP_ARGS);
-        state.add_prop_set_parent(2, 1);
-        state.add_prop_set_parent(0, 1);
-        state.add_prop_set_parent(1, 3);
-        state.add_prop_set_parent(4, 3);
-
-        state.read_prop_ref(0).clone().borrow_mut().print_links("0");
-        state.read_prop_ref(1).clone().borrow_mut().print_links("1");
-        state.read_prop_ref(2).clone().borrow_mut().print_links("2");
-        state.read_prop_ref(3).clone().borrow_mut().print_links("3");
-        state.read_prop_ref(4).clone().borrow_mut().print_links("4");
     });
 }
 
 fn main() {
     println!("start");
 
-    katamari::mesh::KatMesh::init_builtin_meshes();
-
-    // unsafe {
-    // test();
-    // }
+    unsafe {
+        test();
+    }
 }
