@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use crate::{
     constants::{MAX_PLAYERS, NUM_MISSIONS},
     macros::{panic_log, read_bool, read_f32, read_u16, read_u8},
-    math::vec3_scale_inplace,
+    math::vec3_inplace_scale,
     util::vec3_from_le_bytes,
 };
 
@@ -290,7 +290,7 @@ impl MissionConfig {
 
                 // The simulation positions are negative of what Unity expects, so we negate them
                 // in advance here.
-                vec3_scale_inplace(init_pos, -1.0);
+                vec3_inplace_scale(init_pos, -1.0);
             }
 
             for (i, angle) in config.init_prince_angle.iter_mut().enumerate() {

@@ -266,7 +266,7 @@ impl GameState {
     /// Mimicks the `SetCameraMode` API function.
     pub fn set_camera_mode(&mut self, player: i32, mode: i32) {
         if let Some(camera) = self.cameras.get_mut(player as usize) {
-            camera.set_mode(&mut self.katamaris[player as usize], mode.into());
+            camera.set_mode(mode.into());
         }
     }
 
@@ -337,14 +337,15 @@ impl GameState {
                 self.sim_params.destroy_prop_diam_ratio_normal
             };
 
+        // initialize the katamari, the prince, and the camera (in that order)
         self.init_katamari(player, mission_config, override_init_size);
         self.init_prince(player, mission_config);
+        self.cameras[player as usize].init(
+            &self.katamaris[player as usize],
+            &self.princes[player as usize],
+        );
 
         self.global.map_loop_rate = 0.0;
-
-        // TODO: `camera_init(player)` 0xb410
-        // TODO: `camera_set_mode(player, NORMAL)` 0xad40
-        // TODO: `camera_init_transforms()`: 0x57dc0
 
         // TODO: `set_global_angle??(is_vs_mode ? 70.0 : 48.0): 0x59270 (this is probably a no-op)
         // TODO: `init_simulation`:127-277, this may be a no-op
@@ -365,7 +366,6 @@ impl GameState {
             // TODO: `init_simulation`:333-366, initialize somethings coming callbacks?
         }
 
-        // TODO: `camera_reset()`
         // TODO: `prince_init_animation()`
         // TODO: `Init`: 21-51, initialize ending stuff
     }

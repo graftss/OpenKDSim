@@ -1,6 +1,6 @@
 use gl_matrix::common::Vec3;
 
-use crate::{macros::read_f32, math::vec3_scale_inplace};
+use crate::{macros::read_f32, math::vec3_inplace_scale};
 
 static KAT_MESH_BIN: &'static [u8] = include_bytes!("../data/kat_mesh.bin");
 
@@ -29,7 +29,7 @@ impl KatMesh {
             let point_w = read_f32!(point_bytes, 12);
 
             // make all the points negative to translate from simulation to unity coordinates
-            vec3_scale_inplace(&mut point, -1.0);
+            vec3_inplace_scale(&mut point, -1.0);
 
             println!("point={:?}", point);
 

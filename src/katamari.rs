@@ -405,7 +405,7 @@ pub struct Katamari {
 
     /// Various physics-related flags (some of which aren't actually true/false values, but whatever).
     /// offset: 0xa4
-    physics_flags: KatPhysicsFlags,
+    pub physics_flags: KatPhysicsFlags,
 
     /// The value of `physics_flags` on the previous tick.
     /// offset: 0xc7
@@ -413,12 +413,12 @@ pub struct Katamari {
 
     /// Various flags which relate to properties of surfaces the katamari currently contacts.
     /// offset: 0xea
-    hit_flags: KatHitFlags,
+    pub hit_flags: KatHitFlags,
 
     /// The value of `hit_flags` on the previous two ticks.
     /// Index 0 is the previous tick, and index 1 is two ticks ago.
     /// offset: 0xf5
-    last_hit_flags: [KatHitFlags; 2],
+    pub last_hit_flags: [KatHitFlags; 2],
 
     /// (??)
     /// offset: 0x10d

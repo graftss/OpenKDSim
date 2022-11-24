@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    math::{vec3_scale_inplace, vec3_zero_small_inplace},
+    math::{vec3_inplace_scale, vec3_inplace_zero_small},
     prop::WeakPropRef,
 };
 
@@ -147,7 +147,7 @@ impl Katamari {
                 // if the katamari is grounded, the bottom ray is in the direction of the
                 // contact floor surface's normal
                 vec3::copy(&mut tmp, &self.contact_floor_normal_unit);
-                vec3_scale_inplace(&mut tmp, -1.0 * radius);
+                vec3_inplace_scale(&mut tmp, -1.0 * radius);
                 vec3::subtract(&mut bottom_ray.endpoint, &self.center, &tmp);
             } else {
                 // otherwise if the katamari is airborne, the bottom ray is straight down
@@ -159,7 +159,7 @@ impl Katamari {
             // TODO: `kat_orient_mesh_rays:125-147`
         }
         bottom_ray.length = radius;
-        vec3_zero_small_inplace(&mut bottom_ray.endpoint, 0.0001);
+        vec3_inplace_zero_small(&mut bottom_ray.endpoint, 0.0001);
         vec3::subtract(
             &mut bottom_ray.kat_to_endpoint,
             &bottom_ray.endpoint,
