@@ -1,6 +1,6 @@
 use gl_matrix::common::{Mat4, Vec4};
 
-use crate::macros::log;
+use crate::{katamari::Katamari, macros::log};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CameraMode {
@@ -18,6 +18,12 @@ pub enum CameraMode {
     ClearGoalProp,
     VsResult,
     Unknown(i32),
+}
+
+impl Default for CameraMode {
+    fn default() -> Self {
+        Self::Normal
+    }
 }
 
 impl From<i32> for CameraMode {
@@ -53,6 +59,12 @@ pub struct CameraParams {
     /// (??) A duration when the camera is zooming out.
     /// offset: 0x7a0b8
     pub scale_up_duration_short: i32,
+
+    /// (??) The initial timer when changing to Shoot mode.
+    pub shoot_timer_init: u16,
+
+    /// (??) The initial timer when changing to Shootret mode.
+    pub shoot_ret_timer_init: u16,
 }
 
 impl Default for CameraParams {
@@ -60,8 +72,28 @@ impl Default for CameraParams {
         Self {
             scale_up_duration_long: 100,
             scale_up_duration_short: 60,
+            shoot_timer_init: 0x3c,
+            shoot_ret_timer_init: 0x14,
         }
     }
+}
+
+/// A control point that determines how the camera should be positioned at a specific
+/// katamari size. The actual position is determined by lerping the values of the
+/// two control points on either side of the katamari's actual size.
+#[derive(Debug, Default)]
+pub struct CameraControlPt {
+    /// The minimum katamari diameter at which this control point takes effect.
+    pub diam_cm: f32,
+
+    /// The control point's camera position (relative to katamari center).
+    pub pos: Vec4,
+
+    /// The control point's camera target (relative to katamari center).
+    pub target: Vec4,
+
+    /// The max height that the prince reaches after an R1 jump.
+    pub jump_r1_height: f32,
 }
 
 /// General camera state.
@@ -69,9 +101,104 @@ impl Default for CameraParams {
 /// width: 0x980
 #[derive(Debug, Default)]
 pub struct CameraState {
+    /// The camera position's offset from the katamari center position.
+    /// offset: 0x0
+    kat_to_pos: Vec4,
+
+    /// The camera target's offset from the katamari center position.
+    /// offset: 0x10
+    kat_to_target: Vec4,
+
+    /// The camera position's velocity (i.e. how much it moves each tick).
+    /// offset: 0x40
+    pos_velocity: Vec4,
+
+    /// The camera target's velocity (i.e. how much it moves each tick).
+    /// offset: 0x50
+    target_velocity: Vec4,
+
+    /// The current mission's camera control points.
+    /// offset: 0x60
+    control_points: Vec<CameraControlPt>,
+
+    /// (??) A timer counting down to when the camera will finish scaling up.
+    /// offset: 0x68
+    scale_up_end_timer: f32,
+
+    /// (??) The ratio of progress (from 0 to 1) made towards the current scale up.
+    /// offset: 0x6c
+    scale_up_progress: f32,
+
+    /// (??)
+    /// offset: 0x70
+    scale_up_duration: f32,
+
+    /// (??)
+    /// offset: 0x76
+    scale_up_ticks: u16,
+
+    /// The player to which this camera belongs
+    /// offset: 0x78
+    player: u8,
+
+    /// The current area.
+    /// offset: 0x7c
+    area: u8,
+
+    /// (??) True if the camera is currently scaling up.
+    /// offset: 0x7d
+    scale_up_in_progress: bool,
+
+    /// The current camera mode.
+    /// offset: 0x7e
+    mode: CameraMode,
+
+    /// The camera position in world space on the previous tick.
+    /// offset: 0x80
+    last_pos: Vec4,
+
+    /// The camera position in world space.
+    /// offset: 0x90
+    pos: Vec4,
+
+    /// The camera target in world space on the previous tick.
+    /// offset: 0xa0
+    last_target: Vec4,
+
+    /// The camera target in world space.
+    /// offset: 0xb0
+    target: Vec4,
+
+    /// (??) Some kind of timer for vs mode shooting.
+    /// offset: 0x918
+    shoot_timer: u16,
+
+    /// (??) Some kind of position for vs mode shooting.
+    /// offset: 0x91c
+    shoot_pos: Vec4,
+
+    /// If true, applies the `clear_rot` rotation about the y axis to
+    /// the final camera transform.
+    /// offset: 0x96a
+    clear_is_rotating: bool,
+
     /// (??) something to do with clearing i think
     /// offset: 0x96c
     pub cam_eff_1P: bool,
+
+    /// The extra rotation about the y axis applied to the camera after
+    /// clearing a `ClearProp` mission.
+    /// offset: 0x964
+    clear_goal_prop_rot: f32,
+
+    /// (??) The extra rotation about the y axis applied to the camera after
+    /// clearing certain non-`ClearProp` gamemodes.
+    /// offset: 0x978
+    clear_rot: f32,
+
+    /// (??) The update callback that will run during the ending gamemode.
+    /// offset: 0x970
+    update_ending_callback: Option<Box<fn() -> ()>>,
 }
 
 /// Transform matrices for the camera.
@@ -100,9 +227,45 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn set_mode(&mut self, mode: i32) {
-        // TODO: reimplement `camera_set_mode` function at 0xad40
-        log!("set camera mode: {mode:?}");
+    pub fn set_mode(&mut self, kat: &mut Katamari, mode: CameraMode) {
+        if self.state.mode == CameraMode::LookL1 {
+            kat.set_look_l1(true);
+        }
+
+        self.state.mode = mode;
+        self.state.update_ending_callback = None;
+
+        match mode {
+            CameraMode::JumpR1 => {
+                // TODO: `camera_set_mode:40-97`
+            }
+            CameraMode::LookL1 => {
+                // TODO: `camera_set_mode:98-113`
+            }
+            CameraMode::HitByProp => {
+                // TODO: `camera_set_mode: 114-129`
+            }
+            CameraMode::Clear => {
+                // TODO: `camera_set_mode: 129-160`
+            }
+            CameraMode::Shoot => {
+                self.state.shoot_timer = self.params.shoot_timer_init;
+                self.state.shoot_pos = self.transform.pos;
+            }
+            CameraMode::ShootRet => {
+                self.state.shoot_timer = self.params.shoot_ret_timer_init;
+            }
+            CameraMode::AreaChange => {
+                // TODO `camera_set_mode:171-188` (but this seems to be unused in reroll??)
+            }
+            CameraMode::ClearGoalProp => {
+                self.state.clear_goal_prop_rot = 0.0;
+            }
+            CameraMode::VsResult => {
+                self.state.clear_rot = 0.0;
+            }
+            _ => (),
+        };
     }
 
     pub fn check_scale_up(&mut self, _flag: bool) {

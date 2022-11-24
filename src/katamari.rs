@@ -1,8 +1,6 @@
 mod collision;
 pub mod mesh;
 
-use std::iter::Scan;
-
 use gl_matrix::{
     common::{Mat4, Vec4},
     mat4, vec4,
@@ -727,6 +725,10 @@ pub struct Katamari {
     /// offset: 0x3ad6
     pub vs_attack_count: i16,
 
+    /// True if the player is in the "look L1" state.
+    /// offset: 0x3b38
+    is_look_l1: bool,
+
     /// Whether or not the "something's coming" alarm is going off.
     /// offset: 0x3b84
     alarm_mode: bool,
@@ -763,6 +765,10 @@ impl Katamari {
 
     pub fn get_center(&self) -> &Vec4 {
         &self.center
+    }
+
+    pub fn set_look_l1(&mut self, is_look_l1: bool) {
+        self.is_look_l1 = is_look_l1;
     }
 
     pub fn get_translation(
@@ -834,12 +840,6 @@ impl Katamari {
 }
 
 impl Katamari {
-    /// Forcibly end the katamari's movement, if it's moving.
-    /// offset: 0x1f390
-    pub fn set_immobile(&mut self) {
-        // TODO
-    }
-
     ///
     pub fn init(
         &mut self,
@@ -927,5 +927,11 @@ impl Katamari {
 
         // TODO: `kat_init:284-285` (not sure what this is about)
         // TODO: `kat_init:286-288` (compute initial airborne prop gravity)
+    }
+
+    /// Forcibly end the katamari's movement, if it's moving.
+    /// offset: 0x1f390
+    pub fn set_immobile(&mut self) {
+        // TODO
     }
 }

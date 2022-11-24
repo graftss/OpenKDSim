@@ -437,24 +437,23 @@ impl Prince {
         self.min_push_angle_y = 0.363474;
 
         self.update_transform(kat);
-        // TODO: `camera_init(player)` (but put this somewhere else)
 
         self.boost_energy = self.max_boost_energy;
         self.uphill_strength = self.init_uphill_strength;
         self.view_mode = ViewMode::Normal;
         self.ignore_input_ticks = 0;
 
-        // TODO: `camera_set_mode(player, NORMAL)` (but put this somewhere else)
         // TODO: `prince_init:100-123` (vs mode crap)
     }
 
+    /// The main function to update the prince's transform matrix each tick.
     fn update_transform(&mut self, kat: &Katamari) {
         let kat_offset = kat.get_prince_offset();
         let kat_center = kat.get_center();
         self.last_pos = self.pos;
         self.kat_offset_vec[2] = kat_offset;
 
-        // update transform differently based on if the prince is flipping
+        // update transform differently depending on if the prince is flipping
         if self.oujistate.jump_180 != 0 {
             self.update_flip_transform(kat_offset);
         } else {
@@ -468,7 +467,7 @@ impl Prince {
     /// offset: 0x55480
     fn update_flip_transform(&mut self, _kat_offset: f32) {}
 
-    /// TODO
+    /// Update the prince's transform matrix while not flipping.
     /// offset: 0x53650
     fn update_nonflip_transform(&mut self, kat_offset: f32, kat_center: &Vec4) {
         self.angle = normalize_bounded_angle(self.angle);
