@@ -10,7 +10,7 @@ use gl_matrix::{
 };
 
 use crate::{
-    collision::mesh::Mesh,
+    collision::{mesh::Mesh, util::max_transformed_y},
     constants::{_1_3, _4PI, _PI_750},
     gamestate::GameState,
     macros::{max_to_none, new_mat4_copy},
@@ -583,7 +583,6 @@ impl Prop {
         // lines 163-190 of `prop_init` (init twin)
         // lines 348-349 (find first subobject)
         // lines 350-357 (init motion scripts)
-        // lines 365-367 (init links to other props)
         // lines 368-371, 392-401 (init wobble state)
         // lines 373-384 (init generated prop??)
         // line 385
@@ -679,6 +678,16 @@ impl Prop {
         if let Some(aabbs) = &mono_data.aabbs {
             result.init_aabb_and_volume(aabbs, config);
         }
+
+        // move random-spawn props vertically so that they're resting on the ground
+        if args.loc_pos_type != 0 {
+            let y_offset = result.max_aabb_y();
+            result.pos[1] += y_offset;
+            result.init_pos[1] += y_offset;
+        }
+
+        // note the conditional call to `prop_init_tree_links` here in the original sim,
+        // but the condition to call it appears to never be true in reroll.
 
         result.mono_data = Some(mono_data);
 
@@ -934,5 +943,13 @@ impl Prop {
         // TODO: if `should_destroy` is true, call `prop_destroy`
 
         should_destroy
+    }
+}
+
+impl Prop {
+    /// Computes the highest point (in local space) on this prop's AABB
+    /// after transforming the AABB with its current rotation matrix.
+    pub fn max_aabb_y(&self) -> f32 {
+        max_transformed_y(&self.aabb_vertices, &self.rotation_mat)
     }
 }

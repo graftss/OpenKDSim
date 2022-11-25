@@ -195,9 +195,9 @@ impl GameState {
         mission: i32,
         area: i32,
         stage: i32,
-        _kadaiFlag: i32,
-        _clearFlag: i32,
-        _endFlag: i32,
+        _kadai_flag: i32,
+        _clear_flag: i32,
+        _end_flag: i32,
     ) {
         self.global.mono_init_start(
             mission.try_into().unwrap(),
@@ -385,6 +385,8 @@ impl GameState {
 
         let kat = &mut self.katamaris[player as usize];
         kat.init(player, init_diam, init_pos, &self.sim_params);
+
+        println!("katamari pos: {:?}", kat.get_center());
     }
 
     fn init_prince(&mut self, player: u8, mission_config: &MissionConfig) {
@@ -396,7 +398,78 @@ impl GameState {
 
     /// Mimicks the `Tick` API function.
     pub fn tick(&mut self, _delta: f32) {
+        let is_vs_mode = self.global.is_vs_mode;
+
         self.global.ticks += 1;
-        // log!("tick {}", self.global.ticks);
+
+        // `update_game()`
+        // TODO: `update_game:23-89` (if store flag is on, which seems to be irrelevant)
+        self.global.updating_player = 0;
+        // TODO: `props_update()`
+        // TODO: `update_game:93-101` (but put this in `props_update`)
+        // TODO: `tutorial_update_flags`
+
+        // update the first player
+        self.update_player(0);
+
+        if is_vs_mode {
+            // if vs mode, update the second player, then update vsmode-specific stuff
+            self.global.updating_player = 1;
+            self.update_player(1);
+            // TODO: `vsmode_update()`
+        }
+
+        // TODO: `camera_update_transforms()`
+        // TODO: `camera_update_extra_matrices()`
+
+        self.global.updating_player = 0;
+        // TODO: `self.cameras[0].update()`
+
+        if !is_vs_mode {
+            let diam_m = self.katamaris[0].get_diam_m();
+            let _radius_ish = if diam_m >= 1.0 {
+                ((diam_m - 1.0) - 0.5) + 1.0
+            } else {
+                diam_m
+            };
+            // TODO: update prop fadeout alpha crap
+        } else {
+            self.global.updating_player = 1;
+            // TODO: self.cameras[1].update()`
+        }
+
+        self.global.updating_player = 0;
+        if self.preclear.get_enabled() {
+            // TODO: `update_game:142-173` (update preclear mode camera)
+        }
+
+        // TODO: `camera_update_transforms()`
+        // TODO: `camera_update_extra_matrices()`
+
+        if !is_vs_mode {
+            // TODO: `update_game:176-255` (selectively update props based on their alpha)
+        } else {
+            // TODO: `update_game:258-267` (idk vs mode crap)
+        }
+
+        // TODO: `update_game:269` (keep separate running global count of # of attached props, because reasons)
+        //                         (don't do this)
+    }
+
+    /// Update the prince and katamari controlled by the given `player`.    
+    /// offset: 0x25be0
+    fn update_player(&mut self, player: usize) {
+        if self.global.freeze {
+            // TODO: `player_update:26-32` (if game is frozen do less stuff)
+        } else {
+            // update the prince, then the katamari
+            self.princes[player].update();
+            self.katamaris[player].update();
+
+            // update the prince's transform now that the katamari is updated
+            self.princes[player].update_transform(&self.katamaris[player]);
+            // TODO: self.princes[player].update_animation(); (although animations might want to be their own struct)
+            // TODO: `player_update:95-135` (resolve royal warps)
+        }
     }
 }

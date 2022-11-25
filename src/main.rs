@@ -49,7 +49,7 @@ const CHILD_PROP_ARGS: AddPropArgs = AddPropArgs {
     scale_x: 6.0,
     scale_y: 6.0,
     scale_z: 6.0,
-    name_idx: 910, // B pencil
+    name_idx: 837, // B pencil
     loc_pos_type: u16::MAX,
     random_group_id: u16::MAX,
     mono_move_type: u16::MAX,
@@ -133,7 +133,8 @@ unsafe fn test() {
 
         state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
         state.add_prop(CHILD_PROP_ARGS);
-        let x = state.props[0].as_ref().borrow();
+        let prop = state.props[0].as_ref().borrow();
+        println!("{}", prop.max_aabb_y());
         // println!("{:#?}", x);
         // println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
     });

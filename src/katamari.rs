@@ -755,6 +755,10 @@ impl Katamari {
         self.diam_trunc_mm
     }
 
+    pub fn get_diam_m(&self) -> f32 {
+        self.diam_cm * 100.0
+    }
+
     pub fn get_vol(&self) -> f32 {
         self.vol_m3
     }
@@ -863,6 +867,7 @@ impl Katamari {
 
         self.attached_prop_alpha = sim_params.prop_attached_alpha;
 
+        // update sizes
         self.diam_cm = init_diam;
         self.init_diam_cm = init_diam;
         self.radius_cm = init_diam / 2.0;
@@ -934,4 +939,8 @@ impl Katamari {
     pub fn set_immobile(&mut self) {
         // TODO
     }
+}
+
+impl Katamari {
+    pub fn update(&mut self) {}
 }

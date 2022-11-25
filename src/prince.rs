@@ -10,7 +10,7 @@ use crate::{
     math::normalize_bounded_angle,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct OujiState {
     pub dash_start: u8,
     pub wheel_spin_start: u8,
@@ -452,8 +452,64 @@ impl Prince {
         // TODO: `prince_init:100-123` (vs mode crap)
     }
 
+    pub fn copy_oujistate_ptr(&mut self, oujistate: &mut *mut OujiState, data_size: &mut i32) {
+        *data_size = 0x1b;
+        *oujistate = &mut self.oujistate as *mut OujiState;
+    }
+
+    pub fn get_view_mode(&self) -> ViewMode {
+        self.view_mode
+    }
+
+    pub fn get_matrix(
+        &self,
+        xx: &mut f32,
+        xy: &mut f32,
+        xz: &mut f32,
+        yx: &mut f32,
+        yy: &mut f32,
+        yz: &mut f32,
+        zx: &mut f32,
+        zy: &mut f32,
+        zz: &mut f32,
+        tx: &mut f32,
+        ty: &mut f32,
+        tz: &mut f32,
+    ) -> () {
+        *xx = self.transform_rot[0];
+        *xy = self.transform_rot[1];
+        *xz = self.transform_rot[2];
+        *yx = self.transform_rot[4];
+        *yy = self.transform_rot[5];
+        *yz = self.transform_rot[6];
+        *zx = self.transform_rot[8];
+        *zy = self.transform_rot[9];
+        *zz = self.transform_rot[10];
+        *tx = self.pos[0];
+        *ty = self.pos[1];
+        *tz = self.pos[2];
+    }
+
+    pub fn set_ignore_input_timer(&mut self, value: i16) {
+        self.ignore_input_ticks = value;
+    }
+}
+
+impl Prince {
+    pub fn update(&mut self) {
+        self.last_oujistate = self.oujistate;
+
+        // TODO: `player_update:51-67` (update flip duration from current diameter)
+
+        // TODO: `prince_read_player_input()`
+        // TODO: `prince_update_huff_and_end_trigger_actions()`
+        // TODO: `player_update(71-85)` (update `no_spin_ticks`)
+        // TODO: `prince_update_boost()`
+        // TODO: `prince_update_trigger_actions()`
+    }
+
     /// The main function to update the prince's transform matrix each tick.
-    fn update_transform(&mut self, kat: &Katamari) {
+    pub fn update_transform(&mut self, kat: &Katamari) {
         let kat_offset = kat.get_prince_offset();
         let kat_center = kat.get_center();
         self.last_pos = self.pos;
@@ -498,47 +554,5 @@ impl Prince {
         // TODO: `prince_update_nonclip_transform:251-268` (handle r1 jump)
 
         mat4::copy(&mut self.transform_rot, &rotation_mat);
-    }
-
-    pub fn copy_oujistate_ptr(&mut self, oujistate: &mut *mut OujiState, data_size: &mut i32) {
-        *data_size = 0x1b;
-        *oujistate = &mut self.oujistate as *mut OujiState;
-    }
-
-    pub fn get_view_mode(&self) -> ViewMode {
-        self.view_mode
-    }
-
-    pub fn get_matrix(
-        &self,
-        xx: &mut f32,
-        xy: &mut f32,
-        xz: &mut f32,
-        yx: &mut f32,
-        yy: &mut f32,
-        yz: &mut f32,
-        zx: &mut f32,
-        zy: &mut f32,
-        zz: &mut f32,
-        tx: &mut f32,
-        ty: &mut f32,
-        tz: &mut f32,
-    ) -> () {
-        *xx = self.transform_rot[0];
-        *xy = self.transform_rot[1];
-        *xz = self.transform_rot[2];
-        *yx = self.transform_rot[4];
-        *yy = self.transform_rot[5];
-        *yz = self.transform_rot[6];
-        *zx = self.transform_rot[8];
-        *zy = self.transform_rot[9];
-        *zz = self.transform_rot[10];
-        *tx = self.pos[0];
-        *ty = self.pos[1];
-        *tz = self.pos[2];
-    }
-
-    pub fn set_ignore_input_timer(&mut self, value: i16) {
-        self.ignore_input_ticks = value;
     }
 }

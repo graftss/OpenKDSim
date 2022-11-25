@@ -19,6 +19,10 @@ pub struct PreclearState {
 }
 
 impl PreclearState {
+    pub fn get_enabled(&self) -> bool {
+        self.enabled
+    }
+
     pub fn get_alpha(&self) -> f32 {
         self.fog_alpha
     }

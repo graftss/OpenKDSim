@@ -35,7 +35,7 @@ use prince::OujiState;
 use prop::AddPropArgs;
 use std::cell::RefCell;
 
-use crate::macros::panic_log;
+use crate::macros::{log, panic_log};
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());
@@ -624,13 +624,22 @@ pub unsafe extern "C" fn MonoInitStart(
     mission: i32,
     area: i32,
     stage: i32,
-    kadaiFlag: i32,
-    clearFlag: i32,
-    endFlag: i32,
+    kadai_flag: i32,
+    clear_flag: i32,
+    end_flag: i32,
 ) {
+    log!(
+        "MonoInitStart({}, {}, {}, {}, {}, {})",
+        mission,
+        area,
+        stage,
+        kadai_flag,
+        clear_flag,
+        end_flag
+    );
     STATE.with(|state| {
         state.borrow_mut().mono_init_start(
-            mono_data, mission, area, stage, kadaiFlag, clearFlag, endFlag,
+            mono_data, mission, area, stage, kadai_flag, clear_flag, end_flag,
         );
     })
 }
@@ -714,10 +723,16 @@ pub unsafe extern "C" fn MonoGetPlacementMonoDataName(ctrl_idx: i32) -> *const u
     STATE.with(|state| state.borrow().get_internal_prop_name(ctrl_idx))
 }
 
+/// Returns the highest *local* y coordinate on the prop's transformed AABB.
+/// It's used in Unity but appears to do nothing, which is just typical.
 #[no_mangle]
-pub unsafe extern "C" fn MonoGetHitOffsetGround(_ctrl_idx: f32) -> f32 {
-    // TODO (need to compute prop aabb's)
-    0.0
+pub unsafe extern "C" fn MonoGetHitOffsetGround(ctrl_idx: i32) -> f32 {
+    STATE.with(|state| {
+        state.borrow().props[ctrl_idx as usize]
+            .clone()
+            .borrow()
+            .max_aabb_y()
+    })
 }
 
 #[no_mangle]
@@ -763,6 +778,7 @@ pub unsafe extern "C" fn Tick(delta: f32) {
 
 #[no_mangle]
 pub unsafe extern "C" fn Init(player: i32, override_init_size: f32, mission: i32) {
+    log!("Init({}, {}, {})", player, override_init_size, mission);
     STATE.with(|state| {
         state
             .borrow_mut()
