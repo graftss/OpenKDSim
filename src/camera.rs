@@ -281,6 +281,12 @@ pub struct Camera {
 }
 
 impl Camera {
+    pub fn get_mode(&self) -> CameraMode {
+        self.state.mode
+    }
+}
+
+impl Camera {
     pub fn init(&mut self, kat: &Katamari, prince: &Prince) {
         self.init_state(kat, prince);
         self.set_mode(CameraMode::Normal);

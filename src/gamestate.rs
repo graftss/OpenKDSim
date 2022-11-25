@@ -461,7 +461,7 @@ impl GameState {
             // TODO: `player_update:26-32` (if game is frozen do less stuff)
         } else {
             // update the prince, then the katamari
-            self.princes[player].update(&self.inputs[player]);
+            self.update_prince(player);
             self.katamaris[player].update();
 
             // update the prince's transform now that the katamari is updated

@@ -4,10 +4,13 @@ use gl_matrix::{
 };
 
 use crate::{
+    camera::{Camera, CameraMode},
     constants::VEC3_ZERO,
+    gamestate::GameState,
     input::{AnalogPushDirs, GachaDir, Input, StickInput},
     katamari::Katamari,
     math::normalize_bounded_angle,
+    preclear::PreclearState,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -19,7 +22,7 @@ pub struct OujiState {
     pub jump_180: u8,
     pub sw_speed_disp: u8,
     pub climb_wall: u8,
-    pub dash_tired: u8,
+    pub huff: bool,
     pub camera_mode: u8,
     pub dash_effect: u8,
     pub hit_water: u8,
@@ -133,7 +136,7 @@ pub struct Prince {
     /// The remaining ratio of the duration of the current huff.
     /// (Starts at 1 at the beginning of the huff, huff ends at 0).
     /// offset: 0x90
-    remaining_huff_ratio: f32,
+    huff_timer_ratio: f32,
 
     /// The prince's view mode, which distinguishes being in the R1 and L1 states.
     /// offset: 0x9c
@@ -256,7 +259,7 @@ pub struct Prince {
 
     /// The duration of a huff, in ticks.
     /// offset: 0x2f4
-    huff_duration_ticks: u16,
+    huff_duration: u16,
 
     /// The initial multiplier on katamari speed during a huff (this penalty decays as the
     /// huff gets closer to ending)
@@ -381,7 +384,7 @@ pub struct Prince {
 
     /// The remaining ticks in the current huff.
     /// offset: 0x486
-    huff_remain_ticks: u16,
+    huff_timer: u16,
 
     /// The strength with which the katamari can be pushed uphill. Decreases while
     /// pushing uphill. (Seems to start at 100 and decrease from there, so maybe it's a percentage)
@@ -412,7 +415,7 @@ impl Prince {
     pub fn init(&mut self, player: u8, init_angle: f32, kat: &Katamari) {
         self.player = player;
         self.no_spin_ticks = 0;
-        self.huff_remain_ticks = 0;
+        self.huff_timer = 0;
         vec3::copy(&mut self.pos, &VEC3_ZERO);
         self.auto_rotate_right_speed = 0.0;
         self.angle = init_angle;
@@ -422,7 +425,7 @@ impl Prince {
         mat4::identity(&mut self.yaw_rotation_something);
         mat4::identity(&mut self.transform_rot);
         self.huff_init_speed_penalty = 0.4;
-        self.huff_duration_ticks = 240; // TODO: some weird potential off-by-one issue here.
+        self.huff_duration = 240; // TODO: some weird potential off-by-one issue here.
         self.init_uphill_strength = 100.0;
         self.uphill_strength_loss = 0.7649993;
         self.low_stick_angle_threshold = 0.8733223;
@@ -496,21 +499,8 @@ impl Prince {
 }
 
 impl Prince {
-    /// The main function to update the prince each tick.
-    pub fn update(&mut self, input: &Input) {
-        self.last_oujistate = self.oujistate;
-
-        // TODO: `player_update:51-67` (update flip duration from current diameter)
-
-        self.read_player_input(input);
-        // TODO: `prince_update_huff_and_end_trigger_actions()`
-        // TODO: `player_update(71-85)` (update `no_spin_ticks`)
-        // TODO: `prince_update_boost()`
-        // TODO: `prince_update_trigger_actions()`
-    }
-
     /// Read player input from the `GameState`.
-    pub fn read_player_input(&mut self, input: &Input) {
+    pub fn read_input(&mut self, input: &Input) {
         // update whether the sticks are being pushed at all
         self.sticks_pushed = 0;
         if input.ls_x != 0 || input.ls_y != 0 {
@@ -534,6 +524,61 @@ impl Prince {
         // update absolute analog input
         self.input_ls.absolute(&mut self.input_ls_abs);
         self.input_rs.absolute(&mut self.input_rs_abs);
+    }
+
+    /// Update the prince's huff state.
+    /// offset: 0x547f0 (first half of the function)
+    fn update_huff(&mut self) {
+        self.huff_timer_ratio = if self.huff_timer == 0 {
+            0.0
+        } else {
+            self.huff_timer -= 1;
+            self.huff_timer as f32 / self.huff_duration as f32
+        };
+
+        self.is_huffing = self.huff_timer != 0;
+        self.oujistate.huff = self.huff_timer != 0;
+    }
+
+    /// Decide if the current non-normal view mode should be ended.
+    /// If so, end it.
+    /// offset: 0x547f0 (second half of function)
+    fn try_end_view_mode(&mut self, camera: &mut Camera, preclear: &PreclearState) {
+        let should_end = match self.view_mode {
+            ViewMode::R1Jump => {
+                if preclear.get_enabled() {
+                    // if in preclear mode, end the jump immediately
+                    return self.end_view_mode(None);
+                } else {
+                    // if not in preclear mode, end the jump if the camera mode isn't R1 anymore
+                    camera.get_mode() == CameraMode::Normal
+                }
+            }
+            ViewMode::L1Look => {
+                if preclear.get_enabled() {
+                    // if in preclear mode, end the look immediately.
+                    return self.end_view_mode(Some(camera));
+                } else {
+                    // if not in preclear mode, end the look if both sticks are pushed.
+                    self.sticks_pushed & 3 == 3
+                }
+            }
+            ViewMode::Normal => {
+                return;
+            }
+        };
+
+        if should_end {
+            self.end_view_mode(Some(camera));
+        }
+    }
+
+    /// Reset the current view mode back to `Normal`.
+    /// If a camera reference is passed, sets the camera mode back to normal as well.
+    fn end_view_mode(&mut self, camera: Option<&mut Camera>) {
+        self.view_mode = ViewMode::Normal;
+        self.ignore_input_timer = 0;
+        camera.map(|camera| camera.set_mode(CameraMode::Normal));
     }
 
     /// The main function to update the prince's transform matrix each tick.
@@ -582,5 +627,25 @@ impl Prince {
         // TODO: `prince_update_nonclip_transform:251-268` (handle r1 jump)
 
         mat4::copy(&mut self.transform_rot, &rotation_mat);
+    }
+}
+
+impl GameState {
+    /// The main function to update a prince each tick.
+    pub fn update_prince(&mut self, player: usize) {
+        let prince = &mut self.princes[player];
+        let input = &mut self.inputs[player];
+        let camera = &mut self.cameras[player];
+
+        prince.last_oujistate = prince.oujistate;
+
+        // TODO: `player_update:51-67` (update flip duration from current diameter)
+
+        prince.read_input(input);
+        prince.update_huff();
+        prince.try_end_view_mode(camera, &self.preclear);
+        // TODO: `player_update(71-85)` (update `no_spin_ticks`)
+        // TODO: `prince_update_boost()`
+        // TODO: `prince_update_trigger_actions()`
     }
 }
