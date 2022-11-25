@@ -1,9 +1,11 @@
+#![feature(const_float_bits_conv)]
 #![allow(non_snake_case, dead_code)]
 
 // reference this first so it's available to all other modules
 mod macros;
 
 mod camera;
+mod collision;
 mod constants;
 mod delegates;
 mod ending;

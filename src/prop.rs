@@ -6,12 +6,15 @@ use std::{
 
 use gl_matrix::{
     common::{Mat4, Vec3, Vec4},
-    mat4, vec4,
+    mat4, vec3, vec4,
 };
 
 use crate::{
+    collision::mesh::Mesh,
+    constants::{_1_3, _4PI, _PI_750},
     gamestate::GameState,
     macros::{max_to_none, new_mat4_copy},
+    mono_data::{PropAabbs, PropMonoData},
     name_prop_config::NamePropConfig,
     util::scale_sim_transform,
 };
@@ -177,7 +180,7 @@ pub struct AddPropArgs {
 
 pub type PropScript = fn(prop: PropRef) -> ();
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Prop {
     /// The unique id of this prop.
     /// offset: 0x0
@@ -373,6 +376,10 @@ pub struct Prop {
     /// offset: 0x58f
     force_no_wobble: bool,
 
+    /// The AABB of this prop encoded as a collision mesh.
+    /// offset: 0x5e0
+    aabb_mesh: Mesh,
+
     /// The 8 corner points of the prop's AABB.
     /// offset: 0x870
     aabb_vertices: Vec<Vec3>,
@@ -385,26 +392,32 @@ pub struct Prop {
     /// offset: 0x918
     aabb_vol_m3: f32,
 
-    /// (??) The volume of the prop used when comparing to the katamari's volume (in m^3).
+    /// The volume of the prop used when comparing to the katamari's volume for the purposes
+    /// of attaching the prop (in m^3).
     /// offset: 0x91c
     compare_vol_m3: f32,
 
     /// The *base* volume added to the katamari when this prop is attached (in m^3).
     /// This value will still be scaled by the mission's penalty.
     /// offset: 0x920
-    added_vol_m3: f32,
+    attach_vol_m3: f32,
+
+    /// Half the maximum AABB side length; used to quickly decide if the katamari
+    /// is close enough to bother doing a full collision test.
+    /// offset: 0x928
+    aabb_radius: f32,
 
     /// The exact katamari diameter needed to collect this object (in cm), obtained by
     /// comparing the prop's AABB volume to the katamari's volume.
     /// The prop's true collection diameter is obtained by truncating this value to an integral value in mm.
     /// offset: 0x930
-    exact_collect_diam_cm: f32,
+    exact_attach_diam_cm: f32,
 
     /// The minimum katamari diameter needed to collect this object (in mm).
     /// offset: 0x934
-    collect_diam_mm: i32,
+    attach_diam_mm: i32,
 
-    /// The sizes of the prop's AABB
+    /// The sizes of the prop's AABB.
     /// offset: 0x938
     aabb_size: Vec3,
 
@@ -422,11 +435,9 @@ pub struct Prop {
     /// offset: 0x954
     onattach_game_time_ms: i32,
 
-    /// The prop's triangle mesh used to collide the prop with the katamari while the
-    /// katamari is too small to attach the prop.
-    /// The mesh is stored in the "mono data" glob.
-    /// offset: 0x960
-    collision_mesh: (),
+    /// Information about this type of prop from its `PropMonoData`.
+    /// Namely, its AABB, collision mesh, and vault points.
+    mono_data: Option<Rc<PropMonoData>>,
 
     /// (??) The additional transform applied to the prop while it is attached to the katamari.
     /// offset: 0x968
@@ -461,6 +472,10 @@ pub struct Prop {
     /// offset: 0xa18
     remain_knockoff_volume: f32,
 
+    /// A multiple of the prop's volume that seems to be used somewhere. Hell if I know
+    /// offset: 0xa24
+    weird_vol_multiple: f32,
+
     /// If this prop is attached, points to the prop that was attached before this (if one exists).
     /// offset: 0xa28
     collected_before: Option<WeakPropRef>,
@@ -468,6 +483,19 @@ pub struct Prop {
     /// If this prop is attached, points to the prop that was attached after this (if one exists).
     /// offset: 0xa30
     collected_next: Option<WeakPropRef>,
+
+    /// When attached, the index of the katamari collision ray nearest to this prop.
+    /// offset: 0xa88
+    nearest_kat_ray: Option<u16>,
+
+    /// If >0, this prop is intangible. Decrements by 1 each tick.
+    /// offset: 0xa8a
+    intangible_ticks: u16,
+
+    /// The cooldown on when this prop can scream, when >0. If 0, the prop is ready to scream again
+    /// upon collision with the katamari.
+    /// offset: 0xa8f
+    scream_cooldown_ticks: u8,
 
     /// True if this prop has a twin prop on the Gemini mission.
     /// offset: 0xb10
@@ -498,13 +526,13 @@ impl Display for Prop {
     }
 }
 
-impl Debug for Prop {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Prop")
-            .field("ctrl_idx", &self.ctrl_idx)
-            .finish()
-    }
-}
+// impl Debug for Prop {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("Prop")
+//             .field("ctrl_idx", &self.ctrl_idx)
+//             .finish()
+//     }
+// }
 
 impl Prop {
     pub fn print_links(&self, label: &str) {
@@ -529,7 +557,9 @@ impl Prop {
     /// Mostly follows the function `prop_init`.
     /// offset: 0x4e950
     pub fn new_node(state: &mut GameState, args: &AddPropArgs) -> Self {
-        let config = NamePropConfig::get(args.name_idx.into());
+        let name_idx = args.name_idx;
+        let config = NamePropConfig::get(name_idx.into());
+        let mono_data = state.mono_data.props[name_idx as usize].clone();
         let ctrl_idx = state.global.get_next_ctrl_idx();
 
         // initialize rotation matrix
@@ -553,16 +583,15 @@ impl Prop {
         // lines 163-190 of `prop_init` (init twin)
         // lines 348-349 (find first subobject)
         // lines 350-357 (init motion scripts)
-        // lines 358-364 (init aabb)
         // lines 365-367 (init links to other props)
         // lines 368-371, 392-401 (init wobble state)
         // lines 373-384 (init generated prop??)
         // line 385
         // lines 386-391 (init fish)
 
-        let result = Prop {
+        let mut result = Prop {
             ctrl_idx,
-            name_idx: args.name_idx.into(),
+            name_idx,
             flags: 0,
             global_state: PropGlobalState::Unattached,
             flags2: 0,
@@ -617,36 +646,93 @@ impl Prop {
             collected_next: None,
             has_twin: args.twin_id != u16::MAX,
             twin_id: max_to_none!(u16, args.twin_id),
+            nearest_kat_ray: None,
+            intangible_ticks: 0,
+            scream_cooldown_ticks: 0,
+            parent: None,
 
-            // TODO
+            // initialized in `self.init_aabb_and_volume()`
+            aabb_mesh: Mesh::default(),
             aabb_vertices: vec![],
+            aabb_size: [0.0; 3],
+            aabb_vol_m3: 0.0,
+            compare_vol_m3: 0.0,
+            attach_vol_m3: 0.0,
+            exact_attach_diam_cm: 0.0,
+            attach_diam_mm: 0,
+            radius: 0.0,
+            aabb_radius: 0.0,
+            weird_vol_multiple: 0.0,
+
             first_subobject: None, // TODO
             script_0x560: None,    // TODO
             motion_script: None,   // TODO
             innate_script: None,
-            parent: None,                 // TODO
             tree_id: None,                // TODO
             motion_action_type: None,     // TODO
             behavior_type: None,          // TODO
             alt_motion_action_type: None, // TODO
-            radius: 0.0,
-            aabb_vol_m3: 0.0,
-            compare_vol_m3: 0.0,
-            added_vol_m3: 0.0,
-            exact_collect_diam_cm: 0.0,
-            collect_diam_mm: 0,
-            aabb_size: [0.0; 3],
-            collision_mesh: (),
             twin_prop: None,
+            mono_data: None,
         };
+
+        if let Some(aabbs) = &mono_data.aabbs {
+            result.init_aabb_and_volume(aabbs, config);
+        }
+
+        result.mono_data = Some(mono_data);
 
         result
     }
 
     /// Initialize the prop's AABB and volume
-    fn init_aabb_and_volume(&mut self) {
-        let _config = NamePropConfig::get(self.name_idx.into());
-        // TODO: `prop_init_aabb_and_volume:80-259` (something about subobjects?)
+    fn init_aabb_and_volume(&mut self, aabbs: &PropAabbs, config: &NamePropConfig) {
+        // TODO: refactor this as a simulation param
+        let VOL_RATIO_FOR_PICKUP = 0.1;
+
+        if config.is_dummy_hit {
+            // TODO: `prop_init_aabb_and_volume:222-250`
+            return;
+        }
+
+        // TODO: `prop_init_aabb_and_volume:90-115` (compute an AABB that includes the AABB's of all subobjects,
+        //       rather than just the prop's own AABB)
+        // (but this behavior is in `aabbs.get_root_aabb` in this implementation)
+        let root_aabb = aabbs.get_root_aabb();
+        self.aabb_vertices = root_aabb.compute_vertices();
+        self.aabb_mesh = root_aabb.compute_mesh(&self.aabb_vertices);
+        self.aabb_size = root_aabb.size();
+        self.radius = root_aabb.compute_radius();
+
+        // compute various volumes
+        // for the purposes of finding a prop's volume, each side length of
+        // its AABB is treated as being at least 0.1.
+        let mut vol_sizes_m = vec3::create();
+        let mut min_vol_size_m = f32::INFINITY;
+        for i in 0..3 {
+            let real_size = self.aabb_size[i];
+            vol_sizes_m[i] = if real_size < 0.1 { 0.1 } else { real_size };
+
+            vol_sizes_m[i] *= 0.01;
+
+            // maintain the maximum volume-box side length to be used for the katamari
+            // collision radius.
+            if vol_sizes_m[i] < min_vol_size_m {
+                min_vol_size_m = vol_sizes_m[i];
+                println!("mvsm={}", min_vol_size_m);
+            }
+        }
+
+        self.aabb_vol_m3 = vol_sizes_m[0] * vol_sizes_m[1] * vol_sizes_m[2];
+        self.compare_vol_m3 = self.aabb_vol_m3 * config.compare_vol_mult;
+        self.attach_vol_m3 = self.compare_vol_m3 * config.attach_vol_mult;
+        self.aabb_radius = min_vol_size_m * 100.0 * 0.5;
+        self.weird_vol_multiple = self.compare_vol_m3 / _PI_750;
+
+        // compute katamari diameter needed to attach this prop
+        let attach_rad_m = (self.compare_vol_m3 / VOL_RATIO_FOR_PICKUP * 3.0 / _4PI).powf(_1_3);
+        self.exact_attach_diam_cm = attach_rad_m * 100.0 + attach_rad_m * 100.0;
+        self.attach_diam_mm = (self.exact_attach_diam_cm * 10.0) as i32;
     }
 
     pub fn get_name_idx(&self) -> u16 {
@@ -747,7 +833,7 @@ impl Prop {
     /// Mimicks the `MonoGetVolume` API function.
     pub fn get_volume(&self, volume: &mut f32, collect_diam: &mut i32) {
         *volume = self.compare_vol_m3;
-        *collect_diam = self.collect_diam_mm;
+        *collect_diam = self.attach_diam_mm;
     }
 
     pub fn set_disabled(&mut self, force_disabled: i32) {
@@ -805,7 +891,7 @@ impl Prop {
         }
 
         // status & 2: prop is collectible
-        if self.collect_diam_mm <= kat_diam_int {
+        if self.attach_diam_mm <= kat_diam_int {
             status |= 0x2;
         }
 

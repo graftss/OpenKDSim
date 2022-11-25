@@ -1,9 +1,9 @@
+#![feature(const_float_bits_conv)]
 #![feature(vec_into_raw_parts)]
 #![allow(non_snake_case, dead_code)]
 
 use std::cell::RefCell;
 
-use crate::mono_data::MonoData;
 use gamestate::GameState;
 use prop::AddPropArgs;
 
@@ -11,6 +11,7 @@ use prop::AddPropArgs;
 mod macros;
 
 mod camera;
+mod collision;
 mod constants;
 mod delegates;
 mod ending;
@@ -48,7 +49,7 @@ const CHILD_PROP_ARGS: AddPropArgs = AddPropArgs {
     scale_x: 6.0,
     scale_y: 6.0,
     scale_z: 6.0,
-    name_idx: 1251,
+    name_idx: 910, // B pencil
     loc_pos_type: u16::MAX,
     random_group_id: u16::MAX,
     mono_move_type: u16::MAX,
@@ -131,8 +132,10 @@ unsafe fn test() {
         let mut state = state.borrow_mut();
 
         state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
-
-        println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
+        state.add_prop(CHILD_PROP_ARGS);
+        let x = state.props[0].as_ref().borrow();
+        // println!("{:#?}", x);
+        // println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
     });
 }
 

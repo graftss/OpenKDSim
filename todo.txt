@@ -1,0 +1,4 @@
+random things that shouldn't be forgotten:
+
+- port the janky implementation of `power` (offset: 0x26910) to 
+  use in `Prop::init_aabb_and_volume`

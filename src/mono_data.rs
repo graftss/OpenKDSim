@@ -1,6 +1,15 @@
+use std::rc::Rc;
+
 use gl_matrix::common::Vec3;
 
-use crate::{constants::NUM_NAME_PROPS, name_prop_config::NamePropConfig};
+use crate::{
+    collision::{
+        aabb::Aabb,
+        mesh::{Mesh, MeshSector, TriGroup, TriVertex},
+    },
+    constants::NUM_NAME_PROPS,
+    name_prop_config::NamePropConfig,
+};
 
 macro_rules! md_read {
     ($md: ident, $type: ty, $offset: expr) => {
@@ -16,12 +25,6 @@ macro_rules! md_follow_offset {
     ($md: ident, $offset: expr) => {
         $md.offset(md_read!($md, u32, $offset).try_into().unwrap())
     };
-}
-
-#[derive(Debug, Default)]
-pub struct Aabb {
-    pub min: Vec3,
-    pub max: Vec3,
 }
 
 #[derive(Debug, Default)]
@@ -41,33 +44,12 @@ impl PropAabbs {
     pub fn get_subobject_aabb(&self, subobj_idx: i32) -> Option<&Aabb> {
         self.aabbs.get(1 + subobj_idx as usize)
     }
-}
 
-#[derive(Debug, Default)]
-pub struct TriVertex {
-    pub point: Vec3,
-    pub metadata: u32,
-}
-
-#[derive(Debug, Default)]
-pub struct TriGroup {
-    // If true, the triangle group is encoded as a "triangle strip"
-    pub is_tri_strip: bool,
-    pub vertices: Vec<TriVertex>,
-}
-
-// A mesh sector is a sequence of triangle groups, contained within an AABB.
-// Collision with the sector can be tested by first checking collision with the AABB
-// interior first, and then the triangle groups second.
-#[derive(Debug, Default)]
-pub struct MeshSector {
-    pub aabb: Aabb,
-    pub tri_groups: Vec<TriGroup>,
-}
-
-#[derive(Debug, Default)]
-pub struct PropMesh {
-    pub sectors: Vec<MeshSector>,
+    /// Compute the "root" AABB which encloses both the prop and all of its subobjects.
+    pub fn get_root_aabb(&self) -> &Aabb {
+        // TODO: incorporate subobject AABB's, as in `prop_init_aabb:90-115`
+        self.get_prop_aabb()
+    }
 }
 
 pub type MonoDataPtr = Option<usize>;
@@ -83,7 +65,7 @@ const NIL: u64 = 0x206c696e204c494e;
 pub struct PropMonoData {
     pub ptrs: [MonoDataPtr; NUM_MONO_DATA_PROP_PTRS],
     pub aabbs: Option<PropAabbs>,
-    pub triangle_mesh: Option<PropMesh>,
+    pub collision_mesh: Option<Mesh>,
     pub vault_points: Option<Vec<Vec3>>,
 }
 
@@ -107,7 +89,7 @@ impl PropMonoData {
         PropMonoData {
             ptrs,
             aabbs: ptrs[0].map(|ptr| PropMonoData::parse_aabbs(ptr as *const u8)),
-            triangle_mesh: ptrs[7].map(|ptr| PropMonoData::parse_mesh(ptr as *const u8)),
+            collision_mesh: ptrs[7].map(|ptr| PropMonoData::parse_mesh(ptr as *const u8)),
             vault_points: ptrs[8]
                 .map(|ptr| PropMonoData::parse_vault_points(ptr as *const u8, name_idx)),
         }
@@ -145,7 +127,7 @@ impl PropMonoData {
 
     /// Parse a triangle mesh from mono data.
     /// The argument `mono_data` should point to the first byte of the triangle mesh.
-    unsafe fn parse_mesh(mono_data: *const u8) -> PropMesh {
+    unsafe fn parse_mesh(mono_data: *const u8) -> Mesh {
         // parse the number of sectors (mesh offset 0)
         let num_sectors = md_read!(mono_data, u8, 0);
 
@@ -210,7 +192,7 @@ impl PropMonoData {
             sectors.push(MeshSector { aabb, tri_groups });
         }
 
-        PropMesh { sectors }
+        Mesh { sectors }
     }
 }
 
@@ -218,7 +200,7 @@ impl PropMonoData {
 pub struct MonoData {
     pub zones: MonoDataPtr,
     pub areas: [MonoDataPtr; 5],
-    pub props: Vec<PropMonoData>,
+    pub props: Vec<Rc<PropMonoData>>,
 }
 
 impl MonoData {
@@ -236,7 +218,8 @@ impl MonoData {
         ];
 
         for name_idx in 0..NUM_NAME_PROPS {
-            self.props.push(PropMonoData::new(mono_data, name_idx));
+            let prop_data = PropMonoData::new(mono_data, name_idx);
+            self.props.push(Rc::new(prop_data));
         }
     }
 }
