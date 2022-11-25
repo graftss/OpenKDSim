@@ -1,3 +1,14 @@
+use crate::macros::panic_log;
+
+#[derive(Debug)]
+pub struct BoostGachaParam {
+    /// The minimum diameter at which this gacha value applies.
+    pub min_diam_cm: f32,
+
+    /// The number of post-spin gachas needed to boost.
+    pub num_gachas: u8,
+}
+
 #[derive(Debug)]
 pub struct SimulationParams {
     /// The number of ticks where the katamari can't start a second climb after falling out
@@ -41,6 +52,12 @@ pub struct SimulationParams {
 
     /// The alpha of props which are attached to the katamari.
     pub prop_attached_alpha: f32,
+
+    /// The number of gachas needed to spin.
+    pub gachas_for_spin: u8,
+
+    /// The number of post-spin gachas needed to boost, which varies by size.
+    pub extra_gachas_for_boost: Vec<BoostGachaParam>,
 }
 
 impl Default for SimulationParams {
@@ -56,6 +73,40 @@ impl Default for SimulationParams {
             destroy_prop_diam_ratio_clearprops: 0.145,
             destroy_prop_diam_ratio_reduced: 0.1,
             prop_attached_alpha: 0.995,
+            gachas_for_spin: 3,
+            extra_gachas_for_boost: vec![
+                BoostGachaParam {
+                    min_diam_cm: 0.0,
+                    num_gachas: 2,
+                },
+                BoostGachaParam {
+                    min_diam_cm: 50.0,
+                    num_gachas: 3,
+                },
+                BoostGachaParam {
+                    min_diam_cm: 500.0,
+                    num_gachas: 4,
+                },
+                BoostGachaParam {
+                    min_diam_cm: 1000.0,
+                    num_gachas: 5,
+                },
+            ],
         }
+    }
+}
+
+impl SimulationParams {
+    pub fn gachas_for_boost(&self, diam_cm: f32) -> u8 {
+        for (i, param) in self.extra_gachas_for_boost.iter().enumerate() {
+            if param.min_diam_cm > diam_cm {
+                return match i {
+                    0 => panic!(),
+                    _ => self.gachas_for_spin + self.extra_gachas_for_boost[i - 1].num_gachas,
+                };
+            }
+        }
+
+        panic_log!("panic in `gachas_for_boost`: invalid structure of `extra_gachas_for_boost`");
     }
 }

@@ -65,9 +65,31 @@ macro_rules! new_mat4_copy {
     };
 }
 
+macro_rules! max {
+    ($expr0: expr, $expr1: expr) => {
+        if ($expr0) > ($expr1) {
+            $expr0
+        } else {
+            $expr1
+        }
+    };
+}
+
+macro_rules! min {
+    ($expr0: expr, $expr1: expr) => {
+        if ($expr0) < ($expr1) {
+            $expr0
+        } else {
+            $expr1
+        }
+    };
+}
+
 pub(crate) use {
     log,
+    max,
     max_to_none,
+    min,
     new_mat4_copy,
     panic_log,
     read_bool,

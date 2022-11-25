@@ -1,6 +1,9 @@
 use std::f32::consts::{PI, TAU};
 
-use gl_matrix::common::Vec3;
+use gl_matrix::{
+    common::{Vec2, Vec3},
+    vec2,
+};
 
 /// Scale `vec` by `scale` in-place.
 #[inline]

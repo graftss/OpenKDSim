@@ -1,24 +1,30 @@
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4, vec3,
+    mat4, vec2, vec3,
 };
 
 use crate::{
     camera::{Camera, CameraMode},
     constants::VEC3_ZERO,
+    delegates::Delegates,
     gamestate::GameState,
-    input::{AnalogPushDirs, GachaDir, Input, StickInput},
+    global::GlobalState,
+    input::{AnalogPushDirs, GachaDir, Input, StickInput, StickPushDir},
     katamari::Katamari,
+    macros::{max, min},
     math::normalize_bounded_angle,
+    mission::GameMode,
     preclear::PreclearState,
+    simulation_params::SimulationParams,
+    tutorial::TutorialState,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OujiState {
-    pub dash_start: u8,
-    pub wheel_spin_start: u8,
-    pub dash: u8,
-    pub wheel_spin: u8,
+    pub dash_start: bool,
+    pub wheel_spin_start: bool,
+    pub dash: bool,
+    pub wheel_spin: bool,
     pub jump_180: u8,
     pub sw_speed_disp: u8,
     pub climb_wall: u8,
@@ -34,14 +40,23 @@ pub struct OujiState {
     pub tutorial_flag_2: u8,
     pub tutorial_trigger_1: u8,
     pub tutorial_trigger_2: u8,
-    pub power_charge: u8,
-    pub fire_to_enemy: u8,
+    pub power_charge: u8,  // apparently unused
+    pub fire_to_enemy: u8, // apparently unused
     pub search: u8,
     pub attack_1: u8,
     pub attack_2: u8,
     pub tarai: u8,
     pub attack_wait: u8,
     pub vs_attack: u8,
+}
+
+impl OujiState {
+    pub fn end_boost(&mut self) {
+        self.dash_start = false;
+        self.dash = false;
+        self.wheel_spin_start = false;
+        self.wheel_spin = false;
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -142,6 +157,10 @@ pub struct Prince {
     /// offset: 0x9c
     view_mode: ViewMode,
 
+    /// (??) Seems to be a vs-mode flag related to huffing? who cares
+    /// offset: 0x9d
+    vs_mode_huff_related_flag: bool,
+
     /// True if the prince is huffing
     /// offset: 0x9e
     is_huffing: bool,
@@ -238,7 +257,7 @@ pub struct Prince {
 
     /// The number of ticks allowed between gachas before the gacha count resets.
     /// offset: 0x2dc
-    gacha_window_ticks: u16,
+    gacha_window_duration: u16,
 
     /// The number of gachas needed to initiate a spin.
     /// offset: 0x2e0
@@ -246,11 +265,11 @@ pub struct Prince {
 
     /// The maximum boost energy.
     /// offset: 0x2d4
-    max_boost_energy: u16,
+    boost_max_energy: u16,
 
     /// The amount of boost energy gained per recharge.
     /// offset: 0x2ec
-    boost_recharge_amount: u16,
+    boost_recharge: u16,
 
     /// The number of ticks between boost recharges (assuming the player doesn't spin and
     /// reset the timer)
@@ -302,9 +321,9 @@ pub struct Prince {
     /// offset: 0x378
     input_rs_abs: StickInput,
 
-    /// The average of `input_ls` and `input_rs`
+    /// The average of `input_ls` and `input_rs` (unused, apparently)
     /// offset: 0x398
-    input_avg: StickInput,
+    // input_avg: StickInput,
 
     /// The magnitude of the `input_ls` input.
     /// offset: 0x3a8
@@ -338,13 +357,13 @@ pub struct Prince {
     /// offset: 0x3c4
     scaled_push: f32,
 
-    /// (??)
+    /// (??) The matrix encoding a y-axis rotation based on something input related?
     /// offset: 0x3cc
-    yaw_rotation_something: Mat4,
+    input_y_rot_mat: Mat4,
 
-    /// (??)
+    /// (??) The value of the `0x3cc` matrix on the previous tick
     /// offset: 0x40c
-    yaw_rotation_something_else: Mat4,
+    last_input_y_rot_mat: Mat4,
 
     /// The number of ticks remaining in the current flip animation.
     /// offset: 0x44c
@@ -352,7 +371,7 @@ pub struct Prince {
 
     /// Input push directions which just changed this tick.
     /// offset: 0x470
-    push_dirs_down: AnalogPushDirs,
+    push_dirs_changed: AnalogPushDirs,
 
     /// Current input push directions.
     /// offset: 0x472
@@ -368,11 +387,11 @@ pub struct Prince {
 
     /// The remaining ticks before the gacha count resets.
     /// offset: 0x478
-    gacha_window_timer_ticks: u16,
+    gacha_window_timer: u16,
 
     /// The number of gachas counted without the gacha timer expiring.
     /// offset: 0x47c
-    gacha_count: u16,
+    gacha_count: u8,
 
     /// The amount of remaining boost energy.
     /// offset: 0x47e
@@ -380,7 +399,7 @@ pub struct Prince {
 
     /// The number of ticks since the katamari was spun. Used for boost recharging.
     /// offset: 0x484
-    no_spin_ticks: u16,
+    no_dash_ticks: u16,
 
     /// The remaining ticks in the current huff.
     /// offset: 0x486
@@ -414,7 +433,7 @@ impl Prince {
     /// Initialize the prince at the start of a mission.
     pub fn init(&mut self, player: u8, init_angle: f32, kat: &Katamari) {
         self.player = player;
-        self.no_spin_ticks = 0;
+        self.no_dash_ticks = 0;
         self.huff_timer = 0;
         vec3::copy(&mut self.pos, &VEC3_ZERO);
         self.auto_rotate_right_speed = 0.0;
@@ -422,7 +441,8 @@ impl Prince {
         self.kat_offset_vec[2] = kat.get_prince_offset();
         self.push_dir = None;
         self.angle_speed = 0.0;
-        mat4::identity(&mut self.yaw_rotation_something);
+        mat4::identity(&mut self.input_y_rot_mat);
+        mat4::identity(&mut self.last_input_y_rot_mat);
         mat4::identity(&mut self.transform_rot);
         self.huff_init_speed_penalty = 0.4;
         self.huff_duration = 240; // TODO: some weird potential off-by-one issue here.
@@ -437,17 +457,17 @@ impl Prince {
         self.backwards_turn_speed = 0.03;
         self.non_backwards_turn_speed = 0.06;
         self.max_analog_allowing_flip = 0.3;
-        self.gacha_window_ticks = 14;
-        self.max_boost_energy = 0xf0;
+        self.gacha_window_duration = 14;
+        self.boost_max_energy = 0xf0;
         self.gachas_for_spin = 3;
-        self.boost_recharge_amount = 18;
+        self.boost_recharge = 18;
         self.boost_recharge_frequency = 100;
         self.min_angle_btwn_sticks_for_fastest_turn = 0.75;
         self.min_push_angle_y = 0.363474;
 
         self.update_transform(kat);
 
-        self.boost_energy = self.max_boost_energy;
+        self.boost_energy = self.boost_max_energy;
         self.uphill_strength = self.init_uphill_strength;
         self.view_mode = ViewMode::Normal;
         self.ignore_input_timer = 0;
@@ -581,6 +601,218 @@ impl Prince {
         camera.map(|camera| camera.set_mode(CameraMode::Normal));
     }
 
+    fn update_boost_recharge(&mut self) {
+        if !self.oujistate.dash {
+            // if we aren't dashing, increment `no_dash_ticks`:
+            self.no_dash_ticks += 1;
+            if self.no_dash_ticks >= self.boost_recharge_frequency {
+                // if we haven't spun for long enough to recharge, do the recharge:
+                self.no_dash_ticks = 0;
+                self.boost_energy = max!(
+                    self.boost_energy + self.boost_recharge,
+                    self.boost_max_energy
+                );
+            }
+        } else {
+            // if we are dashing, reset `no_dash_ticks` to 0:
+            self.no_dash_ticks = 0;
+        }
+    }
+
+    /// **After** `read_input`, compute various features of analog input (some of which are
+    /// also expressed as analog input, e.g. unit input).
+    /// offset: 0x53cc0 (first half of `prince_update_boost`)
+    fn update_analog_input_features(&mut self, is_vs_mode: bool) {
+        self.input_ls.normalize(&mut self.input_ls_unit);
+        self.input_rs.normalize(&mut self.input_rs_unit);
+        StickInput::normalize_sum(&mut self.input_sum_unit, &self.input_ls, &self.input_rs);
+
+        // TODO: `prince_update_angle_between_sticks()`
+
+        self.input_ls_len = min!(1.0, self.input_ls.len());
+        self.input_rs_len = min!(1.0, self.input_rs.len());
+        self.input_avg_len = (self.input_ls_len + self.input_rs_len) / 2.0;
+
+        // this is reset here and computed elsewhere, i guess because it depends on other things
+        self.input_scaled_avg_len = 0.0;
+
+        if self.view_mode == ViewMode::Normal {
+            self.last_push_dirs = self.push_dirs;
+
+            // TODO: extract as sim param, also it's different in vs mode or whatever
+            let min_push_len = 0.35;
+
+            if !self.vs_mode_huff_related_flag {
+                let ls_y = self.input_ls.y();
+                let rs_y = self.input_rs.y();
+
+                self.push_dirs.update_from_input(ls_y, rs_y, min_push_len);
+                self.push_dirs_changed
+                    .compute_changed(&self.last_push_dirs, &self.push_dirs);
+            } else {
+                self.push_dirs.clear();
+                self.push_dirs_changed.clear();
+            }
+        }
+
+        mat4::copy(&mut self.last_input_y_rot_mat, &self.input_y_rot_mat);
+        if self.oujistate.dash {
+            self.extra_flat_angle_speed = 0.0;
+            if !is_vs_mode {
+                mat4::identity(&mut self.input_y_rot_mat);
+            }
+        }
+    }
+
+    /// Update the prince's gacha count based on input that should have been processed earlier in the tick.
+    /// Also initiates SFX and VFX for boosting and spinning.
+    /// offset: 0x566d0
+    fn update_gachas(
+        &mut self,
+        katamari: &mut Katamari,
+        camera: &Camera,
+        tutorial: &mut TutorialState,
+        global: &GlobalState,
+        params: &SimulationParams,
+    ) {
+        let gamemode = global.gamemode;
+
+        // TODO: this whole function only applies to single player. would need to be rewritten for vs mode
+        if self.oujistate.wheel_spin == false && katamari.physics_flags.airborne {
+            self.end_boost(katamari);
+        }
+
+        self.oujistate.dash_start = false;
+        self.oujistate.wheel_spin_start = false;
+
+        if camera.get_mode() == CameraMode::Shoot {
+            return self.oujistate.dash = true;
+        }
+
+        // early checks to block gachas
+        let block_gachas = (gamemode == Some(GameMode::Tutorial) && tutorial.get_page() == 0)
+            || (gamemode != Some(GameMode::Normal));
+        if block_gachas {
+            return;
+        }
+
+        let gacha_window = self.gacha_window_duration;
+
+        // decrement boost energy, but not in the tutorial
+        if self.oujistate.dash && gamemode != Some(GameMode::Tutorial) {
+            self.boost_energy -= 1;
+            if self.boost_energy == 0 {
+                self.reset_boost_state(katamari);
+                self.huff_timer = self.huff_duration;
+                self.is_huffing = true;
+                self.vs_mode_huff_related_flag = true;
+                return;
+            }
+        }
+
+        // Compute the new gacha direction, if one exists.
+        let change = self.push_dirs_changed;
+        let push = self.push_dirs;
+        let new_gacha =
+            // left stick push dir just changed to the opposite of the right stick push dir 
+            (change.left != None && change.left != push.right) ||
+            // right stick push dir just changed to the opposite of the left stick push dir
+            (change.right != None && change.right != push.left);
+
+        let new_gacha_dir = if !new_gacha {
+            None
+        } else if push.right == Some(StickPushDir::Down) {
+            Some(GachaDir::Right)
+        } else {
+            Some(GachaDir::Left)
+        };
+
+        let mut just_did_gacha = false;
+        if let Some(gacha_dir) = new_gacha_dir {
+            // if a gacha just occurred:
+            just_did_gacha = true;
+            self.last_gacha_direction = Some(gacha_dir);
+            self.gacha_window_timer = gacha_window;
+            self.gacha_count += 1;
+            // TODO: check `should_reset_gachas_in_vs_mode()`
+        }
+
+        // TODO: vsmode specific code
+        // TODO: `prince_update_gachas:154-170`
+        // TODO: `prince_update_gachas:177-211`
+
+        if self.gacha_window_timer > 0 {
+            // if there are gachas in progress and the gacha timer hasn't expired:
+            self.gacha_window_timer -= 1;
+
+            let gachas_for_spin = params.gachas_for_spin;
+            let gachas_for_boost = params.gachas_for_boost(katamari.get_diam_cm());
+
+            if just_did_gacha && self.gacha_count == gachas_for_boost {
+                // if initiating a boost:
+                // TODO: `prince_update_gachas:234-241` (play boost sfx and vfx)
+                return;
+            }
+
+            if just_did_gacha && self.gacha_count == gachas_for_spin {
+                // if initiating a spin:
+                self.oujistate.wheel_spin_start = true;
+            }
+
+            if self.gacha_count >= gachas_for_spin && self.gacha_count < gachas_for_boost {
+                // if spinning, but not yet enough gachas for a boost:
+                // TODO: `prince_update_gachas:249-253` (play spin sfx)
+                self.oujistate.dash = true;
+                self.oujistate.wheel_spin = true;
+            } else {
+                // if enough gachas for a boost:
+                self.oujistate.dash = true;
+                self.oujistate.wheel_spin = false;
+            }
+
+            if !self.oujistate.wheel_spin
+                && self.oujistate.dash
+                && gamemode == Some(GameMode::Tutorial)
+            {
+                // update the tutorial's boost flag
+                tutorial.move_held.boost = true;
+            }
+
+            return;
+        } else {
+            // if the gacha timer has expired:
+
+            // TODO: `prince_update_gachas:275-316` (vs mode crap)
+            // TODO: `prince_update_gachas:318-334` (i don't get what this does)
+
+            self.oujistate.dash = false;
+            self.oujistate.wheel_spin = false;
+        }
+    }
+
+    fn end_boost(&mut self, katamari: &mut Katamari) {
+        self.oujistate.end_boost();
+        self.gacha_count = 0;
+        katamari.physics_flags.wheel_spin = false;
+    }
+
+    /// offset: 0x56650
+    fn reset_boost_state(&mut self, katamari: &mut Katamari) {
+        // TODO: vs mode crap; just look at the function
+        self.end_boost(katamari);
+        self.boost_energy = self.boost_max_energy;
+        self.gacha_window_timer = 0;
+    }
+
+    fn update_gachas_while_huffing(&mut self, katamari: &mut Katamari, is_vs_mode: bool) {
+        if !is_vs_mode {
+            self.oujistate.end_boost();
+            self.gacha_count = 0;
+            katamari.physics_flags.wheel_spin = false;
+        }
+        // TODO: `prince_update_gachas_while_huffing:13-18` (vs mode crap)
+    }
+
     /// The main function to update the prince's transform matrix each tick.
     pub fn update_transform(&mut self, kat: &Katamari) {
         let kat_offset = kat.get_prince_offset();
@@ -634,8 +866,10 @@ impl GameState {
     /// The main function to update a prince each tick.
     pub fn update_prince(&mut self, player: usize) {
         let prince = &mut self.princes[player];
+        let katamari = &mut self.katamaris[player];
         let input = &mut self.inputs[player];
         let camera = &mut self.cameras[player];
+        let global = &self.global;
 
         prince.last_oujistate = prince.oujistate;
 
@@ -644,7 +878,21 @@ impl GameState {
         prince.read_input(input);
         prince.update_huff();
         prince.try_end_view_mode(camera, &self.preclear);
-        // TODO: `player_update(71-85)` (update `no_spin_ticks`)
+        prince.update_boost_recharge();
+        if prince.view_mode == ViewMode::Normal {
+            if prince.is_huffing {
+                prince.update_gachas_while_huffing(katamari, global.is_vs_mode);
+            } else {
+                prince.update_gachas(
+                    katamari,
+                    camera,
+                    &mut self.tutorial,
+                    global,
+                    &self.sim_params,
+                );
+            }
+            // TODO: `prince_update_angle()`
+        }
         // TODO: `prince_update_boost()`
         // TODO: `prince_update_trigger_actions()`
     }

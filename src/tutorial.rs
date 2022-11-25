@@ -32,7 +32,7 @@ pub struct TutorialState {
 
     /// A move flag is `true` if it is currently being held by the player.
     /// offset: 0x16
-    move_held: TutorialMoves,
+    pub move_held: TutorialMoves,
 
     /// A move flag is `true` if the player has received credit for performing it.
     /// offset: 0x22
@@ -44,6 +44,10 @@ pub struct TutorialState {
 }
 
 impl TutorialState {
+    pub fn get_page(&self) -> u8 {
+        self.page
+    }
+
     pub fn set_page(&mut self, page: i32, page_step: i32) {
         self.page = page.try_into().unwrap();
         self.page_step = page_step.try_into().unwrap();

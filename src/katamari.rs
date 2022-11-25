@@ -755,6 +755,10 @@ impl Katamari {
         self.diam_trunc_mm
     }
 
+    pub fn get_diam_cm(&self) -> f32 {
+        self.diam_cm
+    }
+
     pub fn get_diam_m(&self) -> f32 {
         self.diam_cm * 100.0
     }

@@ -1,3 +1,7 @@
+use gl_matrix::{common::Vec2, vec2};
+
+use crate::katamari::KatPushDir;
+
 macro_rules! dequantize {
     ($expr: expr) => {
         if $expr > 0 {
@@ -46,26 +50,48 @@ pub struct Input {
 /// A single analog stick's non-quantized input.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct StickInput {
-    pub x: f32,
-    pub y: f32,
+    pub axes: Vec2,
 }
 
 impl StickInput {
-    pub fn clear(&mut self) {
-        self.x = 0.0;
-        self.y = 0.0;
+    pub fn x(&self) -> f32 {
+        self.axes[0]
+    }
+    pub fn y(&self) -> f32 {
+        self.axes[1]
     }
 
+    /// Clear this input.
+    pub fn clear(&mut self) {
+        self.axes = [0.0, 0.0];
+    }
+
+    /// Write the absolute value of this input to `out`.
     pub fn absolute(&self, out: &mut StickInput) {
-        out.x = self.x.abs();
-        out.y = self.y.abs();
+        out.axes[0] = self.axes[0].abs();
+        out.axes[1] = self.axes[1].abs();
+    }
+
+    /// Write this input normalized to a unit vector to `out`.
+    pub fn normalize(&self, out: &mut StickInput) {
+        vec2::normalize(&mut out.axes, &self.axes);
+    }
+
+    pub fn len(&self) -> f32 {
+        vec2::len(&self.axes)
+    }
+
+    /// Normalize the sum of the `left` and `right` inputs, writing the result to `out`.
+    pub fn normalize_sum(out: &mut StickInput, left: &StickInput, right: &StickInput) {
+        let mut axes_sum = [0.0, 0.0];
+        vec2::add(&mut axes_sum, &left.axes, &right.axes);
+        vec2::normalize(&mut out.axes, &axes_sum);
     }
 }
 
 /// The possible directions a single stick can push.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StickPushDir {
-    None,
     Up,
     Down,
 }
@@ -73,16 +99,60 @@ pub enum StickPushDir {
 /// The possible directions both sticks can push.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AnalogPushDirs {
-    pub left: StickPushDir,
-    pub right: StickPushDir,
+    pub left: Option<StickPushDir>,
+    pub right: Option<StickPushDir>,
 }
 
 impl Default for AnalogPushDirs {
     fn default() -> Self {
         Self {
-            left: StickPushDir::None,
-            right: StickPushDir::None,
+            left: None,
+            right: None,
         }
+    }
+}
+
+impl AnalogPushDirs {
+    /// Clears this struct to have no push directions.
+    pub fn clear(&mut self) {
+        self.left = None;
+        self.right = None;
+    }
+    /// Computes the push directions of `left` and `right`, using
+    /// `min_push_len` as the minimum y axis input to be considered pushing.
+    pub fn update_from_input(&mut self, ls_y: f32, rs_y: f32, min_push_len: f32) {
+        self.left = if ls_y > min_push_len {
+            Some(StickPushDir::Up)
+        } else if ls_y < -min_push_len {
+            Some(StickPushDir::Down)
+        } else {
+            None
+        };
+
+        self.right = if rs_y > min_push_len {
+            Some(StickPushDir::Up)
+        } else if rs_y < -min_push_len {
+            Some(StickPushDir::Down)
+        } else {
+            None
+        };
+    }
+
+    /// Computes the "changed" input directions from the `last` directions to the `current` ones.
+    /// If `last` and `current` are the same direction the "changed" dir is `None`.
+    /// If they're different directions, the "changed" dir is the `current` dir.
+    pub fn compute_changed(&mut self, last: &AnalogPushDirs, current: &AnalogPushDirs) {
+        self.left = if last.left != current.left {
+            current.left
+        } else {
+            None
+        };
+
+        self.right = if last.right != current.right {
+            current.right
+        } else {
+            None
+        };
     }
 }
 
@@ -95,10 +165,10 @@ pub enum GachaDir {
 impl Input {
     /// Dequantize this input's analog axes from i8 to f32.
     pub fn dequantize(&self, ls: &mut StickInput, rs: &mut StickInput) {
-        ls.x = dequantize!(self.ls_x);
-        ls.y = dequantize!(self.ls_y);
-        rs.x = dequantize!(self.rs_x);
-        rs.y = dequantize!(self.rs_y);
+        ls.axes[0] = dequantize!(self.ls_x);
+        ls.axes[1] = dequantize!(self.ls_y);
+        rs.axes[0] = dequantize!(self.rs_x);
+        rs.axes[1] = dequantize!(self.rs_y);
     }
 
     pub fn set_stick_state(
