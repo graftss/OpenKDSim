@@ -1,7 +1,4 @@
-use gl_matrix::{
-    common::{Vec3},
-    vec3,
-};
+use gl_matrix::{common::Vec3, vec3};
 
 use crate::constants::AABB_TRIANGULATION;
 

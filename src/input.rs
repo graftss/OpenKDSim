@@ -1,3 +1,13 @@
+macro_rules! dequantize {
+    ($expr: expr) => {
+        if $expr > 0 {
+            ($expr as f32) / 91.0
+        } else {
+            ($expr as f32) / 90.0
+        }
+    };
+}
+
 /// Holds all controller input that can occur in a single tick.
 #[derive(Debug, Default)]
 pub struct Input {
@@ -34,10 +44,22 @@ pub struct Input {
 }
 
 /// A single analog stick's non-quantized input.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct StickInput {
     pub x: f32,
     pub y: f32,
+}
+
+impl StickInput {
+    pub fn clear(&mut self) {
+        self.x = 0.0;
+        self.y = 0.0;
+    }
+
+    pub fn absolute(&self, out: &mut StickInput) {
+        out.x = self.x.abs();
+        out.y = self.y.abs();
+    }
 }
 
 /// The possible directions a single stick can push.
@@ -71,6 +93,14 @@ pub enum GachaDir {
 }
 
 impl Input {
+    /// Dequantize this input's analog axes from i8 to f32.
+    pub fn dequantize(&self, ls: &mut StickInput, rs: &mut StickInput) {
+        ls.x = dequantize!(self.ls_x);
+        ls.y = dequantize!(self.ls_y);
+        rs.x = dequantize!(self.rs_x);
+        rs.y = dequantize!(self.rs_y);
+    }
+
     pub fn set_stick_state(
         &mut self,
         ls_x: f32,

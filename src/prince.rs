@@ -5,7 +5,7 @@ use gl_matrix::{
 
 use crate::{
     constants::VEC3_ZERO,
-    input::{AnalogPushDirs, GachaDir, StickInput},
+    input::{AnalogPushDirs, GachaDir, Input, StickInput},
     katamari::Katamari,
     math::normalize_bounded_angle,
 };
@@ -168,7 +168,7 @@ pub struct Prince {
     /// If <0, ignores player input forever until changed.
     /// If 0, player input is read as usual.
     /// offset: 0xf4
-    ignore_input_ticks: i16,
+    ignore_input_timer: i16,
 
     /// The transform matrix of the prince.
     /// Note that this is only a rotation matrix; it doesn't include translation.
@@ -447,7 +447,7 @@ impl Prince {
         self.boost_energy = self.max_boost_energy;
         self.uphill_strength = self.init_uphill_strength;
         self.view_mode = ViewMode::Normal;
-        self.ignore_input_ticks = 0;
+        self.ignore_input_timer = 0;
 
         // TODO: `prince_init:100-123` (vs mode crap)
     }
@@ -491,21 +491,49 @@ impl Prince {
     }
 
     pub fn set_ignore_input_timer(&mut self, value: i16) {
-        self.ignore_input_ticks = value;
+        self.ignore_input_timer = value;
     }
 }
 
 impl Prince {
-    pub fn update(&mut self) {
+    /// The main function to update the prince each tick.
+    pub fn update(&mut self, input: &Input) {
         self.last_oujistate = self.oujistate;
 
         // TODO: `player_update:51-67` (update flip duration from current diameter)
 
-        // TODO: `prince_read_player_input()`
+        self.read_player_input(input);
         // TODO: `prince_update_huff_and_end_trigger_actions()`
         // TODO: `player_update(71-85)` (update `no_spin_ticks`)
         // TODO: `prince_update_boost()`
         // TODO: `prince_update_trigger_actions()`
+    }
+
+    /// Read player input from the `GameState`.
+    pub fn read_player_input(&mut self, input: &Input) {
+        // update whether the sticks are being pushed at all
+        self.sticks_pushed = 0;
+        if input.ls_x != 0 || input.ls_y != 0 {
+            self.sticks_pushed |= 1;
+        }
+        if input.rs_x != 0 || input.rs_y != 0 {
+            self.sticks_pushed |= 2;
+        }
+
+        // update analog input
+        let ignore_input_timer = self.ignore_input_timer;
+        if ignore_input_timer == 0 {
+            input.dequantize(&mut self.input_ls, &mut self.input_rs);
+        } else {
+            self.input_ls.clear();
+            self.input_rs.clear();
+        }
+
+        // TODO: `prince_read_player_input:112-145` (try to start a flip)
+
+        // update absolute analog input
+        self.input_ls.absolute(&mut self.input_ls_abs);
+        self.input_rs.absolute(&mut self.input_rs_abs);
     }
 
     /// The main function to update the prince's transform matrix each tick.

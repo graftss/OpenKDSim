@@ -385,8 +385,6 @@ impl GameState {
 
         let kat = &mut self.katamaris[player as usize];
         kat.init(player, init_diam, init_pos, &self.sim_params);
-
-        println!("katamari pos: {:?}", kat.get_center());
     }
 
     fn init_prince(&mut self, player: u8, mission_config: &MissionConfig) {
@@ -463,7 +461,7 @@ impl GameState {
             // TODO: `player_update:26-32` (if game is frozen do less stuff)
         } else {
             // update the prince, then the katamari
-            self.princes[player].update();
+            self.princes[player].update(&self.inputs[player]);
             self.katamaris[player].update();
 
             // update the prince's transform now that the katamari is updated
