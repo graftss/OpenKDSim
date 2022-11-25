@@ -1,5 +1,3 @@
-mod aabb;
-
 use std::{
     cell::RefCell,
     fmt::{Debug, Display},
@@ -375,6 +373,10 @@ pub struct Prop {
     /// offset: 0x58f
     force_no_wobble: bool,
 
+    /// The 8 corner points of the prop's AABB.
+    /// offset: 0x870
+    aabb_vertices: Vec<Vec3>,
+
     /// The radius of the prop's bounding sphere.
     /// offset: 0x910
     radius: f32,
@@ -617,6 +619,7 @@ impl Prop {
             twin_id: max_to_none!(u16, args.twin_id),
 
             // TODO
+            aabb_vertices: vec![],
             first_subobject: None, // TODO
             script_0x560: None,    // TODO
             motion_script: None,   // TODO
@@ -638,6 +641,12 @@ impl Prop {
         };
 
         result
+    }
+
+    /// Initialize the prop's AABB and volume
+    fn init_aabb_and_volume(&mut self) {
+        let _config = NamePropConfig::get(self.name_idx.into());
+        // TODO: `prop_init_aabb_and_volume:80-259` (something about subobjects?)
     }
 
     pub fn get_name_idx(&self) -> u16 {

@@ -131,6 +131,8 @@ unsafe fn test() {
         let mut state = state.borrow_mut();
 
         state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
+
+        println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
     });
 }
 

@@ -25,6 +25,25 @@ pub struct Aabb {
 }
 
 #[derive(Debug, Default)]
+pub struct PropAabbs {
+    /// The first element is the AABB of the prop.
+    /// Remaining elements are the AABBs of the prop's subobjects, if it has any.
+    aabbs: Vec<Aabb>,
+}
+
+impl PropAabbs {
+    /// Get the prop's AABB.
+    pub fn get_prop_aabb(&self) -> &Aabb {
+        &self.aabbs[0]
+    }
+
+    /// Get the AABB of the `subobj_idx`-th subobject.
+    pub fn get_subobject_aabb(&self, subobj_idx: i32) -> Option<&Aabb> {
+        self.aabbs.get(1 + subobj_idx as usize)
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct TriVertex {
     pub point: Vec3,
     pub metadata: u32,
@@ -32,14 +51,23 @@ pub struct TriVertex {
 
 #[derive(Debug, Default)]
 pub struct TriGroup {
-    pub aabb: Aabb,
+    // If true, the triangle group is encoded as a "triangle strip"
     pub is_tri_strip: bool,
     pub vertices: Vec<TriVertex>,
 }
 
+// A mesh sector is a sequence of triangle groups, contained within an AABB.
+// Collision with the sector can be tested by first checking collision with the AABB
+// interior first, and then the triangle groups second.
 #[derive(Debug, Default)]
-pub struct TriMesh {
+pub struct MeshSector {
+    pub aabb: Aabb,
     pub tri_groups: Vec<TriGroup>,
+}
+
+#[derive(Debug, Default)]
+pub struct PropMesh {
+    pub sectors: Vec<MeshSector>,
 }
 
 pub type MonoDataPtr = Option<usize>;
@@ -53,9 +81,10 @@ const NIL: u64 = 0x206c696e204c494e;
 /// Pointers into mono data for one type of prop.
 #[derive(Debug, Default)]
 pub struct PropMonoData {
-    ptrs: [MonoDataPtr; NUM_MONO_DATA_PROP_PTRS],
-    triangle_mesh: Option<TriMesh>,
-    vault_points: Option<Vec<Vec3>>,
+    pub ptrs: [MonoDataPtr; NUM_MONO_DATA_PROP_PTRS],
+    pub aabbs: Option<PropAabbs>,
+    pub triangle_mesh: Option<PropMesh>,
+    pub vault_points: Option<Vec<Vec3>>,
 }
 
 impl PropMonoData {
@@ -77,10 +106,27 @@ impl PropMonoData {
 
         PropMonoData {
             ptrs,
-            triangle_mesh: ptrs[7].map(|ptr| PropMonoData::parse_triangle_mesh(ptr as *const u8)),
+            aabbs: ptrs[0].map(|ptr| PropMonoData::parse_aabbs(ptr as *const u8)),
+            triangle_mesh: ptrs[7].map(|ptr| PropMonoData::parse_mesh(ptr as *const u8)),
             vault_points: ptrs[8]
                 .map(|ptr| PropMonoData::parse_vault_points(ptr as *const u8, name_idx)),
         }
+    }
+
+    /// Parses the AABBs of the prop and its subobjects (if it has any).
+    unsafe fn parse_aabbs(mono_data: *const u8) -> PropAabbs {
+        let num_aabbs = md_read!(mono_data, u8, 0);
+        let mut aabbs = vec![];
+
+        for i in 0..num_aabbs as isize {
+            let aabb_offset = md_read!(mono_data, u32, i * 4 + 4) as isize;
+            aabbs.push(Aabb {
+                min: md_read!(mono_data, Vec3, aabb_offset),
+                max: md_read!(mono_data, Vec3, aabb_offset + 0x10),
+            });
+        }
+
+        PropAabbs { aabbs }
     }
 
     /// Parse a list of vault points from mono data.
@@ -99,58 +145,72 @@ impl PropMonoData {
 
     /// Parse a triangle mesh from mono data.
     /// The argument `mono_data` should point to the first byte of the triangle mesh.
-    unsafe fn parse_triangle_mesh(mono_data: *const u8) -> TriMesh {
-        let mut tri_groups = vec![];
+    unsafe fn parse_mesh(mono_data: *const u8) -> PropMesh {
+        // parse the number of sectors (mesh offset 0)
+        let num_sectors = md_read!(mono_data, u8, 0);
 
-        // parse the number of triangle groups (mesh offset 0)
-        let num_groups = md_read!(mono_data, u8, 0);
+        // for each sector:
+        let mut sectors = vec![];
+        for sector_idx in 0..num_sectors as isize {
+            // parse the offset where sector starts
+            let sector_offset = md_read!(mono_data, u32, sector_idx * 4 + 4) as isize;
 
-        // parse the offset where AABBs are laid out (mesh offset 4)
-        let aabbs_offset = md_read!(mono_data, u32, 4) as isize;
-
-        // for each triangle group:
-        for i in 0..num_groups as isize {
-            // parse the triangle group's AABB ()
-            let aabb_offset = i * 0x18 + aabbs_offset + 8;
+            // parse the sector's AABB
+            let aabb_offset = sector_offset + sector_idx * 0x18 + 8;
             let aabb = Aabb {
                 min: md_read!(mono_data, Vec3, aabb_offset),
                 max: md_read!(mono_data, Vec3, aabb_offset + 12),
             };
 
-            // parse the offset where the vertex header is
-            let vertex_header_offset = md_read!(mono_data, u32, i * 4 + 8) as isize;
+            // parse the offset of the first triangle group
+            let mut tri_group_offset = md_read!(mono_data, u32, sector_idx * 4 + 8) as isize;
 
-            // parse the 1-byte header before the vertex list, which encodes:
-            //   - whether the vertex list is a triangle strip or not
-            //   - the number of encoded vertices following the header
-            let vertex_header = md_read!(mono_data, u8, vertex_header_offset);
+            // parse the contiguous list of triangle groups in the sector
+            let mut tri_groups = vec![];
+            loop {
+                // parse the 1-byte header before the vertex list, which encodes:
+                //   - whether the vertex list is a triangle strip or not
+                //   - the number of encoded vertices following the header
+                let vertex_header: u32 = md_read!(mono_data, u8, tri_group_offset).into();
 
-            let is_tri_strip = vertex_header & 0x80 != 0;
-            let num_vertices = if is_tri_strip {
-                (vertex_header & 0x7f) + 2
-            } else {
-                (vertex_header & 0x7f) * 2
-            };
+                let is_tri_strip = vertex_header & 0x80 != 0;
+                let num_vertices = if is_tri_strip {
+                    (vertex_header & 0x7f) + 2
+                } else {
+                    (vertex_header & 0x7f) * 3
+                };
 
-            let mut vertices = vec![];
-            let mut vertex_offset = vertex_header_offset + 8;
+                // parse the list of vertices
+                let mut vertices = vec![];
+                let mut vertex_offset = tri_group_offset + 8;
+                for _ in 0..num_vertices as isize {
+                    vertices.push(TriVertex {
+                        point: md_read!(mono_data, Vec3, vertex_offset),
+                        metadata: md_read!(mono_data, u32, vertex_offset + 0xc),
+                    });
+                    vertex_offset += 0x10;
+                }
 
-            for _ in 0..num_vertices as isize {
-                vertices.push(TriVertex {
-                    point: md_read!(mono_data, Vec3, vertex_offset),
-                    metadata: md_read!(mono_data, u32, vertex_offset + 12),
+                // create the triangle group
+                tri_groups.push(TriGroup {
+                    is_tri_strip,
+                    vertices,
                 });
-                vertex_offset += 0x10;
+
+                // update the triangle group offset to the beginning of the next group
+                tri_group_offset += 0xc + 0x10 * (num_vertices as isize);
+
+                // parse the vifcode to detect the end of the sector
+                let vif = md_read!(mono_data, u8, tri_group_offset - 1);
+                if vif == 0x97 {
+                    break;
+                }
             }
 
-            tri_groups.push(TriGroup {
-                aabb,
-                is_tri_strip,
-                vertices,
-            });
+            sectors.push(MeshSector { aabb, tri_groups });
         }
 
-        TriMesh { tri_groups }
+        PropMesh { sectors }
     }
 }
 
