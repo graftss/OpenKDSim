@@ -3,7 +3,7 @@ use gl_matrix::{common::Vec3, vec3};
 use crate::{
     constants::VEC3_ZERO,
     math::{vec3_inplace_scale, vec3_inplace_zero_small},
-    prop::WeakPropRef,
+    props::prop::WeakPropRef,
 };
 
 use super::{mesh::KAT_MESHES, Katamari};

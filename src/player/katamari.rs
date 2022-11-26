@@ -1,5 +1,6 @@
 mod collision;
 pub mod mesh;
+mod params;
 
 use gl_matrix::{
     common::{Mat4, Vec3},
@@ -11,15 +12,16 @@ use crate::{
         FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
-    prince::PrincePushDir,
-    prop::PropRef,
-    simulation_params::SimulationParams,
+    props::prop::PropRef,
 };
 
 use self::{
     collision::{KatCollisionRayType, KatCollisionRays, ShellRay},
     mesh::KatMesh,
+    params::KatamariParams,
 };
+
+use super::prince::PrincePushDir;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KatPushDir {
@@ -356,6 +358,8 @@ pub struct KatScaledParams {
 
 #[derive(Debug, Default)]
 pub struct Katamari {
+    params: KatamariParams,
+
     /// A reference to the vector of katamari meshes.
     /// offset: 0x0
     meshes: Vec<KatMesh>,
@@ -898,16 +902,9 @@ impl Katamari {
 }
 
 impl Katamari {
-    ///
-    pub fn init(
-        &mut self,
-        player: u8,
-        init_diam: f32,
-        init_pos: &Vec3,
-        sim_params: &SimulationParams,
-    ) {
+    pub fn init(&mut self, player: u8, init_diam: f32, init_pos: &Vec3) {
         // extra stuff not in the original simulation
-        self.max_prop_rays = sim_params.kat_max_prop_collision_rays;
+        self.max_prop_rays = self.params.max_prop_collision_rays;
         // end extra stuff
 
         self.player = player;
@@ -919,7 +916,7 @@ impl Katamari {
         self.physics_flags = KatPhysicsFlags::default();
         self.hit_flags = KatHitFlags::default();
 
-        self.attached_prop_alpha = sim_params.prop_attached_alpha;
+        self.attached_prop_alpha = self.params.prop_attached_alpha;
 
         // update sizes
         self.diam_cm = init_diam;
@@ -976,7 +973,7 @@ impl Katamari {
         self.is_climbing = 0;
         if self.physics_flags.climbing_wall {
             self.wallclimb_ticks = 0;
-            self.wallclimb_cooldown = sim_params.kat_init_wallclimb_cooldown;
+            self.wallclimb_cooldown = self.params.init_wallclimb_cooldown;
         }
 
         self.physics_flags.climbing_wall = false;

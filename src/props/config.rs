@@ -5,9 +5,9 @@ use crate::{
     macros::{read_bool, read_f32, read_u16, read_u8},
 };
 
-static NP_0X30_TABLE: &'static [u8] = include_bytes!("data/name_prop_0x30_table.bin");
-static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("data/name_prop_mono_data_offsets.bin");
-static NP_INTERNAL_NAMES: &'static str = include_str!("data/name_prop_internal_names.bin");
+static NP_0X30_TABLE: &'static [u8] = include_bytes!("bin/name_prop_0x30_table.bin");
+static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("bin/name_prop_mono_data_offsets.bin");
+static NP_INTERNAL_NAMES: &'static str = include_str!("bin/name_prop_internal_names.bin");
 
 #[derive(Debug, Default, Clone)]
 pub struct NamePropConfig {

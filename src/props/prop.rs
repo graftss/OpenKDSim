@@ -15,9 +15,11 @@ use crate::{
     gamestate::GameState,
     macros::{max_to_none, new_mat4_copy},
     mono_data::{PropAabbs, PropMonoData},
-    name_prop_config::NamePropConfig,
+    props::config::NamePropConfig,
     util::scale_sim_transform,
 };
+
+use super::Props;
 
 const FLAG_HAS_PARENT: u8 = 0x2;
 const FLAG_INTANGIBLE_CHILD: u8 = 0x4;
@@ -253,7 +255,7 @@ pub struct Prop {
 
     /// The area in which this prop loaded.
     /// offset: 0x38
-    init_area: u32,
+    init_area: u8,
 
     /// The position at which this prop loaded.
     /// offset: 0x40
@@ -326,7 +328,7 @@ pub struct Prop {
 
     /// The area at which this prop is destroyed.
     /// offset: 0x582
-    display_off_area: Option<u16>,
+    display_off_area: Option<u8>,
 
     /// (??)
     /// offset: 0x583
@@ -548,19 +550,29 @@ impl Prop {
 }
 
 impl Prop {
-    pub fn new(state: &mut GameState, args: &AddPropArgs) -> PropRef {
-        let node = Prop::new_node(state, args);
-        Rc::new(RefCell::new(node))
+    pub fn new(
+        ctrl_idx: u16,
+        args: &AddPropArgs,
+        area: u8,
+        mono_data: &Rc<PropMonoData>,
+    ) -> PropRef {
+        Rc::new(RefCell::new(Prop::new_node(
+            ctrl_idx, args, area, mono_data,
+        )))
     }
 
     /// Create a new `Prop` object.
     /// Mostly follows the function `prop_init`.
     /// offset: 0x4e950
-    pub fn new_node(state: &mut GameState, args: &AddPropArgs) -> Self {
+    pub fn new_node(
+        ctrl_idx: u16,
+        args: &AddPropArgs,
+        area: u8,
+        mono_data: &Rc<PropMonoData>,
+    ) -> Self {
         let name_idx = args.name_idx;
         let config = NamePropConfig::get(name_idx.into());
-        let mono_data = state.mono_data.props[name_idx as usize].clone();
-        let ctrl_idx = state.global.get_next_ctrl_idx();
+        let mono_data = mono_data.clone();
 
         // initialize rotation matrix
         let id = mat4::create();
@@ -607,7 +619,7 @@ impl Prop {
             has_moving_motion: false,
             next_sibling: None,
             first_child: None,
-            init_area: state.global.area.unwrap(),
+            init_area: area,
             init_pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
             rotation_mat: rotation_mat,
             pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
@@ -622,7 +634,7 @@ impl Prop {
             motion_transform: [0.0; 16],
             extra_action_type: max_to_none!(u16, args.extra_action_type),
             unique_name_id: max_to_none!(u16, args.unique_name_id),
-            display_off_area: max_to_none!(u16, args.disp_off_area_no),
+            display_off_area: max_to_none!(u8, args.disp_off_area_no as u8),
             vs_drop_flag: args.vs_drop_flag != 0,
             unattached_state: PropUnattachedState::Normal,
             animation_type: PropAnimationType::Waiting,
@@ -936,8 +948,10 @@ impl Prop {
     }
 
     /// Returns `true` if this prop should be destroyed when the area `area` loads.
-    pub fn check_destroy_on_area_load(&self, area: u32) -> bool {
-        let should_destroy = self.display_off_area.map_or(false, |a| (a as u32) == area)
+    pub fn check_destroy_on_area_load(&self, area: u8) -> bool {
+        let should_destroy = self
+            .display_off_area
+            .map_or(false, |destroy_area| destroy_area == area)
             && self.global_state != PropGlobalState::Attached;
 
         // TODO: if `should_destroy` is true, call `prop_destroy`

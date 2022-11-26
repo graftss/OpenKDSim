@@ -5,11 +5,15 @@ use gl_matrix::{
 
 use crate::{
     constants::{VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    katamari::Katamari,
     macros::{log, max, min},
     math::{change_bounded_angle, vec3_inplace_normalize, vec3_inplace_scale},
-    prince::Prince,
 };
+
+use self::preclear::PreclearState;
+
+use super::{katamari::Katamari, prince::Prince};
+
+pub mod preclear;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CameraMode {
@@ -303,9 +307,10 @@ pub struct CameraTransform {
 
 #[derive(Debug, Default)]
 pub struct Camera {
-    state: CameraState,
-    transform: CameraTransform,
-    params: CameraParams,
+    pub state: CameraState,
+    pub transform: CameraTransform,
+    pub params: CameraParams,
+    pub preclear: PreclearState,
 }
 
 impl Camera {

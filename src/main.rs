@@ -5,40 +5,31 @@
 use std::cell::RefCell;
 
 use gamestate::GameState;
-use prop::AddPropArgs;
-use stage::StageConfig;
+use props::prop::AddPropArgs;
 
 // reference this first so it's available to all other modules
 mod macros;
 
-mod camera;
 mod collision;
 mod constants;
 mod delegates;
-mod ending;
 mod gamestate;
 mod global;
-mod input;
-mod katamari;
 mod math;
 mod mission;
 mod mono_data;
-mod name_prop_config;
-mod preclear;
-mod prince;
-mod prop;
-mod prop_motion;
-mod simulation_params;
-mod stage;
-mod tutorial;
+mod player;
+mod props;
 mod util;
-mod vsmode;
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());
 }
 
-static MAS1_MONO_DATA: &'static [u8] = include_bytes!("data/mono_data_MAS1.bin");
+// temporary hard copy of monodata for testing.
+// monodata for each mission is passed to the simulation from unity when the mission
+// is loading, so the simulation itself doesn't actually need a copy of any monodata.
+static MAS1_MONO_DATA: &'static [u8] = include_bytes!("../bin/mono_data_MAS1.bin");
 
 const CHILD_PROP_ARGS: AddPropArgs = AddPropArgs {
     pos_x: 1.0,

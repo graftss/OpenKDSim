@@ -1,14 +1,6 @@
-use gl_matrix::common::Vec3;
-use lazy_static::lazy_static;
+use crate::macros::panic_log;
 
-use crate::{
-    constants::NUM_STAGES,
-    macros::{inv_lerp_clamp, lerp, panic_log, read_f32},
-};
-
-static SC_FLIP_PARAMS_TABLE: &'static [u8] = include_bytes!("data/stage_config_flip_params.bin");
-
-/// A stage is a map.
+/// A stage is a map (notably: House, Town, World).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Stage {
     House = 1,
@@ -19,8 +11,8 @@ pub enum Stage {
     Tutorial = 12,
 }
 
-impl Into<u32> for Stage {
-    fn into(self) -> u32 {
+impl Into<u8> for Stage {
+    fn into(self) -> u8 {
         match self {
             Stage::House => 1,
             Stage::Town => 2,
@@ -32,8 +24,8 @@ impl Into<u32> for Stage {
     }
 }
 
-impl From<u32> for Stage {
-    fn from(value: u32) -> Self {
+impl From<u8> for Stage {
+    fn from(value: u8) -> Self {
         match value {
             1 => Self::House,
             2 => Self::Town,
@@ -47,6 +39,14 @@ impl From<u32> for Stage {
         }
     }
 }
+use crate::{
+    constants::NUM_STAGES,
+    macros::{inv_lerp_clamp, lerp, read_f32},
+};
+use gl_matrix::common::Vec3;
+use lazy_static::lazy_static;
+
+static SC_FLIP_PARAMS_TABLE: &'static [u8] = include_bytes!("bin/stage_config_flip_params.bin");
 
 /// Flip duration is computed by lerping the katamari's diameter between
 /// stage-specific minimum and maximum diameters.
@@ -129,6 +129,7 @@ lazy_static! {
 }
 
 /// The katamari position and prince facing angle resulting from a royal warp.
+#[derive(Debug)]
 pub struct RoyalWarpDest {
     /// The katamari position after a royal warp.
     pub kat_pos: Vec3,
@@ -141,10 +142,12 @@ pub struct RoyalWarpDest {
 /// varies with the loaded area of the stage.
 /// TODO: in vs mode, the two players have different royal warp destinations,
 /// which can't be encoded in this structure.
+#[derive(Debug)]
 pub struct StageRoyalWarps {
     pub area_dests: Vec<RoyalWarpDest>,
 }
 
+#[derive(Debug)]
 pub struct StageConfig {
     flip_params: StageFlipParams,
     royal_warps: Option<&'static StageRoyalWarps>,

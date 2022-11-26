@@ -3,7 +3,7 @@ const NUM_GLOBAL_PATH_STATES: usize = 256;
 /// State about a single path, which may have multiple props moving along it at once.
 /// Updating this state allows individual props on the path to affect all such props.
 #[derive(Debug, Default, Clone)]
-pub struct GlobalPathState {
+pub struct GlobalPath {
     /// Flags: &1:reversed, &2:stalled.
     /// offset: 0x0
     pub flags: u8,
@@ -17,11 +17,23 @@ pub struct GlobalPathState {
     pub double_speed: bool,
 }
 
+#[derive(Debug, Default)]
+pub struct GlobalPathState {
+    paths: Vec<GlobalPath>,
+}
+
 impl GlobalPathState {
-    /// Initialize the vector of global path states in the `GameState`.
-    pub fn init(vec: &mut Vec<GlobalPathState>) {
-        for _ in 0..256 {
-            vec.push(GlobalPathState::default());
+    pub const MAX_PATHS: u32 = 256;
+
+    /// Initialize the vector of global path states.
+    /// The original simulation allows for 256 such paths.
+    pub fn init(&mut self) {
+        self.paths.clear();
+
+        for _ in 0..Self::MAX_PATHS {
+            self.paths.push(GlobalPath::default());
         }
     }
 }
+
+impl GlobalPathState {}

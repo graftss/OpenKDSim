@@ -2,11 +2,7 @@ use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 
-use crate::{
-    katamari::mesh::KatMesh,
-    mission::{GameMode, Mission},
-    stage::Stage,
-};
+use crate::mission::{stage::Stage, GameMode, Mission};
 
 /// Miscellaneous global game state.
 #[derive(Debug, Default)]
@@ -35,7 +31,7 @@ pub struct GlobalState {
     /// The current loaded area of the current stage, where the smallest
     /// area of each stage is 0.
     /// offset: 0xff109
-    pub area: Option<u32>,
+    pub area: Option<u8>,
 
     /// If true, the current mission is in VS mode.
     /// offset: 0xff0f1
@@ -72,7 +68,7 @@ pub struct GlobalState {
 
     /// (??) too lazy to document this right now
     /// offset: 0x10daf9
-    pub vs_mission_idx: u32,
+    pub vs_mission_idx: u8,
 
     /// The number of ticks that have been completed.
     /// offset: 0x10ea50
@@ -88,14 +84,10 @@ pub struct GlobalState {
     /// offset: 0x10eadb
     pub detaching_props_from_kat: bool,
 
-    /// All builtin katamari meshes. The game only uses the mesh at index 1.
-    /// offset: 0x10eae8
-    pub katamari_meshes: Vec<KatMesh>,
-
     /// Props with a diameter ratio to the player less
     /// than this value will be destroyed when they reach an alpha of 0.
     /// offset: 0x1339fc
-    pub prop_diam_ratio_destroy_when_invis: f32,
+    pub invis_prop_diam_ratio_to_destroy: f32,
 
     /// The number of loaded theme props.
     /// offset: 0x153198
@@ -211,17 +203,17 @@ impl GlobalState {
         self.neg_gravity[2] = -z;
     }
 
-    pub fn set_gamemode(&mut self, gamemode: u32) {
+    pub fn set_gamemode(&mut self, gamemode: u8) {
         self.gamemode = Some(gamemode.into());
     }
 
-    pub fn mono_init_start(&mut self, mission: u32, area: u32, stage: u32) {
+    pub fn mono_init_start(&mut self, mission: u8, area: u8, stage: u8) {
         self.stage = Some(stage.into());
         self.did_init_start = true;
 
         self.mission = Some(mission.into());
-        self.area = Some(area);
         self.stage = Some(stage.into());
+        self.area = Some(area);
 
         self.num_theme_props = 0;
         self.num_twin_props = 0;

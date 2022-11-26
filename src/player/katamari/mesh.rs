@@ -2,7 +2,7 @@ use gl_matrix::common::Vec3;
 
 use crate::{macros::read_f32, math::vec3_inplace_scale};
 
-static KAT_MESH_BIN: &'static [u8] = include_bytes!("../data/kat_mesh.bin");
+static KAT_MESH_BIN: &'static [u8] = include_bytes!("bin/kat_mesh.bin");
 
 lazy_static::lazy_static! {
     pub static ref KAT_MESHES: Vec<KatMesh> = KatMesh::init_builtin_meshes();

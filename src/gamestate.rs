@@ -1,84 +1,35 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    camera::Camera,
-    constants::MAX_PLAYERS,
     delegates::Delegates,
-    ending::EndingState,
     global::GlobalState,
-    input::Input,
-    katamari::Katamari,
     macros::panic_log,
-    mission::{GameMode, GameType, Mission, MissionConfig},
+    mission::{config::MissionConfig, state::MissionState, GameMode, GameType, Mission},
     mono_data::MonoData,
-    name_prop_config::NamePropConfig,
-    preclear::PreclearState,
-    prince::Prince,
-    prop::{AddPropArgs, Prop, PropRef},
-    prop_motion::GlobalPathState,
-    simulation_params::SimulationParams,
-    stage::StageConfig,
-    tutorial::TutorialState,
-    vsmode::VsModeState,
+    player::{Player, PlayerState},
+    props::{
+        prop::{AddPropArgs, Prop},
+        Props,
+    },
 };
 
 #[derive(Debug, Default)]
 pub struct GameState {
+    pub players: PlayerState,
     pub global: GlobalState,
-    pub katamaris: [Katamari; MAX_PLAYERS],
-    pub princes: [Prince; MAX_PLAYERS],
-    pub cameras: [Camera; MAX_PLAYERS],
-    pub inputs: [Input; MAX_PLAYERS],
-    pub props: Vec<PropRef>,
-    pub global_paths: Vec<GlobalPathState>,
-    pub preclear: PreclearState,
-    pub tutorial: TutorialState,
-    pub vsmode: VsModeState,
-    pub ending: EndingState,
+    pub props: Props,
+    pub mission: MissionState,
     pub delegates: Delegates,
     pub mono_data: MonoData,
-    pub sim_params: SimulationParams,
 }
 
 impl GameState {
-    pub fn borrow_katamari(&self, player: i32) -> &Katamari {
-        &self.katamaris[player as usize]
+    pub fn get_player(&self, player_idx: usize) -> &Player {
+        self.players.get(player_idx).unwrap()
     }
 
-    pub fn borrow_mut_katamari(&mut self, player: i32) -> &mut Katamari {
-        &mut self.katamaris[player as usize]
-    }
-
-    pub fn borrow_prince(&self, player: i32) -> &Prince {
-        &self.princes[player as usize]
-    }
-
-    pub fn borrow_mut_prince(&mut self, player: i32) -> &mut Prince {
-        &mut self.princes[player as usize]
-    }
-
-    pub fn borrow_camera(&self, player: i32) -> &Camera {
-        &self.cameras[player as usize]
-    }
-
-    pub fn borrow_mut_camera(&mut self, player: i32) -> &mut Camera {
-        &mut self.cameras[player as usize]
-    }
-
-    pub fn borrow_input(&self, player: i32) -> &Input {
-        &self.inputs[player as usize]
-    }
-
-    pub fn borrow_mut_input(&mut self, player: i32) -> &mut Input {
-        &mut self.inputs[player as usize]
-    }
-
-    pub fn read_prop_ref(&self, ctrl_idx: i32) -> &PropRef {
-        &self.props[ctrl_idx as usize]
-    }
-
-    pub fn write_prop_ref(&mut self, ctrl_idx: i32) -> &mut PropRef {
-        &mut self.props[ctrl_idx as usize]
+    pub fn get_mut_player(&mut self, player_idx: usize) -> &mut Player {
+        self.players.get_mut(player_idx).unwrap()
     }
 
     /// The `MissionConfig` for the current mission.
@@ -97,13 +48,15 @@ impl GameState {
         self.global.game_time_ms = game_time_ms;
         self.global.remain_time_ticks = remain_time_ticks;
         self.global.freeze = freeze > 0;
-        self.cameras[0 as usize].set_cam_eff_1P(cam_eff_1P);
+        self.get_mut_player(0 as usize)
+            .camera
+            .set_cam_eff_1P(cam_eff_1P);
     }
 
     /// Mimicks the `GetPrice` API function.
     pub fn get_prince(
         &self,
-        player: i32,
+        player_idx: usize,
         xx: &mut f32,
         xy: &mut f32,
         xz: &mut f32,
@@ -123,13 +76,14 @@ impl GameState {
         hit_water: &mut i32,
         map_loop_rate: &mut f32,
     ) {
-        let prince = self.borrow_prince(player);
+        let player = self.get_player(player_idx);
+        let prince = &player.prince;
         prince.get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz);
         *view_mode = prince.get_view_mode() as i32;
 
         // TODO: update `face_mode`
 
-        let katamari = self.borrow_katamari(player);
+        let katamari = &player.katamari;
         katamari.get_alarm(alarm_mode, alarm_type);
         *hit_water = katamari.is_in_water() as i32;
 
@@ -138,18 +92,22 @@ impl GameState {
 
     /// Mimicks the `SetGameStart` API function.
     /// Note that in the actual simulation, the "area" argument is unused.
-    pub fn set_game_start(&mut self, player: i32, _area: i32) {
+    pub fn set_game_start(&mut self, player_idx: usize, _area: u8) {
         self.global.freeze = false;
         self.global.map_change_mode = false;
-        self.borrow_mut_prince(player).set_ignore_input_timer(0);
+        self.get_mut_player(player_idx)
+            .prince
+            .set_ignore_input_timer(0);
     }
 
     /// Mimicks the `SetAreaChange` API function.
-    pub fn set_area_change(&mut self, player: i32) {
+    pub fn set_area_change(&mut self, player_idx: usize) {
         self.global.freeze = true;
         self.global.map_change_mode = true;
-        self.borrow_mut_prince(player).set_ignore_input_timer(-1);
-        self.borrow_mut_katamari(player).set_immobile();
+
+        let player = self.get_mut_player(player_idx);
+        player.prince.set_ignore_input_timer(-1);
+        player.katamari.set_immobile();
     }
 
     /// Mimicks the `SetMapChangeMode` API function.
@@ -158,8 +116,9 @@ impl GameState {
     }
 
     /// Mimicks the `GetRadiusTargetPercent` API function.
-    pub fn get_radius_target_percent(&self, player: i32) -> f32 {
-        let kat = self.borrow_katamari(player);
+    pub fn get_radius_target_percent(&self, player_idx: usize) -> f32 {
+        let player = self.get_player(player_idx);
+        let kat = &player.katamari;
         let init_rad = kat.get_init_radius();
         let curr_rad = kat.get_radius();
 
@@ -172,21 +131,8 @@ impl GameState {
     /// Mimicks the `GetPropAttached` API function.
     /// Returns the number of 3-byte prop statuses written to `out`.
     pub unsafe fn get_props_attach_status(&self, out: *mut u8) -> i32 {
-        let kat_diam_int = self.borrow_katamari(0).get_diam_int();
-        let mut num_props = 0;
-
-        for (ctrl_idx, prop_ref) in self.props.iter().enumerate() {
-            let prop = prop_ref.borrow();
-            if !prop.is_initialized() {
-                break;
-            }
-
-            let status = out.offset((ctrl_idx * 3).try_into().unwrap());
-            prop.get_attach_status(status, kat_diam_int);
-            num_props += 1;
-        }
-
-        num_props
+        let kat_diam_int = self.get_player(0).katamari.get_diam_int();
+        self.props.get_attach_statuses(out, kat_diam_int)
     }
 
     // Mimicks the `MonoInitStart` API function.
@@ -215,20 +161,27 @@ impl GameState {
         // TODO: init generated props
     }
 
-    // Mimicks the `MonoInitAddProp` API function.
-    pub fn add_prop(&mut self, args: AddPropArgs) -> i32 {
-        let prop = Prop::new(self, &args);
-        let result = prop.borrow().get_ctrl_idx().into();
-        self.props.push(prop);
-        result
+    /// Mimicks the `MonoInitAddProp` API function.
+    /// Creates a new prop using the provided arguments.
+    /// Returns the control index of the created prop.
+    pub fn add_prop(&mut self, args: &AddPropArgs) -> i32 {
+        let ctrl_idx = self.global.get_next_ctrl_idx();
+        let area = self.global.area.unwrap();
+        let mono_data = self.mono_data.props.get(args.name_idx as usize);
+
+        self.props.add_prop(ctrl_idx, args, area, mono_data);
+
+        ctrl_idx as i32
     }
 
-    // Mimicks the `MonoInitAddPropSetParent` API function.
+    /// Mimicks the `MonoInitAddPropSetParent` API function.
     pub fn add_prop_set_parent(&mut self, ctrl_idx: i32, parent_ctrl_idx: i32) {
-        let child_rc = self.props.get(ctrl_idx as usize).unwrap_or_else(|| {
+        // the child prop must exist
+        let child_rc = self.props.get_prop(ctrl_idx as usize).unwrap_or_else(|| {
             panic_log!("called `add_prop_set_parent` on a nonexistent prop: {ctrl_idx}");
         });
-        if let Some(parent_rc) = self.props.get(parent_ctrl_idx as usize) {
+
+        if let Some(parent_rc) = self.props.get_prop(parent_ctrl_idx as usize) {
             // adding a parent prop to the child
             let weak_parent_ref = Rc::<RefCell<Prop>>::downgrade(&parent_rc);
 
@@ -250,38 +203,14 @@ impl GameState {
     /// Mimicks the `MonoInitEnd` API function.
     pub fn mono_init_end(&mut self) {
         // TODO: init_cache_gemini_twins();
-        GlobalPathState::init(&mut self.global_paths);
+        self.props.global_paths.init();
         self.global.props_initialized = true;
-    }
-
-    /// Mimicks the `MonoGetPlacementMonoDataName` API function.
-    pub unsafe fn get_internal_prop_name(&self, ctrl_idx: i32) -> *const u8 {
-        let name_idx = self
-            .props
-            .get(ctrl_idx as usize)
-            .map_or(0, |prop| prop.clone().borrow().get_name_idx());
-
-        NamePropConfig::get(name_idx.into()).internal_name.as_ptr()
-    }
-
-    /// Mimicks the `SetCameraMode` API function.
-    pub fn set_camera_mode(&mut self, player: i32, mode: i32) {
-        if let Some(camera) = self.cameras.get_mut(player as usize) {
-            camera.set_mode(mode.into());
-        }
-    }
-
-    /// Mimicks the `SetCameraCheckScaleUp` API function.
-    pub fn set_camera_check_scale_up(&mut self, player: i32, flag: bool) {
-        if let Some(camera) = self.cameras.get_mut(player as usize) {
-            camera.check_scale_up(flag);
-        }
     }
 
     /// Mimicks the `SetStoreFlag` API function.
     pub fn set_store_flag(&mut self, store_flag: bool) {
         self.global.store_flag = store_flag;
-        self.global.kat_diam_int_on_store_flag = self.borrow_katamari(0).get_diam_int();
+        self.global.kat_diam_int_on_store_flag = self.get_player(0).katamari.get_diam_int();
     }
 
     /// Mimicks the `ChangeNextArea` API function.
@@ -295,19 +224,14 @@ impl GameState {
         if self.global.is_vs_mode {
             // TODO: vs mode crap
         } else {
-            // destroy props which have the new area as their "display off" area.
-            self.props.retain(|prop_ref| {
-                let prop_cell = prop_ref.clone();
-                let prop = prop_cell.borrow_mut();
-                prop.check_destroy_on_area_load(new_area)
-            });
+            self.props.change_next_area(new_area)
         }
 
         self.global.updating_player = old_updating_player;
     }
 
     /// Mimicks the `Init` API function.
-    pub fn init(&mut self, player_i32: i32, override_init_size: f32, mission: u32) {
+    pub fn init(&mut self, player_i32: i32, override_init_size: f32, mission: u8) {
         let player: u8 = player_i32.try_into().unwrap();
 
         self.global.is_vs_mode = Mission::is_vs_mode(mission);
@@ -328,23 +252,16 @@ impl GameState {
 
         let mission_config = MissionConfig::get(self.global.mission.unwrap());
 
-        // compute how small props need to be before they're destroyed at alpha 0
-        self.global.prop_diam_ratio_destroy_when_invis =
-            if mission_config.game_type == GameType::ClearProps {
-                self.sim_params.destroy_prop_diam_ratio_clearprops
-            } else if mission_config.keep_smaller_props_alive {
-                self.sim_params.destroy_prop_diam_ratio_reduced
-            } else {
-                self.sim_params.destroy_prop_diam_ratio_normal
-            };
+        // compute how small props need to be relative to the katamari
+        // before they're destroyed as they become invisible.
+        self.global.invis_prop_diam_ratio_to_destroy = self
+            .props
+            .params
+            .compute_destroy_invis_diam_ratio(mission_config);
 
-        // initialize the katamari, the prince, and the camera (in that order)
-        self.init_katamari(player, mission_config, override_init_size);
-        self.init_prince(player, mission_config);
-        self.cameras[player as usize].init(
-            &self.katamaris[player as usize],
-            &self.princes[player as usize],
-        );
+        // initialize the player (katamari, prince, camera)
+        self.get_mut_player(player as usize)
+            .init(player, mission_config, override_init_size);
 
         self.global.map_loop_rate = 0.0;
 
@@ -362,37 +279,13 @@ impl GameState {
         }
 
         if self.global.is_vs_mode {
-            self.vsmode.timer_0x10bf10 = 0;
+            self.mission.vsmode.timer_0x10bf10 = 0;
         } else {
             // TODO: `init_simulation`:333-366, initialize somethings coming callbacks?
         }
 
         // TODO: `prince_init_animation()`
         // TODO: `Init`: 21-51, initialize ending stuff
-    }
-
-    fn init_katamari(
-        &mut self,
-        player: u8,
-        mission_config: &MissionConfig,
-        override_init_size: f32,
-    ) {
-        let init_pos = &mission_config.init_kat_pos[player as usize];
-        let init_diam = if override_init_size < 0.0 {
-            mission_config.init_diam_cm
-        } else {
-            override_init_size
-        };
-
-        let kat = &mut self.katamaris[player as usize];
-        kat.init(player, init_diam, init_pos, &self.sim_params);
-    }
-
-    fn init_prince(&mut self, player: u8, mission_config: &MissionConfig) {
-        let prince = &mut self.princes[player as usize];
-        let init_angle = mission_config.init_prince_angle[player as usize];
-
-        prince.init(player, init_angle, &self.katamaris[player as usize]);
     }
 
     /// Mimicks the `Tick` API function.
@@ -425,7 +318,7 @@ impl GameState {
         // TODO: `self.cameras[0].update()`
 
         if !is_vs_mode {
-            let diam_m = self.katamaris[0].get_diam_m();
+            let diam_m = self.players[0].katamari.get_diam_m();
             let _radius_ish = if diam_m >= 1.0 {
                 ((diam_m - 1.0) - 0.5) + 1.0
             } else {
@@ -438,7 +331,7 @@ impl GameState {
         }
 
         self.global.updating_player = 0;
-        if self.preclear.get_enabled() {
+        if self.get_player(0).camera.preclear.get_enabled() {
             // TODO: `update_game:142-173` (update preclear mode camera)
         }
 
@@ -453,48 +346,5 @@ impl GameState {
 
         // TODO: `update_game:269` (keep separate running global count of # of attached props, because reasons)
         //                         (don't do this)
-    }
-
-    /// Update the prince and katamari controlled by the given `player`.    
-    /// offset: 0x25be0
-    fn update_player(&mut self, player: usize) {
-        if self.global.freeze {
-            self.katamaris[player].update_collision_rays();
-            // TODO: `player_update:29-31` (probably a no-op, but unclear)
-        } else {
-            // update the prince, then the katamari
-            self.update_prince(player);
-            self.katamaris[player].update();
-
-            // update the prince's transform now that the katamari is updated
-            self.princes[player].update_transform(&self.katamaris[player]);
-            // TODO: self.princes[player].update_animation(); (although animations might want to be their own struct)
-            self.update_royal_warp(player);
-        }
-    }
-
-    fn update_royal_warp(&mut self, player: usize) {
-        let katamari = &mut self.katamaris[player];
-
-        // only run a royal warp if the katamari center is below the death plane.
-        if katamari.get_center()[2] <= self.global.royal_warp_plane_y {
-            return;
-        }
-
-        // only run a royal warp if the stage has royal warp destinations
-        let stage_config = StageConfig::get(self.global.stage.unwrap());
-        let dest = stage_config.get_royal_warp_dest(self.global.area.unwrap() as usize);
-        if dest.is_none() {
-            return;
-        }
-
-        let prince = &mut self.princes[player];
-
-        // update the warped player's katamari, prince, and camera.
-        katamari.update_royal_warp(&dest.unwrap().kat_pos);
-        prince.update_royal_warp(katamari, dest.unwrap().prince_angle);
-        self.cameras[player].reset_state(katamari, prince);
-
-        // TODO: call `vs_volume_diff_callback` delegate
     }
 }

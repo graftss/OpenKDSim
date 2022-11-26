@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use gl_matrix::common::{Vec3, Vec4};
 
 /// The rescale factor when translating Unity coordinates to simulation coordinates.
@@ -24,9 +22,6 @@ pub const NUM_MISSIONS: usize = 37;
 /// There aren't this many stages, but this seems to be how many were allocated
 /// in the simulation.
 pub const NUM_STAGES: usize = 16;
-
-/// The maximum number of players.
-pub const MAX_PLAYERS: usize = 2;
 
 /// The maximum number of props in a mission.
 pub const MAX_PROPS: usize = 4000;
@@ -75,6 +70,10 @@ pub const VEC3_Z_NEG: Vec3 = [0.0, 0.0, -1.0];
 
 pub const FRAC_4PI_3: f32 = PI * 4.0 / 3.0;
 
+/// pi
+/// offset: 0x716fc
+pub const PI: f32 = f32::from_bits(0x40490fdb);
+
 /// 4pi, used for sphere volume
 /// offset: 0x7174c
 pub const _4PI: f32 = f32::from_bits(0x41490fdb);
@@ -94,3 +93,5 @@ pub const AABB_TRIANGULATION: [u8; 36] = [
     0, 1, 2, 2, 1, 3, 2, 3, 4, 4, 3, 5, 4, 5, 6, 6, 5, 7, 6, 7, 0, 0, 7, 1, 6, 0, 2, 2, 4, 6, 1, 7,
     3, 3, 7, 5,
 ];
+
+pub const ZERO: [u8; 1] = [0];

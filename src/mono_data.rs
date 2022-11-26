@@ -8,7 +8,7 @@ use crate::{
         mesh::{Mesh, MeshSector, TriGroup, TriVertex},
     },
     constants::NUM_NAME_PROPS,
-    name_prop_config::NamePropConfig,
+    props::config::NamePropConfig,
 };
 
 macro_rules! md_read {

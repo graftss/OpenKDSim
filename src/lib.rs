@@ -4,42 +4,57 @@
 // reference this first so it's available to all other modules
 mod macros;
 
-mod camera;
 mod collision;
 mod constants;
 mod delegates;
-mod ending;
 mod gamestate;
 mod global;
-mod input;
-mod katamari;
 mod math;
 mod mission;
 mod mono_data;
-mod name_prop_config;
-mod preclear;
-mod prince;
-mod prop;
-mod prop_motion;
-mod simulation_params;
-mod stage;
-mod tutorial;
+mod player;
+mod props;
 mod util;
-mod vsmode;
 
 use core::{panic, slice};
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
-use name_prop_config::NamePropConfig;
-use prince::OujiState;
-use prop::AddPropArgs;
-use std::cell::RefCell;
+use player::prince::OujiState;
+use props::{
+    config::NamePropConfig,
+    prop::{AddPropArgs, Prop, PropRef},
+};
+use std::{borrow::BorrowMut, cell::RefCell};
 
 use crate::macros::{log, panic_log};
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());
+}
+
+/// Helper function to read the prop config for name index `name_idx` from the game state.
+fn with_prop_config<T>(name_idx: usize, cb: fn(config: &NamePropConfig) -> T) -> T {
+    STATE.with(|state| {
+        if let Some(configs) = state.borrow().props.config {
+            if let Some(config) = configs.get(name_idx as usize) {
+                return cb(config);
+            }
+        }
+
+        panic_log!("Error reading prop config for name index {}.", name_idx);
+    })
+}
+
+// Helper function to read the prop with control index `ctrl_idx` from the game state.
+fn with_prop<T>(ctrl_idx: usize, cb: fn(prop: &Prop) -> T) -> T {
+    STATE.with(|state| {
+        if let Some(prop_ref) = state.borrow().props.get_prop(ctrl_idx as usize) {
+            return cb(&prop_ref.clone().borrow());
+        }
+
+        panic_log!("Error reading prop with control index {}.", ctrl_idx);
+    })
 }
 
 #[no_mangle]
@@ -48,29 +63,54 @@ pub unsafe extern "C" fn GetKatamariCatchCountB() -> i32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetKatamariRadius(player: i32) -> f32 {
+pub unsafe extern "C" fn GetKatamariRadius(player_idx: i32) -> f32 {
     // this is divided by 100 for no reason (the 100 is immediately multiplied back in unity).
-    STATE.with(|state| state.borrow().borrow_katamari(player).get_radius() / 100.0)
+    STATE.with(|state| {
+        state
+            .borrow()
+            .get_player(player_idx as usize)
+            .katamari
+            .get_radius()
+            / 100.0
+    })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetKatamariDiameterInt(player: i32) -> i32 {
-    STATE.with(|state| state.borrow().borrow_katamari(player).get_diam_int())
+pub unsafe extern "C" fn GetKatamariDiameterInt(player_idx: i32) -> i32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .get_player(player_idx as usize)
+            .katamari
+            .get_diam_int()
+    })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetKatamariVolume(player: i32) -> f32 {
-    STATE.with(|state| state.borrow().borrow_katamari(player).get_vol())
+pub unsafe extern "C" fn GetKatamariVolume(player_idx: i32) -> f32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .get_player(player_idx as usize)
+            .katamari
+            .get_vol()
+    })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetKatamariDisplayRadius(player: i32) -> f32 {
-    STATE.with(|state| state.borrow().borrow_katamari(player).get_display_radius())
+pub unsafe extern "C" fn GetKatamariDisplayRadius(player_idx: i32) -> f32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .get_player(player_idx as usize)
+            .katamari
+            .get_display_radius()
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetPreclearAlpha() -> f32 {
-    STATE.with(|state| state.borrow().preclear.get_alpha())
+    STATE.with(|state| state.borrow().get_player(0).camera.preclear.get_alpha())
 }
 
 #[no_mangle]
@@ -99,7 +139,7 @@ pub unsafe extern "C" fn SetKatamariSpeed(
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariTranslation(
-    player: i32,
+    player_idx: i32,
     x: &mut f32,
     y: &mut f32,
     z: &mut f32,
@@ -110,14 +150,15 @@ pub unsafe extern "C" fn GetKatamariTranslation(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_katamari(player)
+            .get_player(player_idx as usize)
+            .katamari
             .get_translation(x, y, z, sx, sy, sz);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetKatamariMatrix(
-    player: i32,
+    player_idx: i32,
     xx: &mut f32,
     xy: &mut f32,
     xz: &mut f32,
@@ -131,7 +172,8 @@ pub unsafe extern "C" fn GetKatamariMatrix(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_katamari(player)
+            .get_player(player_idx as usize)
+            .katamari
             .get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
     })
 }
@@ -158,6 +200,7 @@ pub unsafe extern "C" fn GetMapRollMatrix(
     STATE.with(|state| {
         state
             .borrow_mut()
+            .mission
             .ending
             .get_map_roll_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
     })
@@ -165,15 +208,16 @@ pub unsafe extern "C" fn GetMapRollMatrix(
 
 #[no_mangle]
 pub unsafe extern "C" fn SetGameMode(mode: u32) {
-    STATE.with(|state| state.borrow_mut().global.set_gamemode(mode))
+    STATE.with(|state| state.borrow_mut().global.set_gamemode(mode as u8))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetKatamariTranslation(player: i32, x: f32, y: f32, z: f32) {
+pub unsafe extern "C" fn SetKatamariTranslation(player_idx: i32, x: f32, y: f32, z: f32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_mut_katamari(player)
+            .get_mut_player(player_idx as usize)
+            .katamari
             .set_translation(x, y, z);
     })
 }
@@ -285,14 +329,15 @@ pub unsafe extern "C" fn TakesCallbackVsVolumeDiff(cb: VsVolumeDiffDelegate) {
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackOujiState(
-    player: i32,
+    player_idx: i32,
     oujistate: &mut *mut OujiState,
     data_size: &mut i32,
 ) -> bool {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_mut_prince(player)
+            .get_mut_player(player_idx as usize)
+            .prince
             .copy_oujistate_ptr(oujistate, data_size);
         true
     })
@@ -314,7 +359,7 @@ pub unsafe extern "C" fn SetGameTime(
 
 #[no_mangle]
 pub unsafe extern "C" fn GetCamera(
-    player: i32,
+    player_idx: i32,
     xx: &mut f32,
     xy: &mut f32,
     xz: &mut f32,
@@ -332,14 +377,15 @@ pub unsafe extern "C" fn GetCamera(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_camera(player)
+            .get_player(player_idx as usize)
+            .camera
             .get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz, offset);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetPrince(
-    player: i32,
+    player_idx: i32,
     xx: &mut f32,
     xy: &mut f32,
     xz: &mut f32,
@@ -361,7 +407,7 @@ pub unsafe extern "C" fn GetPrince(
 ) {
     STATE.with(|state| {
         state.borrow().get_prince(
-            player,
+            player_idx as usize,
             xx,
             xy,
             xz,
@@ -386,7 +432,7 @@ pub unsafe extern "C" fn GetPrince(
 
 #[no_mangle]
 pub unsafe extern "C" fn SetStickState(
-    player: i32,
+    player_idx: i32,
     ls_x: f32,
     ls_y: f32,
     rs_x: f32,
@@ -399,14 +445,15 @@ pub unsafe extern "C" fn SetStickState(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_mut_input(player)
+            .get_mut_player(player_idx as usize)
+            .input
             .set_stick_state(ls_x, ls_y, rs_x, rs_y, l3_down, r3_down, l3_held, r3_held);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn SetTriggerState(
-    player: i32,
+    player_idx: i32,
     l1_down: bool,
     l1_held: bool,
     l2_down: bool,
@@ -420,7 +467,8 @@ pub unsafe extern "C" fn SetTriggerState(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .borrow_mut_input(player)
+            .get_mut_player(player_idx as usize)
+            .input
             .set_trigger_state(
                 l1_down,
                 l1_held,
@@ -437,14 +485,7 @@ pub unsafe extern "C" fn SetTriggerState(
 
 #[no_mangle]
 pub unsafe extern "C" fn GetSubObjectCount(ctrl_idx: i32) -> i32 {
-    STATE.with(|state| {
-        state
-            .borrow()
-            .read_prop_ref(ctrl_idx)
-            .clone()
-            .borrow()
-            .count_subobjects()
-    })
+    with_prop(ctrl_idx as usize, |prop| prop.count_subobjects())
 }
 
 #[no_mangle]
@@ -458,10 +499,13 @@ pub unsafe extern "C" fn GetSubObjectPosition(
     rot_y: &mut f32,
     rot_z: &mut f32,
 ) {
+    // TODO: make this prettier
     STATE.with(|state| {
         state
             .borrow()
-            .read_prop_ref(ctrl_idx)
+            .props
+            .get_prop(ctrl_idx as usize)
+            .unwrap()
             .borrow()
             .get_subobject_position(subobj_idx, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z);
     })
@@ -470,25 +514,19 @@ pub unsafe extern "C" fn GetSubObjectPosition(
 /// Passes the bounding sphere radius of the prop with control index `ctrl_idx` to Unity.
 #[no_mangle]
 pub unsafe extern "C" fn GetPropSize(ctrl_idx: i32, radius: &mut f32) {
-    *radius = STATE.with(|state| state.borrow().read_prop_ref(ctrl_idx).borrow().get_radius());
+    *radius = with_prop(ctrl_idx as usize, |prop| prop.get_radius());
 }
 
 /// Reads whether the prop `ctrl_idx` is attached to a katamari.
 #[no_mangle]
 pub unsafe extern "C" fn IsAttached(ctrl_idx: i32) -> bool {
-    STATE.with(|state| {
-        state
-            .borrow()
-            .read_prop_ref(ctrl_idx)
-            .borrow()
-            .is_attached()
-    })
+    with_prop(ctrl_idx as usize, |prop| prop.is_attached())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MonoGetPlacementDataFloat(ctrl_idx: i32, data_type: i32) -> f32 {
     if data_type == 0xf {
-        STATE.with(|state| state.borrow().read_prop_ref(ctrl_idx).borrow().get_radius())
+        with_prop(ctrl_idx as usize, |prop| prop.get_radius())
     } else {
         panic_log!("unexpected `data_type` in `MonOGetPlacementDataFloat`.");
     }
@@ -499,7 +537,9 @@ pub unsafe extern "C" fn GetPropMatrix(ctrl_idx: i32, out: *mut Mat4) {
     STATE.with(|state| {
         state
             .borrow()
-            .read_prop_ref(ctrl_idx)
+            .props
+            .get_prop(ctrl_idx as usize)
+            .unwrap()
             .borrow()
             .unsafe_copy_transform(out);
     })
@@ -507,46 +547,26 @@ pub unsafe extern "C" fn GetPropMatrix(ctrl_idx: i32, out: *mut Mat4) {
 
 #[no_mangle]
 pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) -> i32 {
-    let mut next_mat = out;
-
-    STATE.with(|state| {
-        let mut result = 0;
-        for prop_ref in &state.borrow().props {
-            let prop = prop_ref.borrow();
-            if !prop.is_initialized() {
-                break;
-            }
-
-            // Convert the `f32` pointer into `out` to a matrix pointer.
-            let mat: &mut Mat4 = slice::from_raw_parts_mut(next_mat, 16).try_into().unwrap();
-
-            // Copy the next prop's matrix into `out`.
-            prop.unsafe_copy_transform(mat);
-
-            // Increment the pointer into `out` to the next matrix.
-            next_mat = next_mat.offset(16);
-            result += 1;
-        }
-
-        result
-    })
+    STATE.with(|state| state.borrow().props.get_prop_matrices(out))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetMonoDataConstScreamSeType(name_idx: i32) -> i32 {
-    NamePropConfig::get(name_idx).scream_sfx_idx.into()
+    with_prop_config(name_idx as usize, |config| config.scream_sfx_idx.into())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetMonoDataConstParent(name_idx: i32) -> i32 {
-    NamePropConfig::get(name_idx).const_parent_name_idx.into()
+    with_prop_config(name_idx as usize, |config| {
+        config.const_parent_name_idx.into()
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetMonoDataOffsetExist(name_idx: i32) -> i32 {
-    NamePropConfig::get(name_idx)
-        .mono_data_offset_exists()
-        .into()
+    with_prop_config(name_idx as usize, |config| {
+        config.mono_data_offset_exists().into()
+    })
 }
 
 #[no_mangle]
@@ -554,34 +574,56 @@ pub unsafe extern "C" fn MonoGetVolume(ctrl_idx: i32, volume: &mut f32, collect_
     STATE.with(|state| {
         state
             .borrow_mut()
-            .read_prop_ref(ctrl_idx)
+            .props
+            .get_prop(ctrl_idx as usize)
+            .unwrap()
             .borrow()
             .get_volume(volume, collect_diam);
     })
 }
 
+fn with_prop_cl<F, T>(ctrl_idx: i32, cb: F) -> T
+where
+    F: FnOnce(&Prop) -> T,
+{
+    STATE.with(|state| {
+        let mut s = state.borrow_mut();
+        let prop = s.props.get_mut_prop(ctrl_idx as usize).unwrap();
+
+        let p = prop.as_ref().borrow_mut();
+        cb(&p)
+    })
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn SetPropStopFlag(ctrl_idx: i32, flag: i32) {
+    let f = |x: usize| flag;
+
     STATE.with(|state| {
         state
             .borrow_mut()
-            .write_prop_ref(ctrl_idx)
+            .props
+            .get_mut_prop(ctrl_idx as usize)
+            .unwrap()
+            .as_ref()
             .borrow_mut()
             .set_disabled(flag);
     })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetGameStart(player: i32, area: i32) {
+pub unsafe extern "C" fn SetGameStart(player_idx: i32, area: i32) {
     STATE.with(|state| {
-        state.borrow_mut().set_game_start(player, area);
+        state
+            .borrow_mut()
+            .set_game_start(player_idx as usize, area as u8);
     })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetAreaChange(player: i32) {
+pub unsafe extern "C" fn SetAreaChange(player_idx: i32) {
     STATE.with(|state| {
-        state.borrow_mut().set_area_change(player);
+        state.borrow_mut().set_area_change(player_idx as usize);
     })
 }
 
@@ -593,24 +635,36 @@ pub unsafe extern "C" fn SetMapChangeMode(map_change_mode: i32) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn KataVsGet_AttackCount(player: i32) -> i32 {
+pub unsafe extern "C" fn KataVsGet_AttackCount(player_idx: i32) -> i32 {
     STATE.with(|state| {
         state
             .borrow()
-            .borrow_katamari(player)
+            .get_player(player_idx as usize)
+            .katamari
             .vs_attack_count
             .into()
     })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn KataVsGet_CatchCount(player: i32) -> i32 {
-    STATE.with(|state| state.borrow().borrow_katamari(player).vs_catch_count.into())
+pub unsafe extern "C" fn KataVsGet_CatchCount(player_idx: i32) -> i32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .get_player(player_idx as usize)
+            .katamari
+            .vs_catch_count
+            .into()
+    })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetRadiusTargetPercent(player: i32) -> f32 {
-    STATE.with(|state| state.borrow().get_radius_target_percent(player))
+pub unsafe extern "C" fn GetRadiusTargetPercent(player_idx: i32) -> f32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .get_radius_target_percent(player_idx as usize)
+    })
 }
 
 /// Writes 3 bytes of status data to `out` for each loaded prop.    
@@ -699,7 +753,7 @@ pub unsafe extern "C" fn MonoInitAddProp(
         shake_off_flag,
     };
 
-    STATE.with(|state| state.borrow_mut().add_prop(args))
+    STATE.with(|state| state.borrow_mut().add_prop(&args))
 }
 
 #[no_mangle]
@@ -721,7 +775,12 @@ pub unsafe extern "C" fn MonoInitEnd() {
 /// Returns a pointer to the "internal name" string of the prop with control index `ctrl_idx`.
 #[no_mangle]
 pub unsafe extern "C" fn MonoGetPlacementMonoDataName(ctrl_idx: i32) -> *const u8 {
-    STATE.with(|state| state.borrow().get_internal_prop_name(ctrl_idx))
+    STATE.with(|state| {
+        state
+            .borrow()
+            .props
+            .get_internal_prop_name(ctrl_idx as usize)
+    })
 }
 
 /// Returns the highest *local* y coordinate on the prop's transformed AABB.
@@ -729,7 +788,11 @@ pub unsafe extern "C" fn MonoGetPlacementMonoDataName(ctrl_idx: i32) -> *const u
 #[no_mangle]
 pub unsafe extern "C" fn MonoGetHitOffsetGround(ctrl_idx: i32) -> f32 {
     STATE.with(|state| {
-        state.borrow().props[ctrl_idx as usize]
+        state
+            .borrow()
+            .props
+            .get_prop(ctrl_idx as usize)
+            .unwrap()
             .clone()
             .borrow()
             .max_aabb_y()
@@ -737,29 +800,48 @@ pub unsafe extern "C" fn MonoGetHitOffsetGround(ctrl_idx: i32) -> f32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetCameraMode(player: i32, mode: i32) {
-    STATE.with(|state| state.borrow_mut().set_camera_mode(player, mode));
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn SetCameraCheckScaleUp(player: i32, flag: i32) {
+pub unsafe extern "C" fn SetCameraMode(player_idx: i32, mode: i32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .set_camera_check_scale_up(player, flag != 0)
+            .get_mut_player(player_idx as usize)
+            .camera
+            .set_mode(mode.into())
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetCameraCheckScaleUp(player_idx: i32, flag: i32) {
+    STATE.with(|state| {
+        state
+            .borrow_mut()
+            .get_mut_player(player_idx as usize)
+            .camera
+            .check_scale_up(flag != 0)
     });
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn SetPreclearMode(mode: i32) {
     STATE.with(|state| {
-        state.borrow_mut().preclear.set_mode(mode != 0);
+        state
+            .borrow_mut()
+            .get_mut_player(0)
+            .camera
+            .preclear
+            .set_mode(mode != 0);
     });
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn SetTutorialA(page: i32, page_step: i32) {
-    STATE.with(|state| state.borrow_mut().tutorial.set_page(page, page_step));
+    STATE.with(|state| {
+        state
+            .borrow_mut()
+            .mission
+            .tutorial
+            .set_page(page, page_step)
+    });
 }
 
 #[no_mangle]
@@ -778,12 +860,12 @@ pub unsafe extern "C" fn Tick(delta: f32) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn Init(player: i32, override_init_size: f32, mission: i32) {
-    log!("Init({}, {}, {})", player, override_init_size, mission);
+pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission: i32) {
+    log!("Init({}, {}, {})", player_idx, override_init_size, mission);
     STATE.with(|state| {
         state
             .borrow_mut()
-            .init(player, override_init_size, mission.try_into().unwrap())
+            .init(player_idx, override_init_size, mission.try_into().unwrap())
     });
 }
 
