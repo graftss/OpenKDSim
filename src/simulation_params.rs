@@ -59,6 +59,7 @@ pub struct SimulationParams {
     /// The number of post-spin gachas needed to boost, which varies by size.
     pub prince_extra_gachas_for_boost: Vec<BoostGachaParam>,
 
+    /// (??) TODO
     pub prince_roll_forwards_angle_threshold: f32,
 }
 

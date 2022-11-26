@@ -6,16 +6,16 @@ use gl_matrix::{
 use crate::{
     constants::{VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     katamari::Katamari,
-    macros::log,
-    math::{vec3_inplace_normalize, vec3_inplace_scale},
+    macros::{log, max, min},
+    math::{change_bounded_angle, vec3_inplace_normalize, vec3_inplace_scale},
     prince::Prince,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CameraMode {
     Normal,
-    JumpR1,
-    LookL1,
+    R1Jump,
+    L1Look,
     HitByProp,
     Clear,
     Shoot,
@@ -39,8 +39,8 @@ impl From<i32> for CameraMode {
     fn from(value: i32) -> Self {
         match value {
             0 => CameraMode::Normal,
-            1 => CameraMode::JumpR1,
-            2 => CameraMode::LookL1,
+            1 => CameraMode::R1Jump,
+            2 => CameraMode::L1Look,
             3 => CameraMode::HitByProp,
             4 => CameraMode::Clear,
             5 => CameraMode::Shoot,
@@ -86,6 +86,22 @@ pub struct CameraParams {
     /// A factor controlling how much the "special camera" move closer
     /// *laterally* to the katamari.
     pub special_camera_tighten: f32,
+
+    /// The vertical speed of the L1 look camera.
+    /// offset: 0x7a058
+    pub l1_look_speed_y: f32,
+
+    /// The horizontal speed of the L1 look camera.
+    /// offset: 0x7a05c
+    pub l1_look_speed_x: f32,
+
+    /// The max y angle of the L1 look camera.
+    /// offset: 0x7a050
+    pub l1_look_max_y: f32,
+
+    /// The min y angle of the L1 look camera.
+    /// offset: 0x7a054
+    pub l1_look_min_y: f32,
 }
 
 impl Default for CameraParams {
@@ -98,6 +114,10 @@ impl Default for CameraParams {
             param_0xd345e8: f32::from_bits(0xff027d4b),
             param_0xd345ec: 0.0,
             special_camera_tighten: 0.75,
+            l1_look_speed_x: f32::from_bits(0x3d0ef998),
+            l1_look_speed_y: f32::from_bits(0x3cc82be9),
+            l1_look_max_y: f32::from_bits(0x3f860a7c),
+            l1_look_min_y: f32::from_bits(0x3e71465f),
         }
     }
 }
@@ -188,6 +208,14 @@ pub struct CameraState {
     /// The camera target in world space.
     /// offset: 0xb0
     target: Vec3,
+
+    /// (??)
+    /// offset: 0x8a8
+    l1_look_init_pos_to_target: Vec3,
+
+    /// The current y angle of the L1 look camera.
+    /// offset: 0x8b8
+    l1_look_y_angle: f32,
 
     /// (??) Some kind of timer for vs mode shooting.
     /// offset: 0x918
@@ -284,6 +312,10 @@ impl Camera {
     pub fn get_mode(&self) -> CameraMode {
         self.state.mode
     }
+
+    pub fn is_scaling_up(&self) -> bool {
+        self.state.scale_up_in_progress
+    }
 }
 
 impl Camera {
@@ -324,6 +356,27 @@ impl Camera {
         self.state.last_target = target;
         self.state.cam_eff_1P = false;
         self.state.cam_eff_1P_related = false;
+    }
+
+    /// Update the camera state during an L1 look with the left stick input `(ls_x, ls_y)`.
+    /// Since the camera's x angle is just the prince's angle, a mutable reference to that
+    /// field on the `Prince` object is needed.
+    /// offset: 0x54c90 (the second half)
+    pub fn update_l1_look(&mut self, ls_x: f32, ls_y: f32, prince_angle: &mut f32) {
+        let speed_x = self.params.l1_look_speed_x;
+        let speed_y = self.params.l1_look_speed_y;
+        let min_y = self.params.l1_look_min_y;
+        let max_y = self.params.l1_look_max_y;
+
+        // update y angle
+        if ls_y > 0.0 {
+            self.state.l1_look_y_angle = max!(self.state.l1_look_y_angle - speed_y * ls_y, max_y);
+        } else if ls_y < 0.0 {
+            self.state.l1_look_y_angle = min!(self.state.l1_look_y_angle - speed_y * ls_y, min_y);
+        }
+
+        // update x angle, which is written directly to the prince
+        change_bounded_angle(prince_angle, ls_x * speed_x);
     }
 
     /// Writes the current desired camera position and target to
@@ -414,10 +467,10 @@ impl Camera {
         self.state.update_ending_callback = None;
 
         match mode {
-            CameraMode::JumpR1 => {
+            CameraMode::R1Jump => {
                 // TODO: `camera_set_mode:40-97`
             }
-            CameraMode::LookL1 => {
+            CameraMode::L1Look => {
                 // TODO: `camera_set_mode:98-113`
             }
             CameraMode::HitByProp => {

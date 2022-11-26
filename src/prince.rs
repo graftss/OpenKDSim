@@ -20,6 +20,11 @@ use crate::{
     tutorial::TutorialState,
 };
 
+/// The maximum ratio of the katamari's max speed that allows the prince to
+/// enter a non-normal view mode (l1 look or r1 jump).
+/// offset: 0x7b258
+const MAX_SPEED_RATIO_FOR_VIEW_MODE: f32 = f32::from_bits(0x3f59999a);
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OujiState {
     pub dash_start: bool,
@@ -61,13 +66,13 @@ impl OujiState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ViewMode {
+pub enum PrinceViewMode {
     Normal = 0,
     R1Jump = 1,
     L1Look = 2,
 }
 
-impl Default for ViewMode {
+impl Default for PrinceViewMode {
     fn default() -> Self {
         Self::Normal
     }
@@ -167,7 +172,7 @@ pub struct Prince {
 
     /// The prince's view mode, which distinguishes being in the R1 and L1 states.
     /// offset: 0x9c
-    view_mode: ViewMode,
+    view_mode: PrinceViewMode,
 
     /// (??) Seems to be a vs-mode flag related to huffing? who cares
     /// offset: 0x9d
@@ -376,7 +381,7 @@ pub struct Prince {
 
     /// (??) The value of the `0x3cc` matrix when not boosting, otherwise it's the identity matrix.
     /// offset: 0x40c
-    nonboost_rotation_mat: Mat4,
+    boost_push_rotation_mat: Mat4,
 
     /// The number of ticks remaining in the current flip animation.
     /// offset: 0x44c
@@ -434,6 +439,18 @@ pub struct Prince {
     /// The type of turning around the katamari the prince is doing.
     /// offset: 0x48e
     turn_type: PrinceTurnType,
+
+    /// If true, the lock caused by large collision impacts is active.
+    /// offset: 0x490
+    impact_lock_active: bool,
+
+    /// (??) the impact lock velocity at which the impact lock ends
+    /// offset: 0x494
+    impact_lock_final_vel: Vec3,
+
+    /// (??) the initial impact lock velocity, imparted by the colliding prop
+    /// offset: 0x4a4
+    impact_lock_init_vel: Vec3,
 }
 
 impl Prince {
@@ -455,7 +472,7 @@ impl Prince {
         self.push_dir = None;
         self.angle_speed = 0.0;
         mat4::identity(&mut self.push_rotation_mat);
-        mat4::identity(&mut self.nonboost_rotation_mat);
+        mat4::identity(&mut self.boost_push_rotation_mat);
         mat4::identity(&mut self.transform_rot);
 
         // TODO: make this a `PrinceParams` struct or something
@@ -484,7 +501,7 @@ impl Prince {
 
         self.boost_energy = self.boost_max_energy;
         self.uphill_strength = self.init_uphill_strength;
-        self.view_mode = ViewMode::Normal;
+        self.view_mode = PrinceViewMode::Normal;
         self.ignore_input_timer = 0;
 
         // TODO: `prince_init:100-123` (vs mode crap)
@@ -495,7 +512,7 @@ impl Prince {
         *oujistate = &mut self.oujistate as *mut OujiState;
     }
 
-    pub fn get_view_mode(&self) -> ViewMode {
+    pub fn get_view_mode(&self) -> PrinceViewMode {
         self.view_mode
     }
 
@@ -580,7 +597,7 @@ impl Prince {
     /// offset: 0x547f0 (second half of function)
     fn try_end_view_mode(&mut self, camera: &mut Camera, preclear: &PreclearState) {
         let should_end = match self.view_mode {
-            ViewMode::R1Jump => {
+            PrinceViewMode::R1Jump => {
                 if preclear.get_enabled() {
                     // if in preclear mode, end the jump immediately
                     return self.end_view_mode(None);
@@ -589,7 +606,7 @@ impl Prince {
                     camera.get_mode() == CameraMode::Normal
                 }
             }
-            ViewMode::L1Look => {
+            PrinceViewMode::L1Look => {
                 if preclear.get_enabled() {
                     // if in preclear mode, end the look immediately.
                     return self.end_view_mode(Some(camera));
@@ -598,7 +615,7 @@ impl Prince {
                     self.sticks_pushed & 3 == 3
                 }
             }
-            ViewMode::Normal => {
+            PrinceViewMode::Normal => {
                 return;
             }
         };
@@ -611,7 +628,7 @@ impl Prince {
     /// Reset the current view mode back to `Normal`.
     /// If a camera reference is passed, sets the camera mode back to normal as well.
     fn end_view_mode(&mut self, camera: Option<&mut Camera>) {
-        self.view_mode = ViewMode::Normal;
+        self.view_mode = PrinceViewMode::Normal;
         self.ignore_input_timer = 0;
         camera.map(|camera| camera.set_mode(CameraMode::Normal));
     }
@@ -653,7 +670,7 @@ impl Prince {
         // this is reset here and computed in `update_angle`, i guess because it depends more complicated stuff
         self.input_avg_push_len = 0.0;
 
-        if self.view_mode == ViewMode::Normal {
+        if self.view_mode == PrinceViewMode::Normal {
             self.last_push_dirs = self.push_dirs;
 
             // TODO: extract as sim param, also it's different in vs mode or whatever
@@ -693,7 +710,7 @@ impl Prince {
 
         // TODO: this whole function only applies to single player. would need to be rewritten for vs mode
         if self.oujistate.wheel_spin == false && katamari.physics_flags.airborne {
-            self.end_boost(katamari);
+            self.end_spin_and_boost(katamari);
         }
 
         self.oujistate.dash_start = false;
@@ -804,7 +821,9 @@ impl Prince {
         }
     }
 
-    fn end_boost(&mut self, katamari: &mut Katamari) {
+    /// Exit spin/boost state and reset gachas.
+    /// offset: 0x56600
+    fn end_spin_and_boost(&mut self, katamari: &mut Katamari) {
         self.oujistate.end_boost();
         self.gacha_count = 0;
         katamari.physics_flags.wheel_spin = false;
@@ -813,7 +832,7 @@ impl Prince {
     /// offset: 0x56650
     fn reset_boost_state(&mut self, katamari: &mut Katamari) {
         // TODO: vs mode crap; just look at the function
-        self.end_boost(katamari);
+        self.end_spin_and_boost(katamari);
         self.boost_energy = self.boost_max_energy;
         self.gacha_window_timer = 0;
     }
@@ -1067,8 +1086,8 @@ impl Prince {
 
     /// The bottom chunk of `prince_update_input_features_and_gachas` in ghidra,
     /// after `prince_update_angle` is called.
-    pub fn update_push_rotation_mat(&mut self, is_vs_mode: bool) {
-        mat4::copy(&mut self.nonboost_rotation_mat, &self.push_rotation_mat);
+    pub fn update_boost_push_rotation_mat(&mut self, is_vs_mode: bool) {
+        mat4::copy(&mut self.boost_push_rotation_mat, &self.push_rotation_mat);
         if self.oujistate.dash {
             self.extra_flat_angle_speed = 0.0;
             if !is_vs_mode {
@@ -1076,6 +1095,91 @@ impl Prince {
             }
         }
     }
+
+    pub fn update_view_mode(
+        &mut self,
+        camera: &mut Camera,
+        katamari: &mut Katamari,
+        tutorial: &mut TutorialState,
+        input: &Input,
+        preclear: &PreclearState,
+        global: &GlobalState,
+    ) {
+        self.update_impact_lock();
+
+        match self.view_mode {
+            PrinceViewMode::Normal => {
+                if !camera.is_scaling_up() {
+                    // TODO: `prince_update_trigger_actions:24-44` (vs mode crap)
+                    if !preclear.get_enabled() {
+                        let is_tutorial = global.gamemode.unwrap() == GameMode::Tutorial;
+
+                        // check if the katamari is moving slow enough to change view mode
+                        let under_speed_threshold = if global.is_vs_mode {
+                            false
+                        } else if katamari.physics_flags.immobile {
+                            true
+                        } else if !self.oujistate.dash && katamari.physics_flags.contacts_floor {
+                            let speed_ratio = katamari
+                                .get_speed_ratio(self.push_dir.unwrap_or(PrincePushDir::Forwards))
+                                .clamp(0.0, 1.0);
+                            speed_ratio <= MAX_SPEED_RATIO_FOR_VIEW_MODE
+                        } else {
+                            false
+                        };
+
+                        let can_view_mode = (!is_tutorial || tutorial.get_page() > 0)
+                            && under_speed_threshold
+                            && !self.oujistate.jump_180 != 0;
+
+                        if can_view_mode {
+                            if input.l1_down && !input.r1_down {
+                                // initiate an L1 look
+                                self.end_spin_and_boost(katamari);
+                                if is_tutorial {
+                                    tutorial.move_held.look_l1 = true;
+                                }
+                                katamari.set_immobile();
+                                self.view_mode = PrinceViewMode::L1Look;
+                                camera.set_mode(CameraMode::L1Look);
+                            } else if input.r1_down && !input.l1_down {
+                                // initiate an R1 jump
+                                self.end_spin_and_boost(katamari);
+                                // TODO: play R1_JUMP sfx
+                                if is_tutorial {
+                                    tutorial.move_held.jump_r1 = true;
+                                }
+                                katamari.set_immobile();
+                                self.view_mode = PrinceViewMode::R1Jump;
+                                camera.set_mode(CameraMode::R1Jump);
+                            }
+                        }
+                    }
+                }
+            }
+            PrinceViewMode::L1Look => {
+                // `prince_update_look_l1`
+                // offset: 0x54c90
+                // if the camera starts scaling up, return to the normal view mode.
+                if camera.is_scaling_up() {
+                    self.view_mode = PrinceViewMode::Normal;
+                    self.ignore_input_timer = 0;
+                    camera.set_mode(CameraMode::Normal);
+                    return;
+                }
+
+                // update the camera with the current input
+                let ls_x = (input.ls_x as f32) / 91.0;
+                let ls_y = (input.ls_y as f32) / 91.0;
+                camera.update_l1_look(ls_x, ls_y, &mut self.angle);
+            }
+            _ => (),
+        }
+    }
+
+    /// Update the impact lock state.
+    /// offset: 0x54e90
+    fn update_impact_lock(&mut self) {}
 
     /// The main function to update the prince's transform matrix each tick.
     pub fn update_transform(&mut self, kat: &Katamari) {
@@ -1134,6 +1238,7 @@ impl GameState {
         let input = &mut self.inputs[player];
         let camera = &mut self.cameras[player];
         let global = &self.global;
+        let preclear = &self.preclear;
 
         prince.last_oujistate = prince.oujistate;
 
@@ -1145,7 +1250,7 @@ impl GameState {
         prince.update_boost_recharge();
         prince.update_analog_input_features();
 
-        if prince.view_mode == ViewMode::Normal {
+        if prince.view_mode == PrinceViewMode::Normal {
             prince.update_gachas(
                 katamari,
                 camera,
@@ -1156,9 +1261,20 @@ impl GameState {
             prince.update_angle(&mut self.tutorial, katamari, global, &self.sim_params);
         }
 
-        prince.update_push_rotation_mat(global.is_vs_mode);
+        prince.update_boost_push_rotation_mat(global.is_vs_mode);
 
-        // TODO: `prince_update_boost()`
-        // TODO: `prince_update_trigger_actions()`
+        // TODO: require `finished_mono_init` here?
+        if global.gamemode.unwrap().can_update_view_mode()
+            && katamari.physics_flags.vs_mode_some_state != 2
+        {
+            prince.update_view_mode(
+                camera,
+                katamari,
+                &mut self.tutorial,
+                input,
+                preclear,
+                global,
+            );
+        }
     }
 }

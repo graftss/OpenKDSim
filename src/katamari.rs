@@ -11,6 +11,7 @@ use crate::{
         FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
+    prince::PrincePushDir,
     prop::PropRef,
     simulation_params::SimulationParams,
 };
@@ -124,7 +125,7 @@ pub struct KatPhysicsFlags {
 
     /// If true, the katamari is not moving.
     /// offset: 0x10
-    pub stationary: bool,
+    pub immobile: bool,
 
     /// (??) The type of boundary ray currently acting as the pivot.
     /// offset: 0x11
@@ -538,6 +539,22 @@ pub struct Katamari {
     /// offset: 0x710
     transform: Mat4,
 
+    /// The katamari's "max" forward speed
+    /// offset: 0x750
+    max_forwards_speed: f32,
+
+    /// The katamari's "max" backwards speed
+    /// offset: 0x754
+    max_backwards_speed: f32,
+
+    /// The katamari's "sideways" forward speed
+    /// offset: 0x758
+    max_sideways_speed: f32,
+
+    /// The katamari's "boost" forward speed
+    /// offset: 0x75c
+    max_boost_speed: f32,
+
     /// The katamari's radius when it started climbing.
     /// offset: 0x768
     wallclimb_init_rad: f32,
@@ -785,6 +802,16 @@ impl Katamari {
 
     pub fn get_speed(&self) -> f32 {
         self.speed
+    }
+
+    /// Computes the ratio of the katamari's current speed to its "max" speed,
+    /// which varies with the prince's push direction.
+    pub fn get_speed_ratio(&self, push_dir: PrincePushDir) -> f32 {
+        match push_dir {
+            PrincePushDir::Forwards => self.speed / self.max_forwards_speed,
+            PrincePushDir::Backwards => self.speed / self.max_backwards_speed,
+            PrincePushDir::Sideways => self.speed / self.max_sideways_speed,
+        }
     }
 
     pub fn set_look_l1(&mut self, is_look_l1: bool) {

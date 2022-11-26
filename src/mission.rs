@@ -229,6 +229,15 @@ impl From<u32> for GameMode {
     }
 }
 
+impl GameMode {
+    pub fn can_update_view_mode(&self) -> bool {
+        match self {
+            GameMode::Normal | GameMode::Tutorial | GameMode::TutorialB => true,
+            GameMode::Ending | GameMode::Load => false,
+        }
+    }
+}
+
 /// Constant features of each mission.
 /// offset: 0x5f7a0
 /// size: 0x60
