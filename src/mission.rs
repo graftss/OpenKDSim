@@ -13,32 +13,6 @@ use crate::{
 static MC_0X60_TABLE: &'static [u8] = include_bytes!("data/mission_config_0x60_table.bin");
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Stage {
-    House = 1,
-    Town = 2,
-    World = 3,
-    Ending = 9,
-    VsMode = 10,
-    Tutorial = 12,
-}
-
-impl From<u32> for Stage {
-    fn from(value: u32) -> Self {
-        match value {
-            1 => Self::House,
-            2 => Self::Town,
-            3 => Self::World,
-            9 => Self::Ending,
-            10 => Self::VsMode,
-            12 => Self::Tutorial,
-            _ => {
-                panic_log!("encountered unknown `Stage` value: {}", value);
-            }
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GameType {
     /// Game type for "Make a Star" missions, where the objective is to reach a fixed diameter.
     ClearSize = 0,

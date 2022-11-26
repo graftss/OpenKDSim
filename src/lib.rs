@@ -22,6 +22,7 @@ mod prince;
 mod prop;
 mod prop_motion;
 mod simulation_params;
+mod stage;
 mod tutorial;
 mod util;
 mod vsmode;

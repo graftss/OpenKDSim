@@ -4,7 +4,8 @@ use gl_matrix::common::{Vec3, Vec4};
 
 use crate::{
     katamari::mesh::KatMesh,
-    mission::{GameMode, Mission, Stage},
+    mission::{GameMode, Mission},
+    stage::Stage,
 };
 
 /// Miscellaneous global game state.

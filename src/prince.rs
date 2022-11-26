@@ -17,6 +17,7 @@ use crate::{
     mission::GameMode,
     preclear::PreclearState,
     simulation_params::SimulationParams,
+    stage::StageConfig,
     tutorial::TutorialState,
 };
 
@@ -1242,7 +1243,9 @@ impl GameState {
 
         prince.last_oujistate = prince.oujistate;
 
-        // TODO: `player_update:51-67` (update flip duration from current diameter)
+        prince.flip_duration_ticks = StageConfig::get(self.global.stage.unwrap())
+            .flip_params
+            .get_duration(katamari.get_diam_cm());
 
         prince.read_input(input);
         prince.update_huff();
@@ -1263,7 +1266,6 @@ impl GameState {
 
         prince.update_boost_push_rotation_mat(global.is_vs_mode);
 
-        // TODO: require `finished_mono_init` here?
         if global.gamemode.unwrap().can_update_view_mode()
             && katamari.physics_flags.vs_mode_some_state != 2
         {

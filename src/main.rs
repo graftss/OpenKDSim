@@ -6,6 +6,7 @@ use std::cell::RefCell;
 
 use gamestate::GameState;
 use prop::AddPropArgs;
+use stage::StageConfig;
 
 // reference this first so it's available to all other modules
 mod macros;
@@ -28,6 +29,7 @@ mod prince;
 mod prop;
 mod prop_motion;
 mod simulation_params;
+mod stage;
 mod tutorial;
 mod util;
 mod vsmode;
@@ -129,15 +131,19 @@ unsafe fn test() {
     let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
 
     STATE.with(|state| {
-        let mut state = state.borrow_mut();
+        // let mut state = state.borrow_mut();
 
-        state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
-        state.add_prop(CHILD_PROP_ARGS);
-        let prop = state.props[0].as_ref().borrow();
-        println!("{}", prop.max_aabb_y());
+        // state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
+        // state.add_prop(CHILD_PROP_ARGS);
+        // let prop = state.props[0].as_ref().borrow();
+        // println!("{}", prop.max_aabb_y());
         // println!("{:#?}", x);
         // println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
     });
+
+    println!("{:?}", StageConfig::get(1.into()).flip_params);
+    println!("{:?}", StageConfig::get(2.into()).flip_params);
+    println!("{:?}", StageConfig::get(3.into()).flip_params);
 }
 
 fn main() {

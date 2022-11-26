@@ -85,12 +85,24 @@ macro_rules! min {
     };
 }
 
+/// Linear map on `$t` induced by `[0, 1] -> [$min, $max]`.
+macro_rules! lerp {
+    ($t: expr, $min: expr, $max: expr) => {
+        ($min) + ($t) * ($max - $min)
+    };
+}
+
+/// Linear map on `$value` induced by `[$min, $max] -> [0, 1]`.
 macro_rules! inv_lerp {
     ($value: expr, $min: expr, $max: expr) => {
         (($value) - ($min)) / (($max) - ($min))
     };
 }
 
+/// Piecewise linear map on `$value`:
+/// [-inf, $min] -> 0
+/// [$min, $max] -> [0, 1]
+/// [$max, +inf] -> 1
 macro_rules! inv_lerp_clamp {
     ($value: expr, $min: expr, $max: expr) => {
         if ($value) <= ($min) {
@@ -106,6 +118,7 @@ macro_rules! inv_lerp_clamp {
 pub(crate) use {
     inv_lerp,
     inv_lerp_clamp,
+    lerp,
     log,
     max,
     max_to_none,

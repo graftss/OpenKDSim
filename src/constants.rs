@@ -21,6 +21,10 @@ pub const NUM_NAME_PROPS: usize = 1718;
 /// The number of missions.
 pub const NUM_MISSIONS: usize = 37;
 
+/// There aren't this many stages, but this seems to be how many were allocated
+/// in the simulation.
+pub const NUM_STAGES: usize = 16;
+
 /// The maximum number of players.
 pub const MAX_PLAYERS: usize = 2;
 
