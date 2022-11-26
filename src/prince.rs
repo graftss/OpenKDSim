@@ -1182,10 +1182,16 @@ impl Prince {
     /// offset: 0x54e90
     fn update_impact_lock(&mut self) {}
 
+    /// Update the prince after a royal warp.
+    pub fn update_royal_warp(&mut self, katamari: &Katamari, angle: f32) {
+        self.angle = angle;
+        self.update_transform(katamari);
+    }
+
     /// The main function to update the prince's transform matrix each tick.
-    pub fn update_transform(&mut self, kat: &Katamari) {
-        let kat_offset = kat.get_prince_offset();
-        let kat_center = kat.get_center();
+    pub fn update_transform(&mut self, katamari: &Katamari) {
+        let kat_offset = katamari.get_prince_offset();
+        let kat_center = katamari.get_center();
         self.last_pos = self.pos;
         self.kat_offset_vec[2] = kat_offset;
 
@@ -1243,9 +1249,8 @@ impl GameState {
 
         prince.last_oujistate = prince.oujistate;
 
-        prince.flip_duration_ticks = StageConfig::get(self.global.stage.unwrap())
-            .flip_params
-            .get_duration(katamari.get_diam_cm());
+        prince.flip_duration_ticks =
+            StageConfig::get(self.global.stage.unwrap()).get_flip_duration(katamari.get_diam_cm());
 
         prince.read_input(input);
         prince.update_huff();

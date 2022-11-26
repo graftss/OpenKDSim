@@ -17,6 +17,7 @@ use crate::{
     prop::{AddPropArgs, Prop, PropRef},
     prop_motion::GlobalPathState,
     simulation_params::SimulationParams,
+    stage::StageConfig,
     tutorial::TutorialState,
     vsmode::VsModeState,
 };
@@ -458,7 +459,8 @@ impl GameState {
     /// offset: 0x25be0
     fn update_player(&mut self, player: usize) {
         if self.global.freeze {
-            // TODO: `player_update:26-32` (if game is frozen do less stuff)
+            self.katamaris[player].update_collision_rays();
+            // TODO: `player_update:29-31` (probably a no-op, but unclear)
         } else {
             // update the prince, then the katamari
             self.update_prince(player);
@@ -467,7 +469,32 @@ impl GameState {
             // update the prince's transform now that the katamari is updated
             self.princes[player].update_transform(&self.katamaris[player]);
             // TODO: self.princes[player].update_animation(); (although animations might want to be their own struct)
-            // TODO: `player_update:95-135` (resolve royal warps)
+            self.update_royal_warp(player);
         }
+    }
+
+    fn update_royal_warp(&mut self, player: usize) {
+        let katamari = &mut self.katamaris[player];
+
+        // only run a royal warp if the katamari center is below the death plane.
+        if katamari.get_center()[2] <= self.global.royal_warp_plane_y {
+            return;
+        }
+
+        // only run a royal warp if the stage has royal warp destinations
+        let stage_config = StageConfig::get(self.global.stage.unwrap());
+        let dest = stage_config.get_royal_warp_dest(self.global.area.unwrap() as usize);
+        if dest.is_none() {
+            return;
+        }
+
+        let prince = &mut self.princes[player];
+
+        // update the warped player's katamari, prince, and camera.
+        katamari.update_royal_warp(&dest.unwrap().kat_pos);
+        prince.update_royal_warp(katamari, dest.unwrap().prince_angle);
+        self.cameras[player].reset_state(katamari, prince);
+
+        // TODO: call `vs_volume_diff_callback` delegate
     }
 }

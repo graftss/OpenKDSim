@@ -140,10 +140,6 @@ unsafe fn test() {
         // println!("{:#?}", x);
         // println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
     });
-
-    println!("{:?}", StageConfig::get(1.into()).flip_params);
-    println!("{:?}", StageConfig::get(2.into()).flip_params);
-    println!("{:?}", StageConfig::get(3.into()).flip_params);
 }
 
 fn main() {

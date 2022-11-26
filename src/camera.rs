@@ -319,20 +319,20 @@ impl Camera {
 }
 
 impl Camera {
-    pub fn init(&mut self, kat: &Katamari, prince: &Prince) {
-        self.init_state(kat, prince);
+    pub fn init(&mut self, katamari: &Katamari, prince: &Prince) {
+        self.init_state(katamari, prince);
         self.set_mode(CameraMode::Normal);
         self.init_transform();
-        self.reset_state(kat, prince);
+        self.reset_state(katamari, prince);
     }
 
     /// Initialize the `CameraState` struct.
     /// offset: 0xb410
-    pub fn init_state(&mut self, kat: &Katamari, prince: &Prince) {
+    pub fn init_state(&mut self, katamari: &Katamari, prince: &Prince) {
         let mut pos = vec3::create();
         let mut target = vec3::create();
 
-        self.compute_normal_pos_and_target(kat, prince, &mut pos, &mut target);
+        self.compute_normal_pos_and_target(katamari, prince, &mut pos, &mut target);
         self.state.pos = pos;
         self.state.last_pos = pos;
         self.state.target = target;
@@ -342,13 +342,13 @@ impl Camera {
     /// Reset the camera state. This is performed at the start of every mission
     /// and after a royal warp.
     /// offset: 0xaba0
-    pub fn reset_state(&mut self, kat: &Katamari, prince: &Prince) {
+    pub fn reset_state(&mut self, katamari: &Katamari, prince: &Prince) {
         self.state.update_ending_callback = None;
         self.state.apply_easing = true;
 
         let mut pos = vec3::create();
         let mut target = vec3::create();
-        self.compute_normal_pos_and_target(kat, prince, &mut pos, &mut target);
+        self.compute_normal_pos_and_target(katamari, prince, &mut pos, &mut target);
 
         self.state.pos = pos;
         self.state.last_pos = pos;
@@ -384,7 +384,7 @@ impl Camera {
     /// offset: 0xd4a0
     pub fn compute_normal_pos_and_target(
         &mut self,
-        kat: &Katamari,
+        katamari: &Katamari,
         prince: &Prince,
         pos: &mut Vec3,
         target: &mut Vec3,
@@ -393,15 +393,19 @@ impl Camera {
         let mut mat2 = mat4::create();
         let mut vec1 = vec3::create();
 
-        let kat_center = kat.get_center();
+        let kat_center = katamari.get_center();
 
         // compute the unit vector in the direction from the prince to the katamari
         let mut prince_to_kat = vec3::create();
-        vec3::subtract(&mut prince_to_kat, &kat.get_center(), &prince.get_pos());
+        vec3::subtract(
+            &mut prince_to_kat,
+            &katamari.get_center(),
+            &prince.get_pos(),
+        );
         prince_to_kat[1] = 0.0;
         vec3_inplace_normalize(&mut prince_to_kat);
 
-        if kat.physics_flags.under_water {
+        if katamari.physics_flags.under_water {
             // TODO: `camera_compute_normal_pos_and_target:63-150`
         } else {
             if self.state.clear_is_rotating {
@@ -422,24 +426,25 @@ impl Camera {
             vec3::scale(&mut kat_to_cam_pos, &prince_to_kat, pos_offset);
 
             // update special camera state before computing camera position
-            self.state.use_special_camera =
-                if !kat.hit_flags.special_camera && !kat.last_hit_flags[0].special_camera {
-                    // if special camera is off
-                    if self.state.use_special_camera {
-                        // detect when special camera is changing from on to off
-                        self.state.changing_special_camera = true;
-                    }
-                    false
-                } else {
-                    // if special camera is on, scooch in the camera position
-                    vec3_inplace_scale(&mut kat_to_cam_pos, self.params.special_camera_tighten);
+            self.state.use_special_camera = if !katamari.hit_flags.special_camera
+                && !katamari.last_hit_flags[0].special_camera
+            {
+                // if special camera is off
+                if self.state.use_special_camera {
+                    // detect when special camera is changing from on to off
+                    self.state.changing_special_camera = true;
+                }
+                false
+            } else {
+                // if special camera is on, scooch in the camera position
+                vec3_inplace_scale(&mut kat_to_cam_pos, self.params.special_camera_tighten);
 
-                    if !self.state.use_special_camera {
-                        // detect when special camera is changing from off to on
-                        self.state.changing_special_camera = true;
-                    }
-                    true
-                };
+                if !self.state.use_special_camera {
+                    // detect when special camera is changing from off to on
+                    self.state.changing_special_camera = true;
+                }
+                true
+            };
 
             // compute camera position
             pos[0] = kat_center[0] + kat_to_cam_pos[0];

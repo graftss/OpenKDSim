@@ -147,7 +147,7 @@ pub struct GlobalState {
     pub camera_delay: Vec3,
 
     /// The y-coordinate of the death plane. Anything below this value should be warped.
-    pub death_plane_y: f32,
+    pub royal_warp_plane_y: f32,
 
     /// Gravity direction.
     pub gravity: Vec4,
@@ -194,7 +194,7 @@ impl GlobalState {
         self.boost_accel = boost_a;
 
         self.prince_turn_speed_mult = rot_s;
-        self.death_plane_y = dp_y;
+        self.royal_warp_plane_y = dp_y;
 
         self.camera_delay[0] = cam_x;
         self.camera_delay[1] = cam_y;

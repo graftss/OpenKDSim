@@ -440,7 +440,7 @@ pub struct Katamari {
     /// The number of ticks the katamari has been airborne.
     /// Resets to 0 each time the katamari starts being airborne.
     /// offset: 0x114
-    ticks_airborne: u16,
+    airborne_ticks: u16,
 
     /// The number of ticks the katamari has been falling.
     /// Resets to 0 each time the katamari starts falling.
@@ -800,6 +800,10 @@ impl Katamari {
         &self.center
     }
 
+    pub fn set_center(&mut self, center: &Vec3) {
+        vec3::copy(&mut self.center, center);
+    }
+
     pub fn get_speed(&self) -> f32 {
         self.speed
     }
@@ -883,6 +887,13 @@ impl Katamari {
 
     pub fn is_in_water(&self) -> bool {
         self.physics_flags.in_water
+    }
+
+    pub fn update_royal_warp(&mut self, dest_pos: &Vec3) {
+        self.set_center(dest_pos);
+        self.reset_collision_rays();
+        self.set_immobile();
+        self.airborne_ticks = 0;
     }
 }
 
