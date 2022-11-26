@@ -11,7 +11,7 @@ use gl_matrix::{
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
-    constants::{_1_3, _4PI, _PI_750},
+    constants::{FRAC_1_3, FRAC_PI_750, _4PI},
     gamestate::GameState,
     macros::{max_to_none, new_mat4_copy},
     mono_data::{PropAabbs, PropMonoData},
@@ -736,10 +736,10 @@ impl Prop {
         self.compare_vol_m3 = self.aabb_vol_m3 * config.compare_vol_mult;
         self.attach_vol_m3 = self.compare_vol_m3 * config.attach_vol_mult;
         self.aabb_radius = min_vol_size_m * 100.0 * 0.5;
-        self.weird_vol_multiple = self.compare_vol_m3 / _PI_750;
+        self.weird_vol_multiple = self.compare_vol_m3 / FRAC_PI_750;
 
         // compute katamari diameter needed to attach this prop
-        let attach_rad_m = (self.compare_vol_m3 / VOL_RATIO_FOR_PICKUP * 3.0 / _4PI).powf(_1_3);
+        let attach_rad_m = (self.compare_vol_m3 / VOL_RATIO_FOR_PICKUP * 3.0 / _4PI).powf(FRAC_1_3);
         self.exact_attach_diam_cm = attach_rad_m * 100.0 + attach_rad_m * 100.0;
         self.attach_diam_mm = (self.exact_attach_diam_cm * 10.0) as i32;
     }

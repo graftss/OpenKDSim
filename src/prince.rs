@@ -1,18 +1,19 @@
+use std::f32::consts::{FRAC_PI_2, PI};
+
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4, vec2, vec3,
+    mat4, vec3,
 };
 
 use crate::{
     camera::{Camera, CameraMode},
     constants::VEC3_ZERO,
-    delegates::Delegates,
     gamestate::GameState,
     global::GlobalState,
     input::{AnalogPushDirs, GachaDir, Input, StickInput, StickPushDir},
     katamari::Katamari,
-    macros::{max, min},
-    math::normalize_bounded_angle,
+    macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log},
+    math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
     mission::GameMode,
     preclear::PreclearState,
     simulation_params::SimulationParams,
@@ -87,17 +88,28 @@ pub enum PrinceSidewaysDir {
     Right,
 }
 
-/// Classifies the ways the prince can move around the katamari.
-/// Note that all katamari-pushing movement belongs to `Push`.
+/// Classifies the ways the prince can be turning around the katamari.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrinceTurnType {
     None,
-    WalkLeftUp,
-    WalkRightUp,
-    WalkLeftDown,
-    WalkRightDown,
+
+    /// Left stick up, right stick neutral.
+    LeftStickUp,
+
+    /// Right stick up, left stick neutral.
+    RightStickUp,
+
+    // Left stick down, right stick neutral.
+    LeftStickDown,
+
+    /// Right stick down, left stick neutral.
+    RightStickDown,
+
+    /// R1 flip in progress.
     Flip,
-    Push,
+
+    /// Both sticks are non-neutral.
+    BothSticks,
 }
 
 impl Default for PrinceTurnType {
@@ -118,7 +130,7 @@ pub struct Prince {
 
     /// (??) Random bit vector.
     /// offset: 0x4
-    flags: u16,
+    flags: u32,
 
     /// The current position of the prince.
     /// offset: 0xc
@@ -203,9 +215,10 @@ pub struct Prince {
     /// offset: 0x24c
     kat_offset_vec: Vec3,
 
-    /// (??)
+    /// The threshold on the angle between the two analog sticks that differentiates
+    /// "rolling fowards/backwards" and "rolling sideways". Whatever that means.
     /// offset: 0x288
-    min_push_angle_y: f32,
+    push_sideways_angle_threshold: f32,
 
     /// The prince's turn speed while not moving backwards.
     /// offset: 0x28c
@@ -233,11 +246,11 @@ pub struct Prince {
 
     /// (??)
     /// offset: 0x2bc
-    low_stick_angle_threshold: f32,
+    forward_push_angle_cutoff: f32,
 
     /// (??)
     /// offset: 0x2c0
-    high_stick_angle_threshold: f32,
+    backward_push_angle_cutoff: f32,
 
     /// A forward push of this value or higher is scaled to 1, with lower values rescaled between [0,1].
     /// offset: 0x2c4
@@ -347,23 +360,23 @@ pub struct Prince {
 
     /// The difference between the angles of the two sticks.
     /// offset: 0x3bc
-    angle_between_sticks: f32,
+    input_angle_btwn_sticks: f32,
 
     /// (??) too lazy
     /// offset: 0x3c0
-    input_scaled_avg_len: f32,
+    input_avg_push_len: f32,
 
     /// 0 if moving sideways, [0,1] if forwards/backwards depending on y angle of net input
     /// offset: 0x3c4
-    scaled_push: f32,
+    push_strength: f32,
 
-    /// (??) The matrix encoding a y-axis rotation based on something input related?
+    /// The matrix encoding a y-axis rotation by the input push angle.
     /// offset: 0x3cc
-    input_y_rot_mat: Mat4,
+    push_rotation_mat: Mat4,
 
-    /// (??) The value of the `0x3cc` matrix on the previous tick
+    /// (??) The value of the `0x3cc` matrix when not boosting, otherwise it's the identity matrix.
     /// offset: 0x40c
-    last_input_y_rot_mat: Mat4,
+    nonboost_rotation_mat: Mat4,
 
     /// The number of ticks remaining in the current flip animation.
     /// offset: 0x44c
@@ -441,15 +454,17 @@ impl Prince {
         self.kat_offset_vec[2] = kat.get_prince_offset();
         self.push_dir = None;
         self.angle_speed = 0.0;
-        mat4::identity(&mut self.input_y_rot_mat);
-        mat4::identity(&mut self.last_input_y_rot_mat);
+        mat4::identity(&mut self.push_rotation_mat);
+        mat4::identity(&mut self.nonboost_rotation_mat);
         mat4::identity(&mut self.transform_rot);
+
+        // TODO: make this a `PrinceParams` struct or something
         self.huff_init_speed_penalty = 0.4;
         self.huff_duration = 240; // TODO: some weird potential off-by-one issue here.
         self.init_uphill_strength = 100.0;
         self.uphill_strength_loss = 0.7649993;
-        self.low_stick_angle_threshold = 0.8733223;
-        self.high_stick_angle_threshold = 2.270252;
+        self.forward_push_angle_cutoff = 0.8733223;
+        self.backward_push_angle_cutoff = 2.270252;
         self.forward_push_cap = 0.5;
         self.one_stick_up_turn_speed = 0.035;
         self.one_stick_down_turn_speed = 0.025;
@@ -463,7 +478,7 @@ impl Prince {
         self.boost_recharge = 18;
         self.boost_recharge_frequency = 100;
         self.min_angle_btwn_sticks_for_fastest_turn = 0.75;
-        self.min_push_angle_y = 0.363474;
+        self.push_sideways_angle_threshold = 0.363474;
 
         self.update_transform(kat);
 
@@ -622,19 +637,21 @@ impl Prince {
     /// **After** `read_input`, compute various features of analog input (some of which are
     /// also expressed as analog input, e.g. unit input).
     /// offset: 0x53cc0 (first half of `prince_update_boost`)
-    fn update_analog_input_features(&mut self, is_vs_mode: bool) {
+    fn update_analog_input_features(&mut self) {
         self.input_ls.normalize(&mut self.input_ls_unit);
         self.input_rs.normalize(&mut self.input_rs_unit);
         StickInput::normalize_sum(&mut self.input_sum_unit, &self.input_ls, &self.input_rs);
 
-        // TODO: `prince_update_angle_between_sticks()`
+        self.input_ls_angle = self.input_ls_unit.angle();
+        self.input_rs_angle = self.input_rs_unit.angle();
+        self.input_angle_btwn_sticks = self.input_ls_unit.angle_with_other(&self.input_rs_unit);
 
         self.input_ls_len = min!(1.0, self.input_ls.len());
         self.input_rs_len = min!(1.0, self.input_rs.len());
         self.input_avg_len = (self.input_ls_len + self.input_rs_len) / 2.0;
 
-        // this is reset here and computed elsewhere, i guess because it depends on other things
-        self.input_scaled_avg_len = 0.0;
+        // this is reset here and computed in `update_angle`, i guess because it depends more complicated stuff
+        self.input_avg_push_len = 0.0;
 
         if self.view_mode == ViewMode::Normal {
             self.last_push_dirs = self.push_dirs;
@@ -654,14 +671,6 @@ impl Prince {
                 self.push_dirs_changed.clear();
             }
         }
-
-        mat4::copy(&mut self.last_input_y_rot_mat, &self.input_y_rot_mat);
-        if self.oujistate.dash {
-            self.extra_flat_angle_speed = 0.0;
-            if !is_vs_mode {
-                mat4::identity(&mut self.input_y_rot_mat);
-            }
-        }
     }
 
     /// Update the prince's gacha count based on input that should have been processed earlier in the tick.
@@ -675,6 +684,11 @@ impl Prince {
         global: &GlobalState,
         params: &SimulationParams,
     ) {
+        // use a different gacha updating strategy while huffing
+        if self.is_huffing {
+            return self.update_gachas_while_huffing(katamari, global.is_vs_mode);
+        }
+
         let gamemode = global.gamemode;
 
         // TODO: this whole function only applies to single player. would need to be rewritten for vs mode
@@ -745,7 +759,7 @@ impl Prince {
             // if there are gachas in progress and the gacha timer hasn't expired:
             self.gacha_window_timer -= 1;
 
-            let gachas_for_spin = params.gachas_for_spin;
+            let gachas_for_spin = params.prince_gachas_for_spin;
             let gachas_for_boost = params.gachas_for_boost(katamari.get_diam_cm());
 
             if just_did_gacha && self.gacha_count == gachas_for_boost {
@@ -804,6 +818,8 @@ impl Prince {
         self.gacha_window_timer = 0;
     }
 
+    /// Update gachas while huffing.
+    /// offset: 0x56e60
     fn update_gachas_while_huffing(&mut self, katamari: &mut Katamari, is_vs_mode: bool) {
         if !is_vs_mode {
             self.oujistate.end_boost();
@@ -811,6 +827,254 @@ impl Prince {
             katamari.physics_flags.wheel_spin = false;
         }
         // TODO: `prince_update_gachas_while_huffing:13-18` (vs mode crap)
+    }
+
+    /// Update the prince's angle around the katamari.
+    /// offset: 0x55b70
+    fn update_angle(
+        &mut self,
+        tutorial: &mut TutorialState,
+        katamari: &Katamari,
+        global: &GlobalState,
+        sim_params: &SimulationParams,
+    ) {
+        let min_push = self.min_push_to_move;
+        let is_tutorial = global.gamemode == Some(GameMode::Tutorial);
+
+        self.flags &= 0xfffbffff; // turn off `flags & 0x40000`
+
+        if self.input_avg_len <= 0.0 || katamari.physics_flags.vs_mode_some_state == 2 {
+            // if no analog input:
+            self.angle_speed = 0.0;
+            self.quick_shifting = false;
+            self.turn_type = PrinceTurnType::None;
+            return self.input_avg_push_len = 0.0;
+        }
+
+        // if there is at least some input, compute the `turn_type` from stick inputs, with six possible cases:
+        if self.input_ls_len == 0.0 {
+            // if left stick neutral:
+            if self.input_rs_len == 0.0 {
+                // case 1 (left stick neutral, right stick neutral)
+                // i guess this shouldn't happen because it would have been detected above, but i'm not sure
+                self.turn_type = PrinceTurnType::None;
+                self.input_avg_len = 0.0;
+                self.input_avg_push_len = 0.0;
+                panic_log!("weird edge case in `update_angle`");
+            } else if self.input_rs.y() > 0.0 {
+                // case 2 (left stick neutral, right stick up)
+                self.turn_type = PrinceTurnType::RightStickUp;
+                self.angle_speed =
+                    -self.one_stick_up_turn_speed * inv_lerp!(self.input_rs_abs.y(), min_push, 1.0);
+                change_bounded_angle(&mut self.angle, self.angle_speed);
+            } else {
+                // case 3 (left stick neutral, right stick down)
+                self.turn_type = PrinceTurnType::RightStickDown;
+                self.angle_speed = self.one_stick_down_turn_speed
+                    * inv_lerp!(self.input_rs_abs.y(), min_push, 1.0);
+                change_bounded_angle(&mut self.angle, self.angle_speed);
+            }
+        } else if self.input_rs_len == 0.0 {
+            if self.input_ls.y() > 0.0 {
+                // case 4 (right stick neutral, left stick up)
+                self.turn_type = PrinceTurnType::LeftStickUp;
+                self.angle_speed =
+                    self.one_stick_up_turn_speed * inv_lerp!(self.input_ls_abs.y(), min_push, 1.0);
+                change_bounded_angle(&mut self.angle, self.angle_speed);
+            } else {
+                // case 5 (right stick neutral, left stick down)
+                self.turn_type = PrinceTurnType::LeftStickDown;
+                self.angle_speed = self.one_stick_down_turn_speed
+                    * inv_lerp!(self.input_ls_abs.y(), min_push, 1.0);
+            }
+        } else {
+            // case 6 (neither stick neutral)
+            self.turn_type = PrinceTurnType::BothSticks;
+
+            // within this case, there are 6 subcases depending on the angle between the two analog sticks.
+            let arms_angle = self.input_angle_btwn_sticks;
+
+            if arms_angle >= FRAC_PI_2 {
+                // case 6.1 ("quick shifting": angle between sticks in [pi/2, pi])
+                if is_tutorial {
+                    tutorial.move_held.quick_shift = true;
+                }
+
+                if katamari.get_speed() > 0.0 {
+                    self.flags |= 0x40000;
+                    self.input_avg_push_len = 0.0;
+                }
+
+                return self.update_angle_from_quick_shift(global.prince_turn_speed_mult);
+            }
+
+            let ls_push_len = inv_lerp_clamp!(self.input_ls_len, min_push, 1.0);
+            let rs_push_len = inv_lerp_clamp!(self.input_rs_len, min_push, 1.0);
+            self.input_avg_push_len = (ls_push_len + rs_push_len) * 0.5;
+
+            let push_angle_len = acos_f32(self.input_sum_unit.y());
+            let mut push_angle = self.input_sum_unit.angle();
+            self.push_sideways_dir = None;
+
+            if push_angle_len < sim_params.prince_roll_forwards_angle_threshold {
+                // case 6.2 ("roll forwards": push angle is below the threshold for rolling forwards)
+                if is_tutorial {
+                    tutorial.move_held.roll_forwards = true;
+                }
+            } else if push_angle_len < FRAC_PI_2 - self.push_sideways_angle_threshold {
+                if push_angle >= 0.0 {
+                    // case 6.3 ("roll to the right")
+                    if is_tutorial {
+                        tutorial.move_held.roll_to_the_right = true;
+                    }
+                } else {
+                    // case 6.4 ("roll to the left")
+                    if is_tutorial {
+                        tutorial.move_held.roll_to_the_left = true;
+                    }
+                }
+            } else if push_angle_len > FRAC_PI_2 + self.push_sideways_angle_threshold {
+                // case 6.5 ("roll backwards": push angle is above the threshold for rolling backwards)
+                if is_tutorial {
+                    tutorial.move_held.roll_backwards = true;
+                }
+            } else {
+                // case 6.6 ("roll sideways": push angle in `[pi/2 - t, pi/2 + t]`,
+                //           where `t` is the push sideways angle threshold.)
+                if is_tutorial {
+                    tutorial.move_held.roll_sideways = true;
+                }
+
+                // whether we're rolling sideways left or right is determined by the
+                // sign of the push-input's x axis (which is identical to the sign
+                // of the `push_angle`).
+                if push_angle >= 0.0 {
+                    push_angle = FRAC_PI_2;
+                    self.push_sideways_dir = Some(PrinceSidewaysDir::Right)
+                } else {
+                    push_angle = -FRAC_PI_2;
+                    self.push_sideways_dir = Some(PrinceSidewaysDir::Left);
+                }
+            }
+
+            let id = mat4::create();
+            mat4::rotate_y(&mut self.push_rotation_mat, &id, push_angle);
+            self.update_angle_from_push(global.prince_turn_speed_mult, push_angle_len);
+        }
+    }
+
+    /// Update the prince's angle around the katamari when quick shifting.
+    /// offset: 0x56510
+    fn update_angle_from_quick_shift(&mut self, global_speed_mult: f32) {
+        let ls_y = self.input_ls_unit.y();
+        let ls_y_sign = ls_y.signum();
+
+        let rs_y = self.input_rs_unit.y();
+        let rs_y_sign = rs_y.signum();
+
+        // don't quick shift if the two sticks have the same y axis sign.
+        if ls_y_sign == rs_y_sign {
+            return;
+        }
+
+        let base_turn_speed = ls_y_sign
+            * inv_lerp!(
+                self.input_angle_btwn_sticks,
+                FRAC_PI_2,
+                self.min_angle_btwn_sticks_for_fastest_turn * PI
+            );
+
+        self.quick_shifting = true;
+        self.angle_speed = base_turn_speed * self.quick_shift_turn_speed;
+        change_bounded_angle(&mut self.angle, global_speed_mult * self.angle_speed);
+    }
+
+    /// Update the prince's angle around the katamari when pushing (i.e.
+    /// whenever neither stick is neutral).
+    /// `push_angle` is the absolute value of the angle between the sticks.
+    /// offset: 0x56250
+    fn update_angle_from_push(&mut self, global_speed_mult: f32, push_angle: f32) {
+        let forw_cutoff = self.forward_push_angle_cutoff;
+        let forw_max = FRAC_PI_2 - self.push_sideways_angle_threshold;
+        let back_min = FRAC_PI_2 + self.push_sideways_angle_threshold;
+        let back_cutoff = self.backward_push_angle_cutoff;
+
+        // compute the first speed component from the angle between the analog
+        // stick inputs.
+        let mut push_angle_speed = if push_angle < forw_cutoff {
+            // case 1: angles in `[0, forw_cutoff]` -> speed in `[0, 1]`
+            push_angle / forw_cutoff
+        } else if push_angle <= forw_max {
+            // case 2: angles in `[forw_cutoff, forw_max]` -> speed in `[0, 1]`
+            inv_lerp!(push_angle, forw_cutoff, forw_max)
+        } else if push_angle <= back_min {
+            // case 3: angles in `[forw_max, back_min]` -> speed `0`
+            0.0
+        } else if push_angle <= back_cutoff {
+            // case 4: angles in `[back_min, back_cutoff]` -> speed in `[0, -1]`
+            -inv_lerp!(push_angle, back_min, back_cutoff)
+        } else {
+            // case 5: angles in `[back_cutoff, pi]` -> speed in `[0, -1]`
+            -inv_lerp!(push_angle, back_cutoff, PI)
+        };
+
+        // the sign of the push angle speed is determined by the x axis of the analog input
+        if self.input_sum_unit.x() < 0.0 {
+            push_angle_speed *= -1.0;
+        }
+
+        // compute the second speed component from the difference between the
+        // stick input magnitudes.
+        let mut stick_mag_speed = self.input_ls_len - self.input_rs_len;
+        if push_angle > FRAC_PI_2 {
+            stick_mag_speed *= -1.0;
+        }
+
+        // compute the base angle speed depending on if the prince is pushing backwards or not
+        let base_angle_speed = if push_angle >= back_min {
+            self.backwards_turn_speed
+        } else {
+            self.non_backwards_turn_speed
+        };
+
+        // compute angle speed from the above two speed components, then update the angle
+        self.angle_speed = 0.5 * base_angle_speed * (push_angle_speed + stick_mag_speed);
+        change_bounded_angle(&mut self.angle, global_speed_mult * self.angle_speed);
+
+        // compute the push direction and push strength
+        if push_angle <= forw_max {
+            // case 1: angle in `[0, forw_max]` (pushing forwards):
+            self.push_dir = Some(PrincePushDir::Forwards);
+
+            // TODO: simplify this, it should be a single clamped inverse lerp
+            let scaled_str = (forw_max - push_angle) / forw_max;
+            self.push_strength = if scaled_str < self.forward_push_cap {
+                scaled_str / self.forward_push_cap
+            } else {
+                1.0
+            };
+        } else if push_angle < back_min {
+            // case 2: angle in `[forw_max, back_min]` (pushing sideways):
+            // when pushing sideways, we have zero push strength
+            self.push_dir = Some(PrincePushDir::Sideways);
+            self.push_strength = 0.0;
+        } else {
+            // case 3: angle in `[back_min, pi]` (pushing backwards):
+            self.push_dir = Some(PrincePushDir::Backwards);
+            self.push_strength = inv_lerp!(push_angle, back_min, PI);
+        };
+    }
+
+    /// The bottom chunk of `prince_update_input_features_and_gachas` in ghidra,
+    /// after `prince_update_angle` is called.
+    pub fn update_push_rotation_mat(&mut self, is_vs_mode: bool) {
+        mat4::copy(&mut self.nonboost_rotation_mat, &self.push_rotation_mat);
+        if self.oujistate.dash {
+            self.extra_flat_angle_speed = 0.0;
+            if !is_vs_mode {
+                mat4::identity(&mut self.push_rotation_mat);
+            }
+        }
     }
 
     /// The main function to update the prince's transform matrix each tick.
@@ -879,20 +1143,21 @@ impl GameState {
         prince.update_huff();
         prince.try_end_view_mode(camera, &self.preclear);
         prince.update_boost_recharge();
+        prince.update_analog_input_features();
+
         if prince.view_mode == ViewMode::Normal {
-            if prince.is_huffing {
-                prince.update_gachas_while_huffing(katamari, global.is_vs_mode);
-            } else {
-                prince.update_gachas(
-                    katamari,
-                    camera,
-                    &mut self.tutorial,
-                    global,
-                    &self.sim_params,
-                );
-            }
-            // TODO: `prince_update_angle()`
+            prince.update_gachas(
+                katamari,
+                camera,
+                &mut self.tutorial,
+                global,
+                &self.sim_params,
+            );
+            prince.update_angle(&mut self.tutorial, katamari, global, &self.sim_params);
         }
+
+        prince.update_push_rotation_mat(global.is_vs_mode);
+
         // TODO: `prince_update_boost()`
         // TODO: `prince_update_trigger_actions()`
     }

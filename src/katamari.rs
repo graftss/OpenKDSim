@@ -8,8 +8,8 @@ use gl_matrix::{
 
 use crate::{
     constants::{
-        TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE, VEC3_X_NEG,
-        VEC3_Y_POS, VEC3_ZERO, _4PI_3,
+        FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
+        VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     prop::PropRef,
     simulation_params::SimulationParams,
@@ -174,6 +174,14 @@ pub struct KatPhysicsFlags {
     /// (??)
     /// offset: 0x1d
     pub moved_more_than_rad_0x1d: bool,
+
+    /// (??)
+    /// offset: 0x1e
+    pub vs_attack: u8,
+
+    /// (??)
+    /// offset: 0x1f
+    pub vs_mode_some_state: u8,
 }
 
 /// A group of flags which mostly record if the katamari is contacting certain special types of surfaces
@@ -775,6 +783,10 @@ impl Katamari {
         &self.center
     }
 
+    pub fn get_speed(&self) -> f32 {
+        self.speed
+    }
+
     pub fn set_look_l1(&mut self, is_look_l1: bool) {
         self.is_look_l1 = is_look_l1;
     }
@@ -887,7 +899,7 @@ impl Katamari {
         self.contact_floor_ray_len = self.radius_cm;
 
         let rad_m = self.radius_cm / 100.0;
-        self.vol_m3 = rad_m * rad_m * rad_m * _4PI_3;
+        self.vol_m3 = rad_m * rad_m * rad_m * FRAC_4PI_3;
 
         vec3::copy(&mut self.u_right_of_vel, &VEC3_X_NEG);
         mat4::identity(&mut self.transform);

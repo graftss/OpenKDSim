@@ -140,7 +140,7 @@ pub struct GlobalState {
     pub boost_accel: f32,
 
     /// Global multiplier on the speed the prince rotates around the katamari.
-    pub rot_speed: f32,
+    pub prince_turn_speed_mult: f32,
 
     /// (??) Global camera delay along x, y, and z axes.
     pub camera_delay: Vec3,
@@ -192,7 +192,7 @@ impl GlobalState {
         self.backwards_accel = back_a;
         self.boost_accel = boost_a;
 
-        self.rot_speed = rot_s;
+        self.prince_turn_speed_mult = rot_s;
         self.death_plane_y = dp_y;
 
         self.camera_delay[0] = cam_x;

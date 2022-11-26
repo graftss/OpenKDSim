@@ -54,10 +54,12 @@ pub struct SimulationParams {
     pub prop_attached_alpha: f32,
 
     /// The number of gachas needed to spin.
-    pub gachas_for_spin: u8,
+    pub prince_gachas_for_spin: u8,
 
     /// The number of post-spin gachas needed to boost, which varies by size.
-    pub extra_gachas_for_boost: Vec<BoostGachaParam>,
+    pub prince_extra_gachas_for_boost: Vec<BoostGachaParam>,
+
+    pub prince_roll_forwards_angle_threshold: f32,
 }
 
 impl Default for SimulationParams {
@@ -73,8 +75,8 @@ impl Default for SimulationParams {
             destroy_prop_diam_ratio_clearprops: 0.145,
             destroy_prop_diam_ratio_reduced: 0.1,
             prop_attached_alpha: 0.995,
-            gachas_for_spin: 3,
-            extra_gachas_for_boost: vec![
+            prince_gachas_for_spin: 3,
+            prince_extra_gachas_for_boost: vec![
                 BoostGachaParam {
                     min_diam_cm: 0.0,
                     num_gachas: 2,
@@ -92,17 +94,21 @@ impl Default for SimulationParams {
                     num_gachas: 5,
                 },
             ],
+            prince_roll_forwards_angle_threshold: f32::from_bits(0x3f060a92), // 0.5235988
         }
     }
 }
 
 impl SimulationParams {
     pub fn gachas_for_boost(&self, diam_cm: f32) -> u8 {
-        for (i, param) in self.extra_gachas_for_boost.iter().enumerate() {
+        for (i, param) in self.prince_extra_gachas_for_boost.iter().enumerate() {
             if param.min_diam_cm > diam_cm {
                 return match i {
                     0 => panic!(),
-                    _ => self.gachas_for_spin + self.extra_gachas_for_boost[i - 1].num_gachas,
+                    _ => {
+                        self.prince_gachas_for_spin
+                            + self.prince_extra_gachas_for_boost[i - 1].num_gachas
+                    }
                 };
             }
         }

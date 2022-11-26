@@ -69,7 +69,7 @@ pub const VEC3_Z_POS: Vec3 = [0.0, 0.0, 1.0];
 /// The negative z axis unit vector.
 pub const VEC3_Z_NEG: Vec3 = [0.0, 0.0, -1.0];
 
-pub const _4PI_3: f32 = PI * 4.0 / 3.0;
+pub const FRAC_4PI_3: f32 = PI * 4.0 / 3.0;
 
 /// 4pi, used for sphere volume
 /// offset: 0x7174c
@@ -77,11 +77,11 @@ pub const _4PI: f32 = f32::from_bits(0x41490fdb);
 
 /// 1/3
 /// offset: 0x715b0
-pub const _1_3: f32 = f32::from_bits(0x3eaaaaab);
+pub const FRAC_1_3: f32 = f32::from_bits(0x3eaaaaab);
 
 /// PI/750, used because reasons
 /// offset: 0x71544
-pub const _PI_750: f32 = f32::from_bits(0x1f42893b);
+pub const FRAC_PI_750: f32 = f32::from_bits(0x1f42893b);
 
 /// The triangulation of AABB's used in the original simulation.
 /// An AABB is triangulated into 12 triangles (= 6 faces * 2 triangles/face),

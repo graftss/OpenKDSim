@@ -1,6 +1,6 @@
 use gl_matrix::{common::Vec2, vec2};
 
-use crate::katamari::KatPushDir;
+use crate::math::acos_f32;
 
 macro_rules! dequantize {
     ($expr: expr) => {
@@ -54,11 +54,31 @@ pub struct StickInput {
 }
 
 impl StickInput {
+    /// Read the x axis of analog input.
     pub fn x(&self) -> f32 {
         self.axes[0]
     }
+
+    /// Read the y axis of analog input.
     pub fn y(&self) -> f32 {
         self.axes[1]
+    }
+
+    /// Compute the angle (in [-pi, pi]) the stick is pointing towards, where:
+    /// y+ axis = 0; x+ axis = pi/2; y- axis = pi; x- axis = -pi/2
+    pub fn angle(&self) -> f32 {
+        let mut ls_angle = acos_f32(self.axes[1]);
+        if self.axes[0] < 0.0 {
+            ls_angle *= -1.0;
+        }
+
+        ls_angle
+    }
+
+    /// Compute the angle between this stick input and the stick input `other`.
+    pub fn angle_with_other(&self, other: &StickInput) -> f32 {
+        let dot = self.axes[0] * other.axes[0] + self.axes[1] * other.axes[1];
+        acos_f32(dot)
     }
 
     /// Clear this input.

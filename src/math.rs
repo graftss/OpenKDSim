@@ -1,9 +1,6 @@
 use std::f32::consts::{PI, TAU};
 
-use gl_matrix::{
-    common::{Vec2, Vec3},
-    vec2,
-};
+use gl_matrix::common::Vec3;
 
 /// Scale `vec` by `scale` in-place.
 #[inline]
@@ -52,5 +49,19 @@ pub fn normalize_bounded_angle(angle: f32) -> f32 {
         angle + TAU
     } else {
         angle
+    }
+}
+
+#[inline]
+pub fn change_bounded_angle(angle: &mut f32, delta: f32) {
+    *angle = normalize_bounded_angle(*angle + delta);
+}
+
+#[inline]
+pub fn acos_f32(value: f32) -> f32 {
+    match value {
+        _ if value >= 1.0 => 0.0,
+        _ if value <= -1.0 => PI,
+        _ => value.acos(),
     }
 }

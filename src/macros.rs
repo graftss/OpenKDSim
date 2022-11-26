@@ -85,7 +85,27 @@ macro_rules! min {
     };
 }
 
+macro_rules! inv_lerp {
+    ($value: expr, $min: expr, $max: expr) => {
+        (($value) - ($min)) / (($max) - ($min))
+    };
+}
+
+macro_rules! inv_lerp_clamp {
+    ($value: expr, $min: expr, $max: expr) => {
+        if ($value) <= ($min) {
+            0.0
+        } else if ($value) >= ($max) {
+            1.0
+        } else {
+            (($value) - ($min)) / (($max) - ($min))
+        }
+    };
+}
+
 pub(crate) use {
+    inv_lerp,
+    inv_lerp_clamp,
     log,
     max,
     max_to_none,
