@@ -11,6 +11,12 @@ pub enum Stage {
     Tutorial = 12,
 }
 
+impl Default for Stage {
+    fn default() -> Self {
+        Self::House
+    }
+}
+
 impl Into<u8> for Stage {
     fn into(self) -> u8 {
         match self {

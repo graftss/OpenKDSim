@@ -1019,8 +1019,8 @@ impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
     pub fn update(&mut self, prince: &Prince, camera: &Camera, mission: &MissionState) {
-        let stage_config = mission.stage.as_ref().unwrap();
-        let mission_config = mission.mission.as_ref().unwrap();
+        let stage_config = mission.stage_config.as_ref().unwrap();
+        let mission_config = mission.mission_config.as_ref().unwrap();
 
         // decrement timers
         self.wallclimb_cooldown -= 1;

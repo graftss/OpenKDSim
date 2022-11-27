@@ -213,15 +213,17 @@ pub unsafe extern "C" fn GetMapRollMatrix(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .mission
+            .mission_state
             .ending
+            .as_mut()
+            .unwrap()
             .get_map_roll_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn SetGameMode(mode: u32) {
-    STATE.with(|state| state.borrow_mut().global.set_gamemode(mode as u8))
+    STATE.with(|state| state.borrow_mut().mission_state.set_gamemode(mode as u8))
 }
 
 #[no_mangle]
@@ -671,7 +673,13 @@ pub unsafe extern "C" fn MonoInitStart(
     );
     STATE.with(|state| {
         state.borrow_mut().mono_init_start(
-            mono_data, mission, area, stage, kadai_flag, clear_flag, end_flag,
+            mono_data,
+            mission as u8,
+            area as u8,
+            stage as u8,
+            kadai_flag != 0,
+            clear_flag != 0,
+            end_flag != 0,
         );
     })
 }
@@ -815,8 +823,10 @@ pub unsafe extern "C" fn SetTutorialA(page: i32, page_step: i32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .mission
+            .mission_state
             .tutorial
+            .as_mut()
+            .unwrap()
             .set_page(page, page_step)
     });
 }

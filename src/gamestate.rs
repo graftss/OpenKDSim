@@ -4,9 +4,9 @@ use crate::{
     delegates::Delegates,
     global::GlobalState,
     macros::panic_log,
-    mission::{config::MissionConfig, state::MissionState, GameMode, Mission},
+    mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
-    player::{Player, PlayerState},
+    player::{Player, PlayersState},
     props::{
         prop::{AddPropArgs, Prop},
         Props,
@@ -15,11 +15,25 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct GameState {
-    pub players: PlayerState,
+    /// State unique to a particular player.
+    pub players: PlayersState,
+
+    /// Global, mutable state (like the number of ticks that have occurred
+    /// so far in the current mission).
     pub global: GlobalState,
+
+    /// State relating to props.
     pub props: Props,
-    pub mission: MissionState,
+
+    /// State relating to the mission in progress.
+    pub mission_state: MissionState,
+
+    /// Delegates which call back into unity code.
     pub delegates: Delegates,
+
+    /// Constant, geometric data relating to props that's passed to the
+    /// simulation from unity (e.g. prop collision meshes, prop random
+    /// roam zones).
     pub mono_data: MonoData,
 }
 
@@ -34,7 +48,7 @@ impl GameState {
 
     /// The `MissionConfig` for the current mission.
     pub fn get_mission_config(&self) -> Option<&MissionConfig> {
-        self.mission.mission.as_ref()
+        self.mission_state.mission_config.as_ref()
     }
 
     /// Mimicks the `SetGameTime` API function.
@@ -119,8 +133,8 @@ impl GameState {
     pub fn get_radius_target_percent(&self, player_idx: usize) -> f32 {
         let player = self.get_player(player_idx);
         let kat = &player.katamari;
-        let mission = &self.mission;
-        let mission_config = mission.mission.as_ref().unwrap();
+        let mission = &self.mission_state;
+        let mission_config = mission.mission_config.as_ref().unwrap();
 
         let init_rad = kat.get_init_radius();
         let curr_rad = kat.get_radius();
@@ -141,18 +155,15 @@ impl GameState {
     pub unsafe fn mono_init_start(
         &mut self,
         mono_data: *const u8,
-        mission: i32,
-        area: i32,
-        stage: i32,
-        _kadai_flag: i32,
-        _clear_flag: i32,
-        _end_flag: i32,
+        mission: u8,
+        area: u8,
+        stage: u8,
+        _kadai_flag: bool,
+        _clear_flag: bool,
+        _end_flag: bool,
     ) {
-        self.global.mono_init_start(
-            mission.try_into().unwrap(),
-            area.try_into().unwrap(),
-            stage.try_into().unwrap(),
-        );
+        self.global.mono_init_start();
+        self.mission_state.mono_init_start(mission, area, stage);
 
         // read the mission's `MonoData` data from the `mono_data` raw pointer.
         self.mono_data.init(mono_data);
@@ -168,7 +179,7 @@ impl GameState {
     /// Returns the control index of the created prop.
     pub fn add_prop(&mut self, args: &AddPropArgs) -> i32 {
         let ctrl_idx = self.global.get_next_ctrl_idx();
-        let area = self.global.area.unwrap();
+        let area = self.mission_state.area;
         let mono_data = self.mono_data.props.get(args.name_idx as usize);
 
         self.props.add_prop(ctrl_idx, args, area, mono_data);
@@ -187,7 +198,7 @@ impl GameState {
             // adding a parent prop to the child
             let weak_parent_ref = Rc::<RefCell<Prop>>::downgrade(&parent_rc);
 
-            let area: u32 = self.global.area.unwrap().into();
+            let area = self.mission_state.area as u32;
             let tree_id: u32 = 1000 * area + (self.global.num_root_props as u32);
 
             // declare that the child has a parent
@@ -219,14 +230,13 @@ impl GameState {
     pub fn change_next_area(&mut self) {
         let old_updating_player = self.global.updating_player;
 
-        self.global.area.map(|v| v + 1);
-        self.global.stage_area += 1;
-        let new_area = self.global.area.unwrap();
+        self.mission_state.area += 1;
+        self.mission_state.stage_area += 1;
 
-        if self.global.is_vs_mode {
+        if self.mission_state.is_vs_mode {
             // TODO: vs mode crap
         } else {
-            self.props.change_next_area(new_area)
+            self.props.change_next_area(self.mission_state.area)
         }
 
         self.global.updating_player = old_updating_player;
@@ -234,14 +244,15 @@ impl GameState {
 
     /// Mimicks the `Init` API function.
     pub fn init(&mut self, player_idx: usize, override_init_size: f32, mission: u8) {
-        self.global.is_vs_mode = Mission::is_vs_mode(mission);
-        if self.global.is_vs_mode {
-            self.global.vs_mission_idx = mission - Mission::MIN_VS_MODE;
-        }
+        let mission_state = &mut self.mission_state;
+        let mission_config = mission_state.mission_config.as_ref().unwrap();
+
+        mission_state.mission = mission.into();
+        mission_state.vs_mission_idx = mission_state.mission.vs_mission_idx();
+        mission_state.is_vs_mode = mission_state.vs_mission_idx.is_some();
 
         // TODO: `init_simulation`:31-97, not sure what this is for
         self.global.freeze = false;
-        self.global.mission = Some(mission.into());
 
         // TODO: `init_simulation_subroutine_1`: 0x263c0
 
@@ -249,9 +260,6 @@ impl GameState {
         self.global.store_flag = false;
 
         // TODO: `init_simulation_subroutine_2`: 0x6740
-
-        let mc = &self.mission;
-        let mission_config = mc.mission.as_ref().unwrap();
 
         // compute how small props need to be relative to the katamari
         // before they're destroyed as they become invisible.
@@ -273,13 +281,14 @@ impl GameState {
 
         // TODO: `init_simulation`:282-284, 290-291
 
-        let gamemode = self.global.gamemode.unwrap();
+        let gamemode = mission_state.gamemode;
         if gamemode == GameMode::Tutorial {
             // TODO: `init_simulation:293-325` (tutorial crap)
         }
 
-        if self.global.is_vs_mode {
-            self.mission.vsmode.timer_0x10bf10 = 0;
+        if mission_state.is_vs_mode {
+            // initialize the vs mode state, presumably
+            self.mission_state.vsmode = Some(VsModeState { timer_0x10bf10: 0 });
         } else {
             // TODO: `init_simulation`:333-366, initialize somethings coming callbacks?
         }
@@ -290,7 +299,7 @@ impl GameState {
 
     /// Mimicks the `Tick` API function.
     pub fn tick(&mut self, _delta: f32) {
-        let is_vs_mode = self.global.is_vs_mode;
+        let is_vs_mode = self.mission_state.is_vs_mode;
 
         self.global.ticks += 1;
 

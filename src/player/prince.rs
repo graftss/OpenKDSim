@@ -7,10 +7,9 @@ use gl_matrix::{
 
 use crate::{
     constants::VEC3_ZERO,
-    global::GlobalState,
     macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
-    mission::{stage::StageConfig, tutorial::TutorialState, GameMode},
+    mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
         camera::{Camera, CameraMode},
         input::{AnalogPushDirs, GachaDir, Input, StickInput, StickPushDir},
@@ -700,15 +699,14 @@ impl Prince {
     fn update_gachas(
         &mut self,
         katamari: &mut Katamari,
-        tutorial: &mut TutorialState,
         camera: &Camera,
-        global: &GlobalState,
+        mission_state: &mut MissionState,
     ) {
-        // TODO: this whole function only applies to single player. would need to be rewritten for vs mode
+        // TODO_VS: this whole function only applies to single player. would need to be rewritten for vs mode
 
         // use a different gacha updating strategy while huffing
         if self.is_huffing {
-            return self.update_gachas_while_huffing(katamari, global.is_vs_mode);
+            return self.update_gachas_while_huffing(katamari, mission_state.is_vs_mode);
         }
 
         if self.oujistate.wheel_spin == false && katamari.physics_flags.airborne {
@@ -722,10 +720,12 @@ impl Prince {
             return self.oujistate.dash = true;
         }
 
-        // early checks to block gachas
-        let gamemode = global.gamemode.unwrap();
-        let block_gachas = (gamemode == GameMode::Tutorial && tutorial.get_page() == 0)
-            || (gamemode != GameMode::Normal);
+        // early check to block gachas based on the gamemode
+        let block_gachas = match mission_state.gamemode {
+            GameMode::Normal => false,
+            GameMode::Tutorial => mission_state.tutorial.as_ref().unwrap().get_page() == 0,
+            _ => true,
+        };
         if block_gachas {
             return;
         }
@@ -733,7 +733,7 @@ impl Prince {
         let gacha_window = self.gacha_window_duration;
 
         // decrement boost energy, but not in the tutorial
-        if self.oujistate.dash && gamemode != GameMode::Tutorial {
+        if self.oujistate.dash && mission_state.gamemode != GameMode::Tutorial {
             self.boost_energy -= 1;
             if self.boost_energy == 0 {
                 self.reset_boost_state(katamari);
@@ -768,12 +768,12 @@ impl Prince {
             self.last_gacha_direction = Some(gacha_dir);
             self.gacha_window_timer = gacha_window;
             self.gacha_count += 1;
-            // TODO: check `should_reset_gachas_in_vs_mode()`
+            // TODO_VS: check `should_reset_gachas_in_vs_mode()`
         }
 
-        // TODO: vsmode specific code
-        // TODO: `prince_update_gachas:154-170`
-        // TODO: `prince_update_gachas:177-211`
+        // TODO_VS: vsmode specific code
+        // TODO_VS: `prince_update_gachas:154-170`
+        // TODO_VS: `prince_update_gachas:177-211`
 
         if self.gacha_window_timer > 0 {
             // if there are gachas in progress and the gacha timer hasn't expired:
@@ -804,16 +804,21 @@ impl Prince {
                 self.oujistate.wheel_spin = false;
             }
 
-            if !self.oujistate.wheel_spin && self.oujistate.dash && gamemode == GameMode::Tutorial {
-                // update the tutorial's boost flag
-                tutorial.move_held.boost = true;
+            if !self.oujistate.wheel_spin
+                && self.oujistate.dash
+                && mission_state.gamemode == GameMode::Tutorial
+            {
+                mission_state
+                    .tutorial
+                    .as_mut()
+                    .unwrap()
+                    .set_move_held(TutorialMove::Boost);
             }
-
             return;
         } else {
             // if the gacha timer has expired:
 
-            // TODO: `prince_update_gachas:275-316` (vs mode crap)
+            // TODO_VS: `prince_update_gachas:275-316` (vs mode crap)
             // TODO: `prince_update_gachas:318-334` (i don't get what this does)
 
             self.oujistate.dash = false;
@@ -845,19 +850,15 @@ impl Prince {
             self.gacha_count = 0;
             katamari.physics_flags.wheel_spin = false;
         }
-        // TODO: `prince_update_gachas_while_huffing:13-18` (vs mode crap)
+        // TODO_VS: `prince_update_gachas_while_huffing:13-18` (vs mode crap)
     }
 
     /// Update the prince's angle around the katamari.
+    /// If the katamari is performing a tutorial move, that move is returned.
     /// offset: 0x55b70
-    fn update_angle(
-        &mut self,
-        tutorial: &mut TutorialState,
-        katamari: &Katamari,
-        global: &GlobalState,
-    ) {
+    fn update_angle(&mut self, katamari: &Katamari) -> Option<TutorialMove> {
         let min_push = self.min_push_to_move;
-        let is_tutorial = global.gamemode == Some(GameMode::Tutorial);
+        let mut tut_move_held = None;
 
         // turn off `self.flags & 0x40000`
         self.flags &= 0xfffbffff;
@@ -867,7 +868,8 @@ impl Prince {
             self.angle_speed = 0.0;
             self.quick_shifting = false;
             self.turn_type = PrinceTurnType::None;
-            return self.input_avg_push_len = 0.0;
+            self.input_avg_push_len = 0.0;
+            return None;
         }
 
         // if there is at least some input, compute the `turn_type` from stick inputs, with six possible cases:
@@ -915,16 +917,14 @@ impl Prince {
 
             if arms_angle >= FRAC_PI_2 {
                 // case 6.1 ("quick shifting": angle between sticks in [pi/2, pi])
-                if is_tutorial {
-                    tutorial.move_held.quick_shift = true;
-                }
-
                 if katamari.get_speed() > 0.0 {
                     self.flags |= 0x40000;
                     self.input_avg_push_len = 0.0;
                 }
 
-                return self.update_angle_from_quick_shift(global.prince_turn_speed_mult);
+                // TODO: move this to prince params
+                // self.update_angle_from_quick_shift(global.prince_turn_speed_mult);
+                return Some(TutorialMove::QuickShift);
             }
 
             let ls_push_len = inv_lerp_clamp!(self.input_ls_len, min_push, 1.0);
@@ -937,32 +937,22 @@ impl Prince {
 
             if push_angle_len < self.params.prince_roll_forwards_angle_threshold {
                 // case 6.2 ("roll forwards": push angle is below the threshold for rolling forwards)
-                if is_tutorial {
-                    tutorial.move_held.roll_forwards = true;
-                }
+                tut_move_held = Some(TutorialMove::RollForwards);
             } else if push_angle_len < FRAC_PI_2 - self.push_sideways_angle_threshold {
                 if push_angle >= 0.0 {
                     // case 6.3 ("roll to the right")
-                    if is_tutorial {
-                        tutorial.move_held.roll_to_the_right = true;
-                    }
+                    tut_move_held = Some(TutorialMove::RollToTheRight);
                 } else {
                     // case 6.4 ("roll to the left")
-                    if is_tutorial {
-                        tutorial.move_held.roll_to_the_left = true;
-                    }
+                    tut_move_held = Some(TutorialMove::RollToTheLeft);
                 }
             } else if push_angle_len > FRAC_PI_2 + self.push_sideways_angle_threshold {
                 // case 6.5 ("roll backwards": push angle is above the threshold for rolling backwards)
-                if is_tutorial {
-                    tutorial.move_held.roll_backwards = true;
-                }
+                tut_move_held = Some(TutorialMove::RollBackwards);
             } else {
                 // case 6.6 ("roll sideways": push angle in `[pi/2 - t, pi/2 + t]`,
                 //           where `t` is the push sideways angle threshold.)
-                if is_tutorial {
-                    tutorial.move_held.roll_sideways = true;
-                }
+                tut_move_held = Some(TutorialMove::RollSideways);
 
                 // whether we're rolling sideways left or right is determined by the
                 // sign of the push-input's x axis (which is identical to the sign
@@ -978,8 +968,11 @@ impl Prince {
 
             let id = mat4::create();
             mat4::rotate_y(&mut self.push_rotation_mat, &id, push_angle);
-            self.update_angle_from_push(global.prince_turn_speed_mult, push_angle_len);
+            // TODO: move this to prince params
+            // self.update_angle_from_push(global.prince_turn_speed_mult, push_angle_len);
         }
+
+        tut_move_held
     }
 
     /// Update the prince's angle around the katamari when quick shifting.
@@ -1100,21 +1093,18 @@ impl Prince {
         &mut self,
         camera: &mut Camera,
         katamari: &mut Katamari,
-        tutorial: &mut TutorialState,
         input: &Input,
-        global: &GlobalState,
-    ) {
-        self.update_impact_lock();
+        mission_state: &mut MissionState,
+    ) -> Option<TutorialMove> {
+        let mut held_tut_move: Option<TutorialMove> = None;
 
         match self.view_mode {
             PrinceViewMode::Normal => {
                 if !camera.is_scaling_up() {
                     // TODO: `prince_update_trigger_actions:24-44` (vs mode crap)
                     if !camera.preclear.get_enabled() {
-                        let is_tutorial = global.gamemode.unwrap() == GameMode::Tutorial;
-
                         // check if the katamari is moving slow enough to change view mode
-                        let under_speed_threshold = if global.is_vs_mode {
+                        let under_speed_threshold = if mission_state.is_vs_mode {
                             false
                         } else if katamari.physics_flags.immobile {
                             true
@@ -1127,27 +1117,25 @@ impl Prince {
                             false
                         };
 
-                        let can_view_mode = (!is_tutorial || tutorial.get_page() > 0)
-                            && under_speed_threshold
-                            && !self.oujistate.jump_180 != 0;
+                        let tutorial = &mission_state.tutorial;
+                        let can_view_mode =
+                            tutorial.as_ref().map_or(true, |tut| tut.get_page() > 0)
+                                && under_speed_threshold
+                                && !self.oujistate.jump_180 != 0;
 
                         if can_view_mode {
                             if input.l1_down && !input.r1_down {
                                 // initiate an L1 look
+                                held_tut_move = Some(TutorialMove::LookL1);
                                 self.end_spin_and_boost(katamari);
-                                if is_tutorial {
-                                    tutorial.move_held.look_l1 = true;
-                                }
                                 katamari.set_immobile();
                                 self.view_mode = PrinceViewMode::L1Look;
                                 camera.set_mode(CameraMode::L1Look);
                             } else if input.r1_down && !input.l1_down {
                                 // initiate an R1 jump
+                                held_tut_move = Some(TutorialMove::JumpR1);
                                 self.end_spin_and_boost(katamari);
                                 // TODO: play R1_JUMP sfx
-                                if is_tutorial {
-                                    tutorial.move_held.jump_r1 = true;
-                                }
                                 katamari.set_immobile();
                                 self.view_mode = PrinceViewMode::R1Jump;
                                 camera.set_mode(CameraMode::R1Jump);
@@ -1164,7 +1152,7 @@ impl Prince {
                     self.view_mode = PrinceViewMode::Normal;
                     self.ignore_input_timer = 0;
                     camera.set_mode(CameraMode::Normal);
-                    return;
+                    return None;
                 }
 
                 // update the camera with the current input
@@ -1174,6 +1162,8 @@ impl Prince {
             }
             _ => (),
         }
+
+        held_tut_move
     }
 
     /// Update the impact lock state.
@@ -1237,16 +1227,12 @@ impl Prince {
 
 impl Player {
     /// The main function to update a prince each tick.
-    pub fn update_prince(
-        &mut self,
-        tutorial: &mut TutorialState,
-        global: &GlobalState,
-        stage_config: &StageConfig,
-    ) {
+    pub fn update_prince(&mut self, mission_state: &mut MissionState) {
         let prince = &mut self.prince;
         let katamari = &mut self.katamari;
         let input = &mut self.input;
         let camera = &mut self.camera;
+        let stage_config = mission_state.stage_config.as_ref().unwrap();
 
         prince.last_oujistate = prince.oujistate;
 
@@ -1260,16 +1246,34 @@ impl Player {
         prince.update_analog_input_features();
 
         if prince.view_mode == PrinceViewMode::Normal {
-            prince.update_gachas(katamari, tutorial, camera, global);
-            prince.update_angle(tutorial, katamari, global);
+            prince.update_gachas(katamari, camera, mission_state);
+            let angle_tut_move = prince.update_angle(katamari);
+
+            if let Some(tut_move) = angle_tut_move {
+                mission_state
+                    .tutorial
+                    .as_mut()
+                    .unwrap()
+                    .set_move_held(tut_move);
+            }
         }
 
-        prince.update_boost_push_rotation_mat(global.is_vs_mode);
+        prince.update_boost_push_rotation_mat(mission_state.is_vs_mode);
 
-        if global.gamemode.unwrap().can_update_view_mode()
+        if mission_state.gamemode.can_update_view_mode()
             && katamari.physics_flags.vs_mode_some_state != 2
         {
-            prince.update_view_mode(camera, katamari, tutorial, input, global);
+            prince.update_impact_lock();
+            let view_mode_tut_move =
+                prince.update_view_mode(camera, katamari, input, mission_state);
+
+            if let Some(tut_move) = view_mode_tut_move {
+                mission_state
+                    .tutorial
+                    .as_mut()
+                    .unwrap()
+                    .set_move_held(tut_move);
+            }
         }
     }
 }

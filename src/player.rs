@@ -70,15 +70,13 @@ impl Player {
     }
 }
 
-pub type PlayerState = [Player; MAX_PLAYERS];
+pub type PlayersState = [Player; MAX_PLAYERS];
 
 impl GameState {
     /// Update the prince and katamari controlled by the given `player`.    
     /// offset: 0x25be0
     pub fn update_prince_and_kat(&mut self, player_idx: usize) {
-        let mission = &mut self.mission;
-        let stage_config = mission.stage.as_ref().unwrap();
-        let tutorial = &mut mission.tutorial;
+        let mission_state = &mut self.mission_state;
         let global = &mut self.global;
         let player = &mut self.players[player_idx];
 
@@ -87,18 +85,19 @@ impl GameState {
             // TODO: `player_update:29-31` (probably a no-op, but unclear)
         } else {
             // update the prince, then the katamari
-            player.update_prince(tutorial, global, stage_config);
+            player.update_prince(mission_state);
             player
                 .katamari
-                .update(&player.prince, &player.camera, mission);
+                .update(&player.prince, &player.camera, mission_state);
 
             // update the prince's transform now that the katamari is updated
             player.prince.update_transform(&player.katamari);
             // TODO: self.princes[player].update_animation(); (although animations might want to be their own struct)
 
+            let stage_config = mission_state.stage_config.as_ref().unwrap();
             player.update_royal_warp(
                 self.global.royal_warp_plane_y,
-                self.global.area.unwrap(),
+                mission_state.area,
                 stage_config,
             );
         }

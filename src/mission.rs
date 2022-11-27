@@ -113,11 +113,40 @@ pub enum Mission {
 }
 
 impl Mission {
-    pub const MIN_VS_MODE: u8 = 31;
-    pub const MAX_VS_MODE: u8 = 38;
+    /// Returns `true` if and only if this mission is a VS mode mission.
+    pub fn is_vs_mode(&self) -> bool {
+        match self {
+            Self::Vs0
+            | Self::Vs1
+            | Self::Vs2
+            | Self::Vs3
+            | Self::Vs4
+            | Self::Vs5
+            | Self::Vs6
+            | Self::Vs7 => true,
+            _ => false,
+        }
+    }
 
-    pub fn is_vs_mode(mission: u8) -> bool {
-        mission >= Self::MIN_VS_MODE && mission <= Self::MAX_VS_MODE
+    /// Returns the VS mode index of this mission if it has one.
+    pub fn vs_mission_idx(&self) -> Option<u8> {
+        match self {
+            Self::Vs0 => Some(0),
+            Self::Vs1 => Some(1),
+            Self::Vs2 => Some(2),
+            Self::Vs3 => Some(3),
+            Self::Vs4 => Some(4),
+            Self::Vs5 => Some(5),
+            Self::Vs6 => Some(6),
+            Self::Vs7 => Some(7),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Mission {
+    fn default() -> Self {
+        Self::None
     }
 }
 
@@ -183,6 +212,12 @@ pub enum GameMode {
     TutorialB = 2,
     Ending = 3,
     Load = 4,
+}
+
+impl Default for GameMode {
+    fn default() -> Self {
+        Self::Normal
+    }
 }
 
 impl From<u8> for GameMode {

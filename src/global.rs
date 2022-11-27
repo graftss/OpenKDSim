@@ -2,8 +2,6 @@ use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 
-use crate::mission::{stage::Stage, GameMode, Mission};
-
 /// Miscellaneous global game state.
 #[derive(Debug, Default)]
 pub struct GlobalState {
@@ -15,28 +13,6 @@ pub struct GlobalState {
     /// offset: 0xff0f4
     pub updating_player: u8,
 
-    /// The current mission.
-    /// offset: 0xff104
-    pub mission: Option<Mission>,
-
-    /// The *unique* id of the currently loaded area among all other areas in the game.
-    /// The House stage has ids 0-4, Town has 5-8, and World has 9+.
-    /// offset: 0xff106
-    pub stage_area: u8,
-
-    /// The current stage (which is the map - house, town, world, etc.)
-    /// offset: 0xff108
-    pub stage: Option<Stage>,
-
-    /// The current loaded area of the current stage, where the smallest
-    /// area of each stage is 0.
-    /// offset: 0xff109
-    pub area: Option<u8>,
-
-    /// If true, the current mission is in VS mode.
-    /// offset: 0xff0f1
-    pub is_vs_mode: bool,
-
     /// The number of ticks before the mission timer expires.
     /// offset: 0xff120
     pub remain_time_ticks: i32,
@@ -44,9 +20,6 @@ pub struct GlobalState {
     /// The current game time (in *real time*, not ticks).
     /// offset: 0xff12c
     pub game_time_ms: i32,
-
-    /// The current game mode.
-    pub gamemode: Option<GameMode>,
 
     /// (??) Set by `SetStoreFlag`.
     /// offset: 0x10dab8
@@ -65,10 +38,6 @@ pub struct GlobalState {
     /// props have been initialized.
     /// offset: 0x10daed
     pub props_initialized: bool,
-
-    /// (??) too lazy to document this right now
-    /// offset: 0x10daf9
-    pub vs_mission_idx: u8,
 
     /// The number of ticks that have been completed.
     /// offset: 0x10ea50
@@ -203,17 +172,8 @@ impl GlobalState {
         self.neg_gravity[2] = -z;
     }
 
-    pub fn set_gamemode(&mut self, gamemode: u8) {
-        self.gamemode = Some(gamemode.into());
-    }
-
-    pub fn mono_init_start(&mut self, mission: u8, area: u8, stage: u8) {
-        self.stage = Some(stage.into());
+    pub fn mono_init_start(&mut self) {
         self.did_init_start = true;
-
-        self.mission = Some(mission.into());
-        self.stage = Some(stage.into());
-        self.area = Some(area);
 
         self.num_theme_props = 0;
         self.num_twin_props = 0;
