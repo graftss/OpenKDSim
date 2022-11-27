@@ -12,6 +12,8 @@ use crate::{
         FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
+    macros::min,
+    math::normalize_bounded_angle,
     props::prop::PropRef,
 };
 
@@ -21,7 +23,10 @@ use self::{
     params::KatamariParams,
 };
 
-use super::prince::PrincePushDir;
+use super::{
+    camera::Camera,
+    prince::{Prince, PrincePushDir},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KatPushDir {
@@ -412,6 +417,10 @@ pub struct Katamari {
     /// offset: 0x7c
     last_speed: f32,
 
+    /// The distance from the camera position to the katamari center.
+    /// offset: 0x98
+    dist_to_cam: f32,
+
     /// The alpha of attached props.
     /// offset: 0xa0
     attached_prop_alpha: f32,
@@ -742,6 +751,14 @@ pub struct Katamari {
     /// offset: 0x3a78
     prop_combo_count: u32,
 
+    /// (??) Initial speed after a boost.
+    /// offset: 0x3a7c
+    boost_speed: f32,
+
+    /// Number of ticks the katamari has been spinning.
+    /// offset: 0x3a80
+    spin_ticks: u32,
+
     /// The extra rotation matrix applied to the katamari's transform when spinning.
     /// offset: 0x3a84
     spin_rotation_mat: Mat4,
@@ -993,5 +1010,81 @@ impl Katamari {
 }
 
 impl Katamari {
-    pub fn update(&mut self) {}
+    /// Main katamari update function.
+    /// offset: 0x1db50
+    pub fn update(&mut self, prince: &Prince, camera: &Camera) {
+        // decrement timers
+        self.wallclimb_cooldown -= 1;
+
+        // record the previous values of various fields
+        self.last_center = self.center;
+        self.last_velocity = self.velocity;
+        self.last_physics_flags = self.physics_flags;
+        self.last_hit_flags[1] = self.last_hit_flags[0];
+        self.last_hit_flags[0] = self.hit_flags;
+
+        if self.num_floor_contacts > 0 {
+            // if the katamari has a ground contact, update the `last_hit_flags`
+            self.last_hit_flags[0] = self.hit_flags
+        }
+
+        let oujistate = prince.get_oujistate();
+        self.physics_flags.wheel_spin = oujistate.wheel_spin;
+
+        // TODO: `kat_update_incline_accel()`
+        // TODO: `kat_update:241-260`update stage elasticity param (store in stage config)
+
+        if !oujistate.wheel_spin && !oujistate.dash_start {
+            // if the katamari is not spinning:
+            self.boost_speed = 0.0;
+            self.spin_ticks = 0;
+            mat4::identity(&mut self.spin_rotation_mat);
+        } else {
+            // if the katamari is spinning:
+            self.spin_ticks += 1;
+            self.boost_speed = min!(
+                self.boost_speed + self.scaled_params.boost_accel,
+                self.scaled_params.base_max_speed * self.scaled_params.max_boost_speed
+            );
+        };
+
+        let spin_rotation = normalize_bounded_angle(self.boost_speed / self.radius_cm);
+        mat4::from_rotation(
+            &mut self.spin_rotation_mat,
+            spin_rotation,
+            &self.camera_side_vector,
+        );
+
+        // TODO: self.update_velocity()
+        // TODO: self.update_friction()
+        // TODO: self.apply_acceleration()
+
+        let cam_transform = camera.get_transform();
+        let left = VEC3_X_NEG;
+        vec3::transform_mat4(
+            &mut self.camera_side_vector,
+            &left,
+            &cam_transform.cam_forward_yaw_rot,
+        );
+
+        self.update_collision_rays();
+
+        // TODO: self.attract_props_to_center();
+        // TODO: `kat_update:348-375` (self.update_mission_volume_penalty())
+        // TODO: self.update_collision()
+
+        // compute distance to camera
+        let mut dist_to_cam = vec3::create();
+        vec3::subtract(&mut dist_to_cam, &self.center, &cam_transform.pos);
+        self.dist_to_cam = vec3::len(&dist_to_cam);
+
+        // TODO: self.update_vel_relative_to_cam()
+
+        // TODO: `kat_update:390-415` (self.update_dust_cloud_vfx())
+        // TODO: `kat_update:416-447` (self.update_prop_combo())
+
+        if !camera.preclear.get_enabled() {
+            // TODO: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
+        }
+    }
 }

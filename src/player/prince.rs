@@ -197,7 +197,7 @@ pub struct Prince {
 
     /// Various 1-byte fields that are shared with the Unity code.
     /// offset: 0xa2
-    oujistate: OujiState,
+    pub oujistate: OujiState,
 
     /// The previous frame's values of various 1-byte fields that are shared with the Unity code.
     /// offset: 0xbd
@@ -456,6 +456,10 @@ pub struct Prince {
 impl Prince {
     pub fn get_pos(&self) -> &Vec3 {
         &self.pos
+    }
+
+    pub fn get_oujistate(&self) -> OujiState {
+        self.oujistate.clone()
     }
 }
 

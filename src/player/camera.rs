@@ -280,9 +280,21 @@ pub struct CameraTransform {
     /// offset: 0x0
     transform: Mat4,
 
+    /// (??)
+    /// offset: 0x40
+    mat_0x40: Mat4,
+
+    /// (??)
+    /// offset: 0x80
+    mat_0x80: Mat4,
+
     /// The rotation component of `transform`
     /// offset: 0xc0
     transform_rot: Mat4,
+
+    /// (??)
+    /// offset: 0x100
+    pub cam_forward_yaw_rot: Mat4,
 
     /// The camera's "up" vector (which should always be the y+ axis unit vector)
     /// offset: 0x140
@@ -294,11 +306,11 @@ pub struct CameraTransform {
 
     /// The target of the camera.
     /// offset: 0x160
-    target: Vec3,
+    pub target: Vec3,
 
     /// The position of the camera.
     /// offset: 0x170
-    pos: Vec3,
+    pub pos: Vec3,
 
     /// The extra zoom out distance as the timer expires at the end of MAS4.
     /// offset: 0x180
@@ -308,7 +320,7 @@ pub struct CameraTransform {
 #[derive(Debug, Default)]
 pub struct Camera {
     pub state: CameraState,
-    pub transform: CameraTransform,
+    transform: CameraTransform,
     pub params: CameraParams,
     pub preclear: PreclearState,
 }
@@ -316,6 +328,10 @@ pub struct Camera {
 impl Camera {
     pub fn get_mode(&self) -> CameraMode {
         self.state.mode
+    }
+
+    pub fn get_transform(&self) -> &CameraTransform {
+        &self.transform
     }
 
     pub fn is_scaling_up(&self) -> bool {

@@ -88,7 +88,7 @@ impl GameState {
         } else {
             // update the prince, then the katamari
             player.update_prince(tutorial, global, stage_config);
-            player.katamari.update();
+            player.katamari.update(&player.prince, &player.camera);
 
             // update the prince's transform now that the katamari is updated
             player.prince.update_transform(&player.katamari);
