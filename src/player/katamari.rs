@@ -1,5 +1,5 @@
 mod collision;
-pub mod mesh;
+mod flags;
 mod params;
 
 use gl_matrix::{
@@ -8,6 +8,7 @@ use gl_matrix::{
 };
 
 use crate::{
+    collision::raycast_state::RaycastState,
     constants::{
         FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
@@ -19,8 +20,9 @@ use crate::{
 };
 
 use self::{
-    collision::{KatCollisionRayType, KatCollisionRays, ShellRay},
-    mesh::KatMesh,
+    collision::mesh::KatMesh,
+    collision::{hit::KatamariHit, ray::KatCollisionRays},
+    flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,
 };
 
@@ -42,260 +44,12 @@ impl Default for KatPushDir {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KatInclineMoveType {
-    MoveFlatground,
-    MoveUphill,
-    MoveDownhill,
-}
-
-impl Default for KatInclineMoveType {
-    fn default() -> Self {
-        Self::MoveFlatground
-    }
-}
-
 /// (??) not sure about this
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlarmType {
     Closest,
     Closer,
     Close,
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct KatPhysicsFlags {
-    /// If true, the katamari has no surface contacts.
-    /// offset: 0x0
-    pub airborne: bool,
-
-    /// If true, the katamari is climbing a wall.
-    /// offset: 0x1
-    pub climbing_wall: bool,
-
-    /// If true, the katamari is at its maximum climb height (so it can't climb higher).
-    /// offset: 0x2
-    pub at_max_climb_height: bool,
-
-    /// If true, the katamari is braking.
-    /// offset: 0x3
-    pub braking: bool,
-
-    /// If true, the katamari just bonked something (only true the frame it bonks).
-    /// offset: 0x4
-    pub bonked: bool,
-
-    /// If true, the katamari is contacting a wall.
-    /// offset: 0x5
-    pub contacts_wall: bool,
-
-    /// If true, the katamari is contacting a wall.
-    /// offset: 0x6
-    pub contacts_floor: bool,
-
-    /// If true, the katamari is in water.
-    /// offset: 0x7
-    pub in_water: bool,
-
-    /// (??) copy of `in_water`
-    /// offset: 0x8
-    pub in_water_copy: bool,
-
-    /// (??) If true, the katamari was hit by a moving prop.
-    /// offset: 0x9
-    pub hit_by_moving_prop: bool,
-
-    /// (??) If true, the katamari is contacting a prop.
-    /// offset: 0xa
-    pub _contacts_prop: bool,
-
-    /// (??) If true, the katamari is contacting the bottom of a downward-slanting surface.
-    /// (e.g. can be triggered under mas1 table by setting simulation+0x71614 to 3, which
-    /// changes the definition of how downward-slanting such a surface needs to be)
-    /// offset: 0xb
-    pub contacts_slanted_ceiling: bool,
-
-    /// (??) If true, the katamari moved more than its own radius during the last tick.
-    /// offset: 0xc
-    pub moved_more_than_radius_0xc: bool,
-
-    /// If true, the katamari is contacting a prop.
-    /// offset: 0xd
-    pub contacts_prop: bool,
-
-    /// (??) A shell ray which collided with something
-    /// offset: 0xe
-    pub hit_shell_ray: Option<ShellRay>,
-
-    /// If true, the katamari is completely submerged underwater.
-    /// offset: 0xf
-    pub under_water: bool,
-
-    /// If true, the katamari is not moving.
-    /// offset: 0x10
-    pub immobile: bool,
-
-    /// (??) The type of boundary ray currently acting as the pivot.
-    /// offset: 0x11
-    pub pivot_ray: Option<KatCollisionRayType>,
-
-    /// If true, the katamari is contacting a non-flat floor (normal < 0.9999).
-    /// offset: 0x12
-    pub on_sloped_floor: bool,
-
-    /// If true, the katamari is contacting a flat floor (normal >= 0.9999).
-    /// offset: 0x13
-    pub on_flat_floor: bool,
-
-    /// (??)
-    /// offset: 0x14
-    pub moved_too_much_0x14: bool,
-
-    /// (??)
-    /// offset: 0x15
-    pub incline_move_type: KatInclineMoveType,
-
-    /// If true, the katamari is spinning
-    /// offset: 0x16
-    pub wheel_spin: bool,
-
-    /// True if not boosting AND input below the "min push" threshold.
-    /// offset: 0x17
-    pub no_input_push: bool,
-
-    /// True if the katamari moved more than its radius on the previous tick.
-    /// offset: 0x19
-    pub moved_more_than_rad: bool,
-
-    /// True if the katamari is considered stuck between walls.
-    /// offset: 0x1a
-    pub stuck_between_walls: bool,
-
-    /// (??)
-    /// offset: 0x1b
-    pub is_colliding: bool,
-
-    /// True if the katamari should emit the "puff of smoke" vfx as it moves.
-    /// By default this occurs when it's over 12m in the World stage.
-    /// offset: 0x1c
-    pub should_emit_smoke: bool,
-
-    /// (??)
-    /// offset: 0x1d
-    pub moved_more_than_rad_0x1d: bool,
-
-    /// (??)
-    /// offset: 0x1e
-    pub vs_attack: u8,
-
-    /// (??)
-    /// offset: 0x1f
-    pub vs_mode_some_state: u8,
-}
-
-/// A group of flags which mostly record if the katamari is contacting certain special types of surfaces
-/// with non-standard `HitAttribute` values.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct KatHitFlags {
-    /// If true, ignores "pushing downward" incline effect (e.g. on park entrance steps)
-    /// offset: 0x0
-    pub force_flatground: bool,
-
-    /// (??) True while climbing a prop, and also certain surfaces e.g. park steps.
-    /// offset: 0x1
-    pub wall_climb_free: bool,
-
-    /// (??)
-    /// offset: 0x2
-    pub small_ledge_climb: bool,
-
-    /// True when speed should be uncapped while moving downhill (e.g. big hill in Town stage)
-    /// offset: 0x3
-    pub speed_check_off: bool,
-
-    /// (??)
-    /// offset: 0x4
-    pub flag_0x4: bool,
-
-    /// (??)
-    /// offset: 0x5
-    pub flag_0x5: bool,
-
-    /// True when the camera should be zoomed in (e.g. under House stage table, under trees outside World park).
-    /// offset: 0x6
-    pub special_camera: bool,
-
-    /// (??) Applies when contacting a "NoReactionNoSlope" surface
-    /// offset: 0x7
-    pub no_reaction_no_slope: bool,
-
-    /// True if the "turntable" spin effect should be applied.
-    /// offset: 0x8
-    pub on_turntable: bool,
-
-    /// True when contacting a "WallClimbDisabled" surface.
-    /// If true, climbing is disabled. (e.g. the legs under the mas1 table)
-    /// offset: 0x9
-    pub wall_climb_disabled: bool,
-
-    /// (??) True when contacting a "MapSemiTranslucent" surface.
-    /// offset: 0xa
-    pub map_semi_translucent: bool,
-}
-
-#[derive(Debug, Default, Copy, Clone)]
-pub struct KatVelocity {
-    /// Current velocity
-    /// offset: 0x0
-    pub velocity: Vec3,
-
-    /// Current unit velocity
-    /// offset: 0x10
-    pub velocity_unit: Vec3,
-
-    /// (??)
-    /// offset: 0x20
-    pub speed_orth_on_floor: Vec3,
-
-    /// (??)
-    /// offset: 0x30
-    pub speed_proj_on_floor: Vec3,
-
-    /// (??)
-    /// offset: 0x40
-    pub last_vel_accel: Vec3,
-
-    /// (??) Velocity + player acceleration
-    /// offset: 0x50
-    pub vel_accel: Vec3,
-
-    /// Unit vector of `vel_accel`.
-    /// offset: 0x60
-    pub vel_accel_unit: Vec3,
-
-    /// (??) Velocity + player accel + gravity
-    /// offset: 0x70
-    pub vel_accel_grav: Vec3,
-
-    /// Unit vector of `vel_accel_grav`.
-    /// offset: 0x80
-    pub vel_accel_grav_unit: Vec3,
-
-    /// (??)
-    /// offset: 0x90
-    pub push_vel_on_floor_unit: Vec3,
-
-    /// Acceleration from gravity
-    /// offset: 0xa0
-    pub accel_gravity: Vec3,
-
-    /// Acceleration from the contacted floor incline
-    /// offset: 0xb0
-    pub accel_incline: Vec3,
-
-    /// (??) Acceleration from the contacted floor friction (or some kind of similar force)
-    /// offset: 0xc0
-    pub accel_ground_friction: Vec3,
 }
 
 /// Katamari parameters which vary based on the katamari's current size.
@@ -362,10 +116,97 @@ pub struct KatScaledParams {
     pub alarm_close_range: f32,
 }
 
+/// Katamari velocity and acceleration values.
+#[derive(Debug, Default, Copy, Clone)]
+pub struct KatVelocity {
+    /// Current velocity
+    /// offset: 0x0
+    pub velocity: Vec3,
+
+    /// Current unit velocity
+    /// offset: 0x10
+    pub velocity_unit: Vec3,
+
+    /// (??)
+    /// offset: 0x20
+    pub speed_orth_on_floor: Vec3,
+
+    /// (??)
+    /// offset: 0x30
+    pub speed_proj_on_floor: Vec3,
+
+    /// (??)
+    /// offset: 0x40
+    pub last_vel_accel: Vec3,
+
+    /// (??) Velocity + player acceleration
+    /// offset: 0x50
+    pub vel_accel: Vec3,
+
+    /// Unit vector of `vel_accel`.
+    /// offset: 0x60
+    pub vel_accel_unit: Vec3,
+
+    /// (??) Velocity + player accel + gravity
+    /// offset: 0x70
+    pub vel_accel_grav: Vec3,
+
+    /// Unit vector of `vel_accel_grav`.
+    /// offset: 0x80
+    pub vel_accel_grav_unit: Vec3,
+
+    /// (??)
+    /// offset: 0x90
+    pub push_vel_on_floor_unit: Vec3,
+
+    /// Acceleration from gravity
+    /// offset: 0xa0
+    pub accel_gravity: Vec3,
+
+    /// Acceleration from the contacted floor incline
+    /// offset: 0xb0
+    pub accel_incline: Vec3,
+
+    /// (??) Acceleration from the contacted floor friction (or some kind of similar force)
+    /// offset: 0xc0
+    pub accel_ground_friction: Vec3,
+}
+
 #[derive(Debug, Default)]
 pub struct Katamari {
+    // BEGIN new fields (that were not part of the original simulation's `Katamari` struct.)
+    /// Parameters that affect katamari movement. In the original simulation these were
+    /// mostly static constants.
     params: KatamariParams,
 
+    /// A static flag to tell to turn on the "map semi translucent" hit flag.
+    /// offset: 0x10eacd
+    has_map_semi_translucent_hit: bool,
+
+    /// A static timer which affects prop collisions when >0.
+    /// offset: 0x10eae0
+    prop_pseudo_iframes_timer: u8,
+
+    /// A list of all currently hit floor surfaces.
+    /// offset: 0x1959f0
+    hit_floors: Vec<KatamariHit>,
+
+    /// (??) A list of all hit floor surfaces on the previous tick.
+    /// Seems like it's unused?
+    /// offset: 0x1941f0
+    last_hit_floors: Vec<KatamariHit>,
+
+    /// A list of all hit wall surfaces.
+    hit_walls: Vec<KatamariHit>,
+
+    /// TODO
+    raycast_state: RaycastState,
+
+    /// The number of props attached to the katamari (including unloaded ones).
+    /// offset: 0x133a08
+    num_attached_props: u16,
+
+    // END new fields
     /// A reference to the vector of katamari meshes.
     /// offset: 0x0
     meshes: Vec<KatMesh>,
@@ -384,7 +225,12 @@ pub struct Katamari {
 
     /// The maximum prop volume that can be collected (in m^3).
     /// offset: 0x54
-    max_pickup_vol_m3: f32,
+    max_attach_vol_m3: f32,
+
+    /// If colliding with a prop that can use its AABB for collisions,
+    /// its AABB can only be used if its (compare) volume is less than this value.
+    /// offset: 0x58
+    use_prop_aabb_collision_vol: f32,
 
     /// The exact diameter of the katamari (in cm).
     /// offset: 0x5c
@@ -614,9 +460,9 @@ pub struct Katamari {
     /// offset: 0x78c
     u_contact_wall_normal: Vec3,
 
-    /// The length of the collision ray contacting the floor.
+    /// (??) The length of the primary collision ray contacting the floor.
     /// offset: 0x7fc
-    contact_floor_ray_len: f32,
+    fc_ray_len: f32,
 
     /// A multiplier affecting how fast pivoted props are sucked in towards the center
     /// of the katamari (which also reduces the length of their induced collision ray).
@@ -654,7 +500,7 @@ pub struct Katamari {
 
     /// (??)
     /// offset: 0x880
-    prop_interaction_iframes: i32,
+    prop_ignore_collision_timer: u32,
 
     /// The (real-time) game time when the last collision occurred.
     /// offset: 0x884
@@ -680,6 +526,14 @@ pub struct Katamari {
     /// offset: 0x89e
     water_sfx_timer: u16,
 
+    /// (??) The lowest y coordinate of all current wall contact points.
+    /// offset: 0x8a0
+    lowest_wall_contact_y: f32,
+
+    /// (??) The lowest y coordinate of all current floor contact points.
+    /// offset: 0x8a4
+    lowest_floor_contact_y: f32,
+
     /// The katamari's current collision rays.
     /// offset: 0x8d0
     collision_rays: KatCollisionRays,
@@ -703,16 +557,28 @@ pub struct Katamari {
     /// offset: 0x3914
     vault_transform_unknown: Mat4,
 
-    /// (??) The vector from the katamari center to the vault contact point.
+    /// (??) The vector from the katamari center to the primary floor contact.
     /// offset: 0x3954
-    vault_contact_ray: Vec3,
+    fc_contact_ray: Vec3,
+
+    /// (??) The contact point of the primary floor contact.
+    fc_contact_point: Vec3,
 
     /// (??) The current vault contact point.
-    /// offset: 0x3964
+    /// offset: 0x3974
     vault_contact_point: Vec3,
 
-    /// The index of the collision ray being used to vault, if one exists.
+    /// (??) The unit normal vector of the floor used for the current vault.
+    /// offset: 0x3984
+    vault_floor_normal_unit: Vec3,
+
+    /// (??) The index of the collision ray being used to vault, if one exists.
+    /// offset: 0x3998
     vault_ray_idx: Option<u16>,
+
+    /// (??) The index of the collision ray used as the primary floor contact, if one exists.
+    /// offset: 0x399c
+    fc_ray_idx: Option<u16>,
 
     /// (??) The maximum allowed length of any collision ray.
     /// offset: 0x39ac
@@ -954,7 +820,7 @@ impl Katamari {
         vec3::copy(&mut self.bottom, &self.center);
         self.bottom[1] -= self.radius_cm;
 
-        self.contact_floor_ray_len = self.radius_cm;
+        self.fc_ray_len = self.radius_cm;
 
         let rad_m = self.radius_cm / 100.0;
         self.vol_m3 = rad_m * rad_m * rad_m * FRAC_4PI_3;
@@ -978,7 +844,7 @@ impl Katamari {
 
         self.reset_collision_rays();
 
-        self.prop_interaction_iframes = 0;
+        self.prop_ignore_collision_timer = 0;
 
         // TODO: `kat_init:181-237` (camera initialization using static mission/area params table)
 
@@ -1018,9 +884,9 @@ impl Katamari {
 impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
-    pub fn update(&mut self, prince: &Prince, camera: &Camera, mission: &MissionState) {
-        let stage_config = mission.stage_config.as_ref().unwrap();
-        let mission_config = mission.mission_config.as_ref().unwrap();
+    pub fn update(&mut self, prince: &Prince, camera: &Camera, mission_state: &MissionState) {
+        let stage_config = mission_state.stage_config.as_ref().unwrap();
+        let mission_config = mission_state.mission_config.as_ref().unwrap();
 
         // decrement timers
         self.wallclimb_cooldown -= 1;
@@ -1081,7 +947,7 @@ impl Katamari {
         // TODO: self.attract_props_to_center();
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
-        // TODO: self.update_collision()
+        self.update_collision(&mission_state);
 
         // compute distance to camera
         let mut dist_to_cam = vec3::create();
