@@ -12,14 +12,11 @@ use gl_matrix::{
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, _4PI},
-    gamestate::GameState,
     macros::{max_to_none, new_mat4_copy},
     mono_data::{PropAabbs, PropMonoData},
     props::config::NamePropConfig,
     util::scale_sim_transform,
 };
-
-use super::Props;
 
 const FLAG_HAS_PARENT: u8 = 0x2;
 const FLAG_INTANGIBLE_CHILD: u8 = 0x4;

@@ -16,16 +16,15 @@ mod player;
 mod props;
 mod util;
 
-use core::{panic, slice};
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
 use player::prince::OujiState;
 use props::{
     config::NamePropConfig,
-    prop::{AddPropArgs, Prop, PropRef},
+    prop::{AddPropArgs, Prop},
 };
-use std::{borrow::BorrowMut, cell::RefCell};
+use std::cell::RefCell;
 
 use crate::macros::{log, panic_log};
 
@@ -46,7 +45,7 @@ fn with_prop_config<T>(name_idx: usize, cb: fn(config: &NamePropConfig) -> T) ->
     })
 }
 
-// Helper function to read the prop with control index `ctrl_idx` from the game state.
+// Helper function to read from the prop at control index `ctrl_idx`.
 fn with_prop<T>(ctrl_idx: usize, cb: fn(prop: &Prop) -> T) -> T {
     STATE.with(|state| {
         if let Some(prop_ref) = state.borrow().props.get_prop(ctrl_idx as usize) {
@@ -54,6 +53,20 @@ fn with_prop<T>(ctrl_idx: usize, cb: fn(prop: &Prop) -> T) -> T {
         }
 
         panic_log!("Error reading prop with control index {}.", ctrl_idx);
+    })
+}
+
+/// Helper function to mutate the prop at control index `ctrl_idx`.
+fn with_prop_mut<F, T>(ctrl_idx: i32, cb: F) -> T
+where
+    F: FnOnce(&mut Prop) -> T,
+{
+    STATE.with(|state| {
+        let mut s = state.borrow_mut();
+        let prop = s.props.get_mut_prop(ctrl_idx as usize).unwrap();
+
+        let mut p = prop.as_ref().borrow_mut();
+        cb(&mut p)
     })
 }
 
@@ -499,16 +512,9 @@ pub unsafe extern "C" fn GetSubObjectPosition(
     rot_y: &mut f32,
     rot_z: &mut f32,
 ) {
-    // TODO: make this prettier
-    STATE.with(|state| {
-        state
-            .borrow()
-            .props
-            .get_prop(ctrl_idx as usize)
-            .unwrap()
-            .borrow()
-            .get_subobject_position(subobj_idx, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z);
-    })
+    with_prop_mut(ctrl_idx, |prop| {
+        prop.get_subobject_position(subobj_idx, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z);
+    });
 }
 
 /// Passes the bounding sphere radius of the prop with control index `ctrl_idx` to Unity.
@@ -532,17 +538,12 @@ pub unsafe extern "C" fn MonoGetPlacementDataFloat(ctrl_idx: i32, data_type: i32
     }
 }
 
+/// Write the transform of the prop at `ctrl_idx` to `out`.
 #[no_mangle]
 pub unsafe extern "C" fn GetPropMatrix(ctrl_idx: i32, out: *mut Mat4) {
-    STATE.with(|state| {
-        state
-            .borrow()
-            .props
-            .get_prop(ctrl_idx as usize)
-            .unwrap()
-            .borrow()
-            .unsafe_copy_transform(out);
-    })
+    with_prop_mut(ctrl_idx, |prop| {
+        prop.unsafe_copy_transform(out);
+    });
 }
 
 #[no_mangle]
@@ -582,33 +583,9 @@ pub unsafe extern "C" fn MonoGetVolume(ctrl_idx: i32, volume: &mut f32, collect_
     })
 }
 
-fn with_prop_cl<F, T>(ctrl_idx: i32, cb: F) -> T
-where
-    F: FnOnce(&Prop) -> T,
-{
-    STATE.with(|state| {
-        let mut s = state.borrow_mut();
-        let prop = s.props.get_mut_prop(ctrl_idx as usize).unwrap();
-
-        let p = prop.as_ref().borrow_mut();
-        cb(&p)
-    })
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn SetPropStopFlag(ctrl_idx: i32, flag: i32) {
-    let f = |x: usize| flag;
-
-    STATE.with(|state| {
-        state
-            .borrow_mut()
-            .props
-            .get_mut_prop(ctrl_idx as usize)
-            .unwrap()
-            .as_ref()
-            .borrow_mut()
-            .set_disabled(flag);
-    })
+    with_prop_mut(ctrl_idx, |prop| prop.set_disabled(flag));
 }
 
 #[no_mangle]

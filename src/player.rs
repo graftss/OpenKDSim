@@ -1,9 +1,6 @@
 use crate::{
     gamestate::GameState,
-    global::GlobalState,
-    mission::{
-        config::MissionConfig, stage::StageConfig, state::MissionState, tutorial::TutorialState,
-    },
+    mission::{config::MissionConfig, stage::StageConfig},
 };
 
 use self::{
@@ -45,15 +42,6 @@ impl Player {
         self.camera.init(&self.katamari, &self.prince);
     }
 
-    /// Update the prince and katamari controlled by the given `Player`.    
-    /// offset: 0x25be0
-    pub fn update_prince_and_kat(
-        &mut self,
-        tutorial: &mut TutorialState,
-        stage_config: &StageConfig,
-    ) {
-    }
-
     /// Check if the player needs to royal warp, and if so, perform the warp.
     pub fn update_royal_warp(&mut self, warp_y: f32, area: u8, stage: &StageConfig) {
         let Player {
@@ -87,9 +75,8 @@ pub type PlayerState = [Player; MAX_PLAYERS];
 impl GameState {
     /// Update the prince and katamari controlled by the given `player`.    
     /// offset: 0x25be0
-    pub fn update_player(&mut self, player_idx: usize) {
+    pub fn update_prince_and_kat(&mut self, player_idx: usize) {
         let mission = &mut self.mission;
-        let mission_config = mission.mission.as_mut().unwrap();
         let stage_config = mission.stage.as_mut().unwrap();
         let tutorial = &mut mission.tutorial;
         let global = &mut self.global;

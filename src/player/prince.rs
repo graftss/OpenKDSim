@@ -7,7 +7,6 @@ use gl_matrix::{
 
 use crate::{
     constants::VEC3_ZERO,
-    gamestate::GameState,
     global::GlobalState,
     macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
@@ -16,12 +15,11 @@ use crate::{
         camera::{Camera, CameraMode},
         input::{AnalogPushDirs, GachaDir, Input, StickInput, StickPushDir},
         katamari::Katamari,
+        Player,
     },
 };
 
 use self::params::PrinceParams;
-
-use super::{camera::preclear::PreclearState, Player};
 
 mod params;
 

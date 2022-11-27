@@ -1,5 +1,3 @@
-use crate::macros::panic_log;
-
 use super::{
     config::MissionConfig, ending::EndingState, stage::StageConfig, tutorial::TutorialState,
     vsmode::VsModeState,

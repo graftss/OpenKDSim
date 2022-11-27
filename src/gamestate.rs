@@ -4,7 +4,7 @@ use crate::{
     delegates::Delegates,
     global::GlobalState,
     macros::panic_log,
-    mission::{config::MissionConfig, state::MissionState, GameMode, GameType, Mission},
+    mission::{config::MissionConfig, state::MissionState, GameMode, Mission},
     mono_data::MonoData,
     player::{Player, PlayerState},
     props::{
@@ -302,12 +302,12 @@ impl GameState {
         // TODO: `tutorial_update_flags`
 
         // update the first player
-        self.update_player(0);
+        self.update_prince_and_kat(0);
 
         if is_vs_mode {
             // if vs mode, update the second player, then update vsmode-specific stuff
             self.global.updating_player = 1;
-            self.update_player(1);
+            self.update_prince_and_kat(1);
             // TODO: `vsmode_update()`
         }
 

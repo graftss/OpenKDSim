@@ -119,9 +119,9 @@ struct Test {
 }
 
 unsafe fn test() {
-    let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
+    // let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
 
-    STATE.with(|state| {
+    STATE.with(|_state| {
         // let mut state = state.borrow_mut();
 
         // state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
