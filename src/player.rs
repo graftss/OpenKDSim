@@ -77,7 +77,6 @@ impl GameState {
     /// offset: 0x25be0
     pub fn update_prince_and_kat(&mut self, player_idx: usize) {
         let mission = &mut self.mission;
-        let mission_config = mission.mission.as_ref().unwrap();
         let stage_config = mission.stage.as_ref().unwrap();
         let tutorial = &mut mission.tutorial;
         let global = &mut self.global;
@@ -91,7 +90,7 @@ impl GameState {
             player.update_prince(tutorial, global, stage_config);
             player
                 .katamari
-                .update(&player.prince, &player.camera, mission_config);
+                .update(&player.prince, &player.camera, mission);
 
             // update the prince's transform now that the katamari is updated
             player.prince.update_transform(&player.katamari);

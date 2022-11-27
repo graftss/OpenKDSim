@@ -14,7 +14,7 @@ use crate::{
     },
     macros::min,
     math::normalize_bounded_angle,
-    mission::config::MissionConfig,
+    mission::state::MissionState,
     props::prop::PropRef,
 };
 
@@ -464,6 +464,11 @@ pub struct Katamari {
     /// counts down from 10 after falling from a climb; if still nonzero, can't climb again    
     /// offset: 0x118
     wallclimb_cooldown: u16,
+
+    /// "Bounciness" or elasticity multiplier, which is a linear function of
+    /// the katamari's diameter. The linear can be different depending on the stage.
+    /// offset: 0x19c
+    elasticity: f32,
 
     /// Katamari velocities.
     /// offset: 0x240
@@ -1013,7 +1018,10 @@ impl Katamari {
 impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
-    pub fn update(&mut self, prince: &Prince, camera: &Camera, mission_config: &MissionConfig) {
+    pub fn update(&mut self, prince: &Prince, camera: &Camera, mission: &MissionState) {
+        let stage_config = mission.stage.as_ref().unwrap();
+        let mission_config = mission.mission.as_ref().unwrap();
+
         // decrement timers
         self.wallclimb_cooldown -= 1;
 
@@ -1033,7 +1041,8 @@ impl Katamari {
         self.physics_flags.wheel_spin = oujistate.wheel_spin;
 
         // TODO: `kat_update_incline_accel()`
-        // TODO: `kat_update:241-260`update stage elasticity param (store in stage config)
+
+        self.elasticity = stage_config.get_kat_elasticity(self.diam_cm);
 
         if !oujistate.wheel_spin && !oujistate.dash_start {
             // if the katamari is not spinning:
