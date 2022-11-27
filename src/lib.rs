@@ -842,7 +842,7 @@ pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission:
     STATE.with(|state| {
         state
             .borrow_mut()
-            .init(player_idx, override_init_size, mission.try_into().unwrap())
+            .init(player_idx as usize, override_init_size, mission as u8)
     });
 }
 

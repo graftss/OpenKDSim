@@ -33,8 +33,8 @@ impl GameState {
     }
 
     /// The `MissionConfig` for the current mission.
-    pub fn current_mission_config(&self) -> Option<&MissionConfig> {
-        self.global.mission.map(MissionConfig::get)
+    pub fn get_mission_config(&self) -> Option<&MissionConfig> {
+        self.mission.mission.as_ref()
     }
 
     /// Mimicks the `SetGameTime` API function.
@@ -119,11 +119,13 @@ impl GameState {
     pub fn get_radius_target_percent(&self, player_idx: usize) -> f32 {
         let player = self.get_player(player_idx);
         let kat = &player.katamari;
+        let mission = &self.mission;
+        let mission_config = mission.mission.as_ref().unwrap();
+
         let init_rad = kat.get_init_radius();
         let curr_rad = kat.get_radius();
 
-        let mission_conf = MissionConfig::get(self.global.mission.unwrap());
-        let goal_rad = mission_conf.goal_diam_cm / 2.0;
+        let goal_rad = mission_config.goal_diam_cm / 2.0;
 
         (curr_rad - init_rad) / (goal_rad - init_rad)
     }
@@ -231,9 +233,7 @@ impl GameState {
     }
 
     /// Mimicks the `Init` API function.
-    pub fn init(&mut self, player_i32: i32, override_init_size: f32, mission: u8) {
-        let player: u8 = player_i32.try_into().unwrap();
-
+    pub fn init(&mut self, player_idx: usize, override_init_size: f32, mission: u8) {
         self.global.is_vs_mode = Mission::is_vs_mode(mission);
         if self.global.is_vs_mode {
             self.global.vs_mission_idx = mission - Mission::MIN_VS_MODE;
@@ -250,7 +250,8 @@ impl GameState {
 
         // TODO: `init_simulation_subroutine_2`: 0x6740
 
-        let mission_config = MissionConfig::get(self.global.mission.unwrap());
+        let mc = &self.mission;
+        let mission_config = mc.mission.as_ref().unwrap();
 
         // compute how small props need to be relative to the katamari
         // before they're destroyed as they become invisible.
@@ -260,8 +261,7 @@ impl GameState {
             .compute_destroy_invis_diam_ratio(mission_config);
 
         // initialize the player (katamari, prince, camera)
-        self.get_mut_player(player as usize)
-            .init(player, mission_config, override_init_size);
+        self.players[player_idx].init(player_idx as u8, mission_config, override_init_size);
 
         self.global.map_loop_rate = 0.0;
 

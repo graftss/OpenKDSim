@@ -115,6 +115,22 @@ macro_rules! inv_lerp_clamp {
     };
 }
 
+/// Linearly rescale the value `$val` from the interval `[$val_min, $val_max]`
+/// to the interval `[$out_min, $out_max]`.
+/// That is:
+///   $val_min -> $out_min,
+///   $val_max -> $out_max,
+///   and intermediate values are obtained from linear interpolation.
+macro_rules! rescale {
+    ($val: expr, $val_min: expr, $val_max: expr, $out_min: expr, $out_max: expr) => {
+        crate::macros::lerp!(
+            crate::macros::inv_lerp!($val, $val_min, $val_max),
+            $out_min,
+            $out_max
+        )
+    };
+}
+
 pub(crate) use {
     inv_lerp,
     inv_lerp_clamp,
@@ -130,4 +146,5 @@ pub(crate) use {
     // read_i32,
     read_u16,
     read_u8,
+    rescale,
 };

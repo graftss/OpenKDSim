@@ -63,7 +63,7 @@ impl From<u8> for GameType {
 
 /// Game missions.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Mission {
     None = 0,               // king talking???
     MAS1 = 1,               // MAS1

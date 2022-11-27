@@ -14,6 +14,7 @@ use crate::{
     },
     macros::min,
     math::normalize_bounded_angle,
+    mission::config::MissionConfig,
     props::prop::PropRef,
 };
 
@@ -1012,7 +1013,7 @@ impl Katamari {
 impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
-    pub fn update(&mut self, prince: &Prince, camera: &Camera) {
+    pub fn update(&mut self, prince: &Prince, camera: &Camera, mission_config: &MissionConfig) {
         // decrement timers
         self.wallclimb_cooldown -= 1;
 
@@ -1068,9 +1069,9 @@ impl Katamari {
         );
 
         self.update_collision_rays();
-
         // TODO: self.attract_props_to_center();
-        // TODO: `kat_update:348-375` (self.update_mission_volume_penalty())
+
+        self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         // TODO: self.update_collision()
 
         // compute distance to camera
