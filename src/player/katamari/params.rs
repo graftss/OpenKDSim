@@ -48,6 +48,37 @@ pub struct KatamariParams {
     /// by the collision system while the katamari contacts both of them.
     /// offset: 0x7160c
     pub surface_similarity_threshold: f32,
+
+    /// If: - the katamari contacts a wall and a floor,
+    ///     - the angle between those contacted surface normals is bigger than this value, and
+    ///     - the katamari is moving
+    /// then the katamari is considered stuck.
+    /// default: 3pi/2
+    /// offset: 0x716d4
+    pub wall_to_floor_angle_stuck_threshold: f32,
+
+    /// If: - the katamari contacts exactly 2 walls
+    ///     - the angle between the walls' normals is bigger than this value,
+    /// then the katamari is considered stuck.
+    /// default: 5pi/6
+    /// offset: 0x716f0
+    pub wall_to_wall_angle_stuck_threshold: f32,
+
+    /// When stuck between walls, the katamari will continuously detach props
+    /// after this many ticks pass.
+    pub detach_cooldown_when_stuck_btwn_walls: u8,
+
+    /// The "baseline" ratio of the katamari's volume that's detached
+    /// as prop volume, whenever props are detached. Depending on the source
+    /// of the detachment, the volume will be multiplied scaled further.
+    /// default: 0.03
+    /// offset: 0x7b224
+    pub base_detached_prop_vol_mult: f32,
+
+    /// The multiplier to detached prop volume when props are detached while
+    /// the katamari is stuck between walls.
+    /// offset: 0x715bc (used at 0x17742)
+    pub stuck_detached_prop_vol_mult: f32,
 }
 
 impl Default for KatamariParams {
@@ -64,6 +95,11 @@ impl Default for KatamariParams {
             clip_len_constant: f32::from_bits(0x3a03126f),
             surface_similarity_threshold: f32::from_bits(0x3f7ffeb0),
             sloped_floor_y_normal_threshold: f32::from_bits(0x3f7ff972),
+            wall_to_floor_angle_stuck_threshold: f32::from_bits(0x40060a92), // 3pi/2
+            wall_to_wall_angle_stuck_threshold: f32::from_bits(0x40278d36),  // 5pi/6
+            detach_cooldown_when_stuck_btwn_walls: 15,
+            base_detached_prop_vol_mult: f32::from_bits(0x3cf5c28f),
+            stuck_detached_prop_vol_mult: 0.5,
         }
     }
 }

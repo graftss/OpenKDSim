@@ -4,8 +4,8 @@ use crate::{
     collision::raycast_state::RaycastCallType,
     macros::panic_log,
     math::{
-        vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_scale, vec3_inplace_subtract,
-        vec3_inplace_zero_small,
+        acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_scale,
+        vec3_inplace_subtract, vec3_inplace_zero_small,
     },
     mission::{state::MissionState, GameMode},
     props::prop::WeakPropRef,
@@ -15,6 +15,7 @@ use self::{hit::SurfaceHit, ray::KatCollisionRayType};
 
 use super::Katamari;
 
+pub mod history;
 pub mod hit;
 pub mod mesh;
 pub mod ray;
@@ -76,7 +77,7 @@ impl Katamari {
             // TODO: `kat_update_water_contact()`
             self.update_surface_contacts();
             self.process_surface_contacts();
-            // TODO: `kat_update_contact_history_and_stuckness()`
+            self.resolve_being_stuck();
             // TODO: `kat_update_vault_and_climb()
 
             if self.physics_flags.airborne && self.raycast_state.closest_hit_idx.is_some() {
@@ -449,4 +450,95 @@ impl Katamari {
             self.fc_contact_point = Some(contact_pt);
         }
     }
+
+    fn resolve_being_stuck(&mut self) {
+        self.hit_history.push(
+            self.num_wall_contacts,
+            self.num_floor_contacts,
+            &self.contact_wall_normal_unit,
+            &self.contact_floor_normal_unit,
+        );
+
+        // TODO: this control flow
+        let stuck_btwn_walls = if !self.hit_flags.small_ledge_climb {
+            true
+        } else if self.num_wall_contacts == 1 && self.num_floor_contacts > 0 {
+            // contacting exactly 1 wall and at least 1 floor:
+
+            let wall_dot_floor = vec3::dot(
+                &self.contact_wall_normal_unit,
+                &self.contact_floor_normal_unit,
+            );
+            // TODO: technically this needs to be an `acos` of doubles
+            let angle = acos_f32(wall_dot_floor);
+
+            // stuck if the wall-to-floor angle is over the threshold parameter and the katamari moved.
+            angle > self.params.wall_to_floor_angle_stuck_threshold
+                && !vec3::exact_equals(&self.center, &self.last_center)
+        } else if self.num_wall_contacts == 2 {
+            // contacting exactly 2 walls:
+            let wall_dot_wall = vec3::dot(
+                &self.hit_walls[0].normal_unit,
+                &self.hit_walls[1].normal_unit,
+            );
+
+            if wall_dot_wall > self.params.wall_to_wall_angle_stuck_threshold {
+                // stuck if the angle between the walls is beyond the threshold param
+                self.lose_props_when_stuck();
+                true
+            } else {
+                // also stuck if the katamari's was stuck on the previous tick
+                self.stuck_ticks > 0
+            }
+        } else {
+            // contacting 3 or more walls:
+            // always stuck
+            self.lose_props_when_stuck();
+            true
+        };
+
+        // TODO: `kat_update_stuckness:304-335` (a case that's too annoying right now)
+
+        if stuck_btwn_walls {
+            // if stuck between walls, try to push the katamari away from the wall
+            // (i.e. push it in the direction of the wall's normal).
+            vec3::copy(
+                &mut self.stuck_btwn_walls_push,
+                &self.contact_wall_normal_unit,
+            );
+            self.stuck_ticks += 1;
+            self.physics_flags.stuck_between_walls = true;
+
+            // also detach props every so often, because why not? maybe that'll help.
+            // what the hell do i know? fuck it!
+            if self.stuck_ticks > self.params.detach_cooldown_when_stuck_btwn_walls {
+                // TODO: (line 352) needs camera+global state here
+                if !self.physics_flags.detaching_props {
+                    self.static_detaching_props = true;
+                    // TODO: (line 358) needs gametype != C here
+                    if self.can_detach_props {
+                        let lost_vol_mult = self.params.base_detached_prop_vol_mult * 0.5;
+                        self.physics_flags.detaching_props = true;
+                        self.detach_props(lost_vol_mult * self.vol_m3, 0.5);
+                    }
+                    self.static_detaching_props = false;
+                }
+
+                self.stuck_ticks = 1;
+            }
+        } else {
+            // if not stuck between walls:
+            // reset the stuckness state
+            self.stuck_ticks = 0;
+            self.physics_flags.stuck_between_walls = false;
+        }
+    }
+
+    /// TODO
+    /// offset: 0x17790
+    fn lose_props_when_stuck(&mut self) {}
+
+    /// TODO
+    /// offset: 0x26f10
+    fn detach_props(&mut self, _vol: f32, _prop_speed: f32) {}
 }

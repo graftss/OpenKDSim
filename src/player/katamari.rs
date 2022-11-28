@@ -24,7 +24,7 @@ use crate::{
 
 use self::{
     collision::mesh::KatMesh,
-    collision::{hit::SurfaceHit, ray::KatCollisionRays},
+    collision::{history::HitHistory, hit::SurfaceHit, ray::KatCollisionRays},
     flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,
 };
@@ -208,6 +208,19 @@ pub struct Katamari {
     /// The number of props attached to the katamari (including unloaded ones).
     /// offset: 0x133a08
     num_attached_props: u16,
+
+    /// A history of the katamari's surface contacts over the past several frames.
+    /// This is used to detect when it's likely stuck.
+    hit_history: HitHistory,
+
+    /// Set to true *just before* the katamari is detaching props and
+    /// set back to false *just after* the detach call ends.
+    /// offset: 0x10eadb
+    static_detaching_props: bool,
+
+    /// If false, the katamari can't detach props from bonking or being stuck.
+    /// offset: 0x15313c
+    can_detach_props: bool,
 
     // END new fields
     /// A reference to the vector of katamari meshes.
@@ -488,6 +501,11 @@ pub struct Katamari {
     /// offset: 0x7bc
     contact_wall_clip: Vec3,
 
+    /// The direction the katamari is pushed when stuck between walls.
+    /// In practice it's just the last-contacted wall's normal.
+    /// offset: 0x7dc
+    stuck_btwn_walls_push: Vec3,
+
     /// (??) The length of the primary collision ray contacting the floor.
     /// offset: 0x7fc
     fc_ray_len: f32,
@@ -528,7 +546,7 @@ pub struct Katamari {
 
     /// (??) The number of ticks the katamari has been stuck between walls.
     /// offset: 0x87c
-    stuck_ticks: u32,
+    stuck_ticks: u8,
 
     /// (??)
     /// offset: 0x880

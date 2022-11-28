@@ -127,7 +127,7 @@ pub struct KatPhysicsFlags {
 
     /// (??)
     /// offset: 0x1b
-    pub is_colliding_0x1b: bool,
+    pub detaching_props: bool,
 
     /// True if the katamari should emit the "puff of smoke" vfx as it moves.
     /// By default this occurs when it's over 12m in the World stage.
@@ -158,7 +158,7 @@ impl KatPhysicsFlags {
         self.hit_by_moving_prop = false;
         self.contacts_prop_0xa = false;
         self.stuck_between_walls = false;
-        self.is_colliding_0x1b = false;
+        self.detaching_props = false;
         self.contacts_wall = false;
         self.contacts_floor = false;
     }
