@@ -8,13 +8,15 @@ use crate::{
     macros::{panic_log, read_bool, read_f32, read_u16, read_u8, rescale},
     math::vec3_inplace_scale,
     mission::GameType,
-    player::constants::MAX_PLAYERS,
+    player::{constants::MAX_PLAYERS, katamari::scaled_params::KatScaledParams},
     util::vec3_from_le_bytes,
 };
 
 use super::{stage::Stage, Mission};
 
 static MC_0X60_TABLE: &'static [u8] = include_bytes!("bin/mission_config_0x60_table.bin");
+static MC_SCALING_PARAMS_TABLE: &'static [u8] =
+    include_bytes!("bin/mission_config_scaling_params.bin");
 
 /// Data controlling the mission-specific volume penalty to attached objects.
 /// The penalty is a piecewise-linear function of the katamari's diameter.
@@ -90,10 +92,82 @@ lazy_static! {
     };
 }
 
+/// Each mission has a list of control points which give the katamari's `KatScaledParams`
+/// values at a specific size. During the mission, the katamari's scaled params are computed
+/// by linearly interpolating between the `KatScaledCtrlPt` values with sizes just smaller
+/// and just bigger than the katamari's actual size.
+/// offset: 0x60180 (mission-indexed table of pointers to variable-length control point lists)
+#[derive(Debug, Default, Clone)]
+pub struct KatScaledParamsCtrlPt {
+    /// The diameter at which the given params apply.
+    /// offset: 0x0
+    pub diam_cm: f32,
+
+    /// The params that apply at the given diameter.
+    /// offset: 0x4
+    pub params: KatScaledParams,
+}
+
+impl KatScaledParamsCtrlPt {
+    const WIDTH: usize = 0x54;
+
+    /// Read the `KatScaledParamsCtrlPt` values for each mission from the
+    /// ragged table of control points extracted from the simulation.
+    /// The end of a mission's control point list is detected from a control
+    /// point's size being `-1.0`.
+    fn from_floats(raw_data: &[u8]) -> Vec<Vec<KatScaledParamsCtrlPt>> {
+        let mut result = vec![];
+        let mut mission_ctrl_pts = vec![];
+
+        for chunk in raw_data.chunks(Self::WIDTH) {
+            let diam_cm = read_f32!(chunk, 0);
+
+            if diam_cm < 0.0 {
+                result.push(mission_ctrl_pts);
+                mission_ctrl_pts = vec![];
+            } else {
+                mission_ctrl_pts.push(KatScaledParamsCtrlPt {
+                    diam_cm,
+                    params: KatScaledParams {
+                        base_max_speed: read_f32!(chunk, 0x4),
+                        gravity_accel: read_f32!(chunk, 0x8),
+                        brake_forwards_force: read_f32!(chunk, 0xc),
+                        brake_backwards_force: read_f32!(chunk, 0x10),
+                        brake_sideways_force: read_f32!(chunk, 0x14),
+                        brake_boost_force: read_f32!(chunk, 0x18),
+                        max_forwards_speed: read_f32!(chunk, 0x1c),
+                        max_backwards_speed: read_f32!(chunk, 0x20),
+                        max_sideways_speed: read_f32!(chunk, 0x24),
+                        max_boost_speed: read_f32!(chunk, 0x28),
+                        push_uphill_accel: read_f32!(chunk, 0x2c),
+                        not_push_uphill_accel: read_f32!(chunk, 0x30),
+                        forwards_accel: read_f32!(chunk, 0x34),
+                        backwards_accel: read_f32!(chunk, 0x38),
+                        sideways_accel: read_f32!(chunk, 0x3c),
+                        boost_accel: read_f32!(chunk, 0x40),
+                        prince_offset: read_f32!(chunk, 0x44),
+                        alarm_closest_range: read_f32!(chunk, 0x48),
+                        alarm_closer_range: read_f32!(chunk, 0x4c),
+                        alarm_close_range: read_f32!(chunk, 0x50),
+                    },
+                })
+            }
+        }
+
+        result
+    }
+}
+
 /// Constant, mission-specific data.
 #[derive(Debug, Default, Clone)]
 pub struct MissionConfig {
+    /// List of control points describing how the katamari's `attach_vol_penalty`
+    /// changes as the katamari grows in size in the mission.
     pub vol_penalty_ctrl_pts: Option<Vec<VolPenaltyCtrlPt>>,
+
+    /// List of control points describing how the katamari's `KatScaledParams`
+    /// change as the katamari grows in size in the mission.
+    pub scaled_params_ctrl_pts: Option<Vec<KatScaledParamsCtrlPt>>,
 
     // mission config 0x60 table
     // offset: 0x5f7a0
@@ -176,6 +250,7 @@ impl MissionConfig {
 fn read_from_data(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     read_mission_config_0x60_table(configs);
     read_vol_penalty_ctrl_pts(configs);
+    read_scaled_params_ctrl_pts(configs);
 }
 
 /// Read the binary "mission config 0x60" table from the simulation into
@@ -220,6 +295,15 @@ fn read_vol_penalty_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
             VolPenaltyCtrlPt::validate_mission_ctrl_pts(raw_data);
             config.vol_penalty_ctrl_pts = Some(VolPenaltyCtrlPt::from_floats(raw_data));
         }
+    }
+}
+
+fn read_scaled_params_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
+    let parsed_scaled_params = KatScaledParamsCtrlPt::from_floats(MC_SCALING_PARAMS_TABLE);
+
+    // println!("{:?}", parsed_scaled_params);
+    for (config, params) in configs.iter_mut().zip(parsed_scaled_params) {
+        config.scaled_params_ctrl_pts = Some(params);
     }
 }
 

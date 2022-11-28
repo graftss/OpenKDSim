@@ -1,6 +1,8 @@
-pub mod collision;
+mod collision;
 mod flags;
 mod params;
+pub mod scaled_params;
+mod velocity;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -27,6 +29,8 @@ use self::{
     collision::{history::HitHistory, hit::SurfaceHit, ray::KatCollisionRays},
     flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,
+    scaled_params::KatScaledParams,
+    velocity::KatVelocity,
 };
 
 use super::{
@@ -53,126 +57,6 @@ pub enum AlarmType {
     Closest,
     Closer,
     Close,
-}
-
-/// Katamari parameters which vary based on the katamari's current size.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct KatScaledParams {
-    /// Base max speed which acts as a multiplier on the speeds of all movement types.
-    pub base_max_speed: f32,
-
-    /// Downward acceleration from gravity.
-    pub gravity_accel: f32,
-
-    /// (??) The force exerted when braking with forwards movement.
-    pub brake_forwards_force: f32,
-
-    /// (??) The force exerted when braking with backwards movement.
-    pub brake_backwards_force: f32,
-
-    /// (??) The force exerted when braking with sideways movement.
-    pub brake_sideways_force: f32,
-
-    /// (??) The force exerted when braking boost movement.
-    pub brake_boost_force: f32,
-
-    /// Max speed with forwards movement.
-    pub max_forwards_speed: f32,
-
-    /// Max speed with backwards movement.
-    pub max_backwards_speed: f32,
-
-    /// Max speed with sideways movement.
-    pub max_sideways_speed: f32,
-
-    /// Max speed with boost movement.
-    pub max_boost_speed: f32,
-
-    /// (??)
-    pub push_uphill_accel: f32,
-
-    /// (??)
-    pub not_push_uphill_accel: f32,
-
-    /// Acceleration during forwards movement.
-    pub forwards_accel: f32,
-
-    /// Acceleration during backwards movement.
-    pub backwards_accel: f32,
-
-    /// Acceleration during sideways movement.
-    pub sideways_accel: f32,
-
-    /// Acceleration during boost movement.
-    pub boost_accel: f32,
-
-    /// The prince's lateral distance from the katamari center.
-    pub prince_offset: f32,
-
-    /// (??)
-    pub alarm_closest_range: f32,
-
-    /// (??)
-    pub alarm_closer_range: f32,
-
-    /// (??)
-    pub alarm_close_range: f32,
-}
-
-/// Katamari velocity and acceleration values.
-#[derive(Debug, Default, Copy, Clone)]
-pub struct KatVelocity {
-    /// Current velocity
-    /// offset: 0x0
-    pub velocity: Vec3,
-
-    /// Current unit velocity
-    /// offset: 0x10
-    pub velocity_unit: Vec3,
-
-    /// (??)
-    /// offset: 0x20
-    pub speed_orth_on_floor: Vec3,
-
-    /// (??)
-    /// offset: 0x30
-    pub speed_proj_on_floor: Vec3,
-
-    /// (??)
-    /// offset: 0x40
-    pub last_vel_accel: Vec3,
-
-    /// (??) Velocity + player acceleration
-    /// offset: 0x50
-    pub vel_accel: Vec3,
-
-    /// Unit vector of `vel_accel`.
-    /// offset: 0x60
-    pub vel_accel_unit: Vec3,
-
-    /// (??) Velocity + player accel + gravity
-    /// offset: 0x70
-    pub vel_accel_grav: Vec3,
-
-    /// Unit vector of `vel_accel_grav`.
-    /// offset: 0x80
-    pub vel_accel_grav_unit: Vec3,
-
-    /// (??)
-    /// offset: 0x90
-    pub push_vel_on_floor_unit: Vec3,
-
-    /// Acceleration from gravity
-    /// offset: 0xa0
-    pub accel_gravity: Vec3,
-
-    /// Acceleration from the contacted floor incline
-    /// offset: 0xb0
-    pub accel_incline: Vec3,
-
-    /// (??) Acceleration from the contacted floor friction (or some kind of similar force)
-    /// offset: 0xc0
-    pub accel_ground_friction: Vec3,
 }
 
 #[derive(Debug, Default)]
@@ -1000,7 +884,7 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
-        // TODO: self.update_velocity()
+        self.update_velocity(prince);
         // TODO: self.update_friction()
         // TODO: self.apply_acceleration()
 
