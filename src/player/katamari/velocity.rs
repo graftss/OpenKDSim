@@ -1,6 +1,6 @@
 use gl_matrix::common::Vec3;
 
-use crate::player::prince::Prince;
+use crate::{mission::state::MissionState, player::prince::Prince};
 
 use super::Katamari;
 
@@ -61,5 +61,9 @@ pub struct KatVelocity {
 }
 
 impl Katamari {
-    pub(super) fn update_velocity(&mut self, _prince: &Prince) {}
+    pub(super) fn update_velocity(&mut self, _prince: &Prince, mission: &MissionState) {
+        mission
+            .mission_config
+            .get_kat_scaled_params(&mut self.scaled_params, self.diam_cm);
+    }
 }

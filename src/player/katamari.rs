@@ -20,7 +20,7 @@ use crate::{
     delegates::Delegates,
     macros::min,
     math::normalize_bounded_angle,
-    mission::state::MissionState,
+    mission::{config::MissionConfig, state::MissionState},
     props::prop::PropRef,
 };
 
@@ -736,9 +736,10 @@ impl Katamari {
     pub fn init(
         &mut self,
         player: u8,
-        delegates: &Rc<RefCell<Delegates>>,
         init_diam: f32,
         init_pos: &Vec3,
+        delegates: &Rc<RefCell<Delegates>>,
+        mission_config: &MissionConfig,
     ) {
         // extra stuff not in the original simulation
         self.max_prop_rays = self.params.max_prop_collision_rays;
@@ -801,7 +802,7 @@ impl Katamari {
 
         self.set_immobile();
 
-        // TODO: `kat_update_size_scaled_params()`
+        self.update_scaled_params(mission_config);
         // TODO: `kat_init:253`
 
         self.prop_combo_count = 0;
@@ -884,7 +885,7 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
-        self.update_velocity(prince);
+        self.update_velocity(prince, mission_state);
         // TODO: self.update_friction()
         // TODO: self.apply_acceleration()
 
@@ -915,5 +916,15 @@ impl Katamari {
         if !camera.preclear.get_enabled() {
             // TODO: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
+    }
+
+    /// Update the katamari's scaled params by interpolating the mission's param control points.
+    /// offset: 0x1f980
+    pub fn update_scaled_params(&mut self, mission_config: &MissionConfig) {
+        // TODO_VS: in vs mode, the smaller of the two katamaris takes its params from
+        // the bigger katamari, so that would need to be handled differently.
+        mission_config.get_kat_scaled_params(&mut self.scaled_params, self.diam_cm);
+        // TODO_VS: there's also some crap at the end with `vsAttack` and gravity.
+        // (see `kat_update_scaled_params`)
     }
 }

@@ -28,21 +28,22 @@ impl Player {
         &mut self,
         player: u8,
         delegates: &DelegatesRef,
-        mission: &MissionConfig,
+        mission_config: &MissionConfig,
         override_init_size: f32,
     ) {
         // first initialize the katamari
-        let init_pos = &mission.init_kat_pos[player as usize];
+        let init_pos = &mission_config.init_kat_pos[player as usize];
         let init_diam = if override_init_size < 0.0 {
-            mission.init_diam_cm
+            mission_config.init_diam_cm
         } else {
             override_init_size
         };
 
-        self.katamari.init(player, delegates, init_diam, init_pos);
+        self.katamari
+            .init(player, init_diam, init_pos, delegates, mission_config);
 
         // then initialize the prince
-        let init_angle = mission.init_prince_angle[player as usize];
+        let init_angle = mission_config.init_prince_angle[player as usize];
         self.prince.init(player, init_angle, &self.katamari);
 
         // then initialize the camera

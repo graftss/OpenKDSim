@@ -90,6 +90,13 @@ lazy_static! {
         result.insert(Mission::Eternal3, vec![0.0, 1.0, 50.0, 1.0, 100.0, 1.0, 1000.0, 1.0, 10000.0, 1.1, 20000.0, 0.9, 30000.0, 0.9, 40000.0, 1.0, 50000.0, 1.0, 60000.0, 0.9, 70000.0, 0.7, 80000.0, 0.4, 90000.0, 0.05]);
         result
     };
+
+    /// Handwritten mission-specific max scaled sizes.
+    /// When the katamari grows above a mission's max scaled size, its scaled params stop
+    /// changing: all sizes larger than this size yield the same scaled params.
+    static ref MC_MAX_SCALED_SIZE: Vec<f32> = vec![
+        100.0, 14.0, 30.0, 85.0, 50.0, 150.0, 250.0, 600.0, 1500.0, 5000.0, 100000.0, 80.0, 100.0, 30.0, 1000.0, 1000.0, 1000.0, 250.0, 30000.0, 30000.0, 200.0, 1000.0, 100.0, 1500.0, 100000.0, 230.0, 100.0, 100.0, 100.0, 500.0, 100.0, 500.0, 100.0,
+    ];
 }
 
 /// Each mission has a list of control points which give the katamari's `KatScaledParams`
@@ -169,6 +176,9 @@ pub struct MissionConfig {
     /// change as the katamari grows in size in the mission.
     pub scaled_params_ctrl_pts: Option<Vec<KatScaledParamsCtrlPt>>,
 
+    /// The katamari size at which scaled params stop growing.    
+    pub scaled_params_max_size: f32,
+
     // mission config 0x60 table
     // offset: 0x5f7a0
     // size: 0x60
@@ -244,6 +254,33 @@ impl MissionConfig {
         // use a penalty of 1.0 if the mission doesn't have any control points
         1.0
     }
+
+    /// Writes the scaled params of a katamari with diameter `diam_cm` to `params`.
+    pub fn get_kat_scaled_params(&self, params: &mut KatScaledParams, mut diam_cm: f32) {
+        if let Some(ctrl_pts) = &self.scaled_params_ctrl_pts {
+            // for the purposes of scaled params, cap the katamari's diameter at the mission's
+            // max size.
+            if diam_cm > self.scaled_params_max_size {
+                diam_cm = self.scaled_params_max_size;
+            }
+
+            for (i, ctrl_pt) in ctrl_pts.iter().enumerate() {
+                if ctrl_pt.diam_cm > diam_cm {
+                    // if we find a control point for a size bigger than the katamari's size,
+                    // take the previous control point as the point just smaller than the katamari.
+                    // (if the first point was already to smaller, just use it as both min and
+                    //  max. the interpolation will just copy the params of the first point.)
+                    let (min_pt, max_pt) = match i {
+                        0 => (ctrl_pt, ctrl_pt),
+                        _ => (&ctrl_pts[i - 1], ctrl_pt),
+                    };
+
+                    params.interpolate_from(diam_cm, min_pt, max_pt);
+                    break;
+                }
+            }
+        }
+    }
 }
 
 /// Initialize the `MissionConfig` table `configs`.
@@ -251,6 +288,7 @@ fn read_from_data(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     read_mission_config_0x60_table(configs);
     read_vol_penalty_ctrl_pts(configs);
     read_scaled_params_ctrl_pts(configs);
+    read_scaled_max_sizes(configs);
 }
 
 /// Read the binary "mission config 0x60" table from the simulation into
@@ -304,6 +342,12 @@ fn read_scaled_params_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     // println!("{:?}", parsed_scaled_params);
     for (config, params) in configs.iter_mut().zip(parsed_scaled_params) {
         config.scaled_params_ctrl_pts = Some(params);
+    }
+}
+
+fn read_scaled_max_sizes(configs: &mut [MissionConfig; NUM_MISSIONS]) {
+    for (config, max_size) in configs.iter_mut().zip(MC_MAX_SCALED_SIZE.iter()) {
+        config.scaled_params_max_size = *max_size;
     }
 }
 

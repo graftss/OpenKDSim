@@ -133,9 +133,11 @@ unsafe fn test() {
     });
 
     let mut s = mission::config::MissionConfig::default();
-    mission::config::MissionConfig::get(&mut s, 6);
-    let p = s.scaled_params_ctrl_pts.unwrap();
-    println!("{:#?}, \n\nlen: {}", p, p.len());
+    mission::config::MissionConfig::get(&mut s, 1);
+    let mut params = player::katamari::scaled_params::KatScaledParams::default();
+    s.get_kat_scaled_params(&mut params, 14.0);
+    println!("{:#?}", params);
+    println!("max size: {:#?}", s.scaled_params_max_size);
 }
 
 fn main() {
