@@ -1,14 +1,16 @@
-use std::{collections::HashMap, f32::consts::PI};
+use std::{collections::HashMap};
 
 use gl_matrix::common::Vec3;
 use lazy_static::lazy_static;
 
 use crate::{
-    constants::NUM_MISSIONS,
+    constants::{NUM_MISSIONS, PI},
     macros::{panic_log, read_bool, read_f32, read_u16, read_u8, rescale},
     math::vec3_inplace_scale,
     mission::GameType,
-    player::{constants::MAX_PLAYERS, katamari::scaled_params::KatScaledParams},
+    player::{
+        camera::CameraState, constants::MAX_PLAYERS, katamari::scaled_params::KatScaledParams,
+    },
     util::vec3_from_le_bytes,
 };
 
@@ -17,6 +19,8 @@ use super::{stage::Stage, Mission};
 static MC_0X60_TABLE: &'static [u8] = include_bytes!("bin/mission_config_0x60_table.bin");
 static MC_SCALING_PARAMS_TABLE: &'static [u8] =
     include_bytes!("bin/mission_config_scaling_params.bin");
+static MC_CAMERA_PARAMS_TABLE: &'static [u8] =
+    include_bytes!("bin/mission_config_camera_params.bin");
 
 /// Data controlling the mission-specific volume penalty to attached objects.
 /// The penalty is a piecewise-linear function of the katamari's diameter.
@@ -165,6 +169,63 @@ impl KatScaledParamsCtrlPt {
     }
 }
 
+/// A control point that determines how the camera should be positioned at a specific
+/// katamari size. The actual position is determined by lerping the values of the
+/// two control points on either side of the katamari's actual size.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CamScaledCtrlPt {
+    /// The minimum katamari diameter at which this control point takes effect.
+    pub diam_cm: f32,
+
+    /// The control point's camera position (relative to katamari center).
+    pub kat_to_pos: Vec3,
+
+    /// The control point's camera target (relative to katamari center).
+    pub kat_to_target: Vec3,
+
+    /// The max height that the prince reaches after an R1 jump.
+    pub jump_r1_height: f32,
+}
+
+impl CamScaledCtrlPt {
+    const WIDTH: usize = 0x28;
+
+    /// Read the `KatScaledParamsCtrlPt` values for each mission from the
+    /// ragged table of control points extracted from the simulation.
+    /// The end of a mission's control point list is detected from a control
+    /// point's size being `-1.0`.
+    fn from_floats(raw_data: &[u8]) -> Vec<Vec<CamScaledCtrlPt>> {
+        let mut result = vec![];
+        let mut mission_ctrl_pts = vec![];
+
+        for chunk in raw_data.chunks(Self::WIDTH) {
+            let diam_cm = read_f32!(chunk, 0);
+
+            if diam_cm < 0.0 {
+                result.push(mission_ctrl_pts);
+                mission_ctrl_pts = vec![];
+            } else {
+                mission_ctrl_pts.push(CamScaledCtrlPt {
+                    diam_cm,
+                    kat_to_pos: [
+                        read_f32!(chunk, 0x4),
+                        read_f32!(chunk, 0x8),
+                        read_f32!(chunk, 0xc),
+                    ],
+                    kat_to_target: [
+                        read_f32!(chunk, 0x14),
+                        read_f32!(chunk, 0x18),
+                        read_f32!(chunk, 0x1c),
+                    ],
+                    jump_r1_height: read_f32!(chunk, 0x24),
+                });
+            }
+        }
+
+        result
+    }
+}
+
 /// Constant, mission-specific data.
 #[derive(Debug, Default, Clone)]
 pub struct MissionConfig {
@@ -173,11 +234,15 @@ pub struct MissionConfig {
     pub vol_penalty_ctrl_pts: Option<Vec<VolPenaltyCtrlPt>>,
 
     /// List of control points describing how the katamari's `KatScaledParams`
-    /// change as the katamari grows in size in the mission.
+    /// change as the katamari grows in size.
     pub scaled_params_ctrl_pts: Option<Vec<KatScaledParamsCtrlPt>>,
 
     /// The katamari size at which scaled params stop growing.    
     pub scaled_params_max_size: f32,
+
+    /// List of control points describing how the camera should be positioned
+    /// and oriented as the katamari grows in size.
+    pub camera_params_ctrl_pts: Option<Vec<CamScaledCtrlPt>>,
 
     // mission config 0x60 table
     // offset: 0x5f7a0
@@ -281,6 +346,18 @@ impl MissionConfig {
             }
         }
     }
+
+    pub fn init_camera_ctrl_points(&self, camera_state: &mut CameraState, diam_cm: f32) {
+        if let Some(ctrl_pts) = &self.camera_params_ctrl_pts {
+            for (i, ctrl_pt) in ctrl_pts.iter().enumerate() {
+                if diam_cm <= ctrl_pt.diam_cm {
+                    camera_state.kat_offset_ctrl_pts = ctrl_pts.clone();
+                    camera_state.kat_offset_ctrl_pt_idx = i as u8;
+                    camera_state.set_offsets(&ctrl_pt);
+                }
+            }
+        }
+    }
 }
 
 /// Initialize the `MissionConfig` table `configs`.
@@ -289,6 +366,7 @@ fn read_from_data(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     read_vol_penalty_ctrl_pts(configs);
     read_scaled_params_ctrl_pts(configs);
     read_scaled_max_sizes(configs);
+    read_camera_params_ctrl_pts(configs);
 }
 
 /// Read the binary "mission config 0x60" table from the simulation into
@@ -348,6 +426,15 @@ fn read_scaled_params_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
 fn read_scaled_max_sizes(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     for (config, max_size) in configs.iter_mut().zip(MC_MAX_SCALED_SIZE.iter()) {
         config.scaled_params_max_size = *max_size;
+    }
+}
+
+fn read_camera_params_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
+    let parsed_scaled_params = CamScaledCtrlPt::from_floats(MC_CAMERA_PARAMS_TABLE);
+
+    // println!("{:?}", parsed_scaled_params);
+    for (config, params) in configs.iter_mut().zip(parsed_scaled_params) {
+        config.camera_params_ctrl_pts = Some(params);
     }
 }
 

@@ -733,6 +733,8 @@ impl Katamari {
 }
 
 impl Katamari {
+    /// Main katamari initialization function.
+    /// offset: 0x1f030
     pub fn init(
         &mut self,
         player: u8,
@@ -784,9 +786,6 @@ impl Katamari {
         mat4::identity(&mut self.pitch_rotation_mat);
         mat4::identity(&mut self.spin_rotation_mat);
         vec3::copy(&mut self.bonus_vel, &VEC3_ZERO);
-
-        // TODO: `kat_init:148-152` (zeroing out surface contact history; continues beyond line 152).
-
         vec3::copy(&mut self.contact_floor_normal_unit, &VEC3_Y_POS);
 
         self.first_attached_prop = None;

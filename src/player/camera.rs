@@ -7,6 +7,7 @@ use crate::{
     constants::{VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     macros::{log, max, min},
     math::{change_bounded_angle, vec3_inplace_normalize, vec3_inplace_scale},
+    mission::config::{CamScaledCtrlPt, MissionConfig},
 };
 
 use self::preclear::PreclearState;
@@ -126,34 +127,20 @@ impl Default for CameraParams {
     }
 }
 
-/// A control point that determines how the camera should be positioned at a specific
-/// katamari size. The actual position is determined by lerping the values of the
-/// two control points on either side of the katamari's actual size.
-#[derive(Debug, Default)]
-pub struct CameraControlPt {
-    /// The minimum katamari diameter at which this control point takes effect.
-    pub diam_cm: f32,
-
-    /// The control point's camera position (relative to katamari center).
-    pub pos: Vec3,
-
-    /// The control point's camera target (relative to katamari center).
-    pub target: Vec3,
-
-    /// The max height that the prince reaches after an R1 jump.
-    pub jump_r1_height: f32,
-}
-
 /// General camera state.
 /// offset: 0x192ee0
 /// width: 0x980
 #[derive(Debug, Default)]
 pub struct CameraState {
     /// The camera position's offset from the katamari center position.
+    /// This value only changes during the "swirl" effect that occurs when the
+    /// katamari reaches certain mission-specific size thresholds.
     /// offset: 0x0
     kat_to_pos: Vec3,
 
     /// The camera target's offset from the katamari center position.
+    /// This value only changes during the "swirl" effect that occurs when the
+    /// katamari reaches certain mission-specific size thresholds.
     /// offset: 0x10
     kat_to_target: Vec3,
 
@@ -167,7 +154,7 @@ pub struct CameraState {
 
     /// The current mission's camera control points.
     /// offset: 0x60
-    control_points: Vec<CameraControlPt>,
+    pub kat_offset_ctrl_pts: Vec<CamScaledCtrlPt>,
 
     /// (??) A timer counting down to when the camera will finish scaling up.
     /// offset: 0x68
@@ -185,9 +172,9 @@ pub struct CameraState {
     /// offset: 0x78
     player: u8,
 
-    /// The current area.
+    /// The index of the current `CamScaledCtrlPt` being used.
     /// offset: 0x7c
-    area: u8,
+    pub kat_offset_ctrl_pt_idx: u8,
 
     /// (??) True if the camera is currently scaling up.
     /// offset: 0x7d
@@ -271,6 +258,14 @@ pub struct CameraState {
     pub changing_special_camera: bool,
 }
 
+impl CameraState {
+    /// Set the camera's offsets from the katamari to those described by the control point `pt`.
+    pub fn set_offsets(&mut self, pt: &CamScaledCtrlPt) {
+        vec3::copy(&mut self.kat_to_pos, &pt.kat_to_pos);
+        vec3::copy(&mut self.kat_to_target, &pt.kat_to_target);
+    }
+}
+
 /// Transform matrices for the camera.
 /// offset: 0xd34180
 /// width: 0x188
@@ -340,11 +335,13 @@ impl Camera {
 }
 
 impl Camera {
-    pub fn init(&mut self, katamari: &Katamari, prince: &Prince) {
+    pub fn init(&mut self, katamari: &Katamari, prince: &Prince, mission_config: &MissionConfig) {
         self.init_state(katamari, prince);
         self.set_mode(CameraMode::Normal);
         self.init_transform();
         self.reset_state(katamari, prince);
+
+        mission_config.init_camera_ctrl_points(&mut self.state, katamari.get_diam_cm());
     }
 
     /// Initialize the `CameraState` struct.

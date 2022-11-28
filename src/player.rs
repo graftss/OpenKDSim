@@ -47,7 +47,8 @@ impl Player {
         self.prince.init(player, init_angle, &self.katamari);
 
         // then initialize the camera
-        self.camera.init(&self.katamari, &self.prince);
+        self.camera
+            .init(&self.katamari, &self.prince, mission_config);
     }
 
     /// Check if the player needs to royal warp, and if so, perform the warp.
