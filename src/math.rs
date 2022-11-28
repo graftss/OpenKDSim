@@ -18,6 +18,22 @@ pub fn vec3_inplace_subtract(vec: &mut Vec3, dx: f32, dy: f32, dz: f32) {
     vec[2] -= dz;
 }
 
+/// Add `<dx, dy, dz>` to `vec` in-place.
+#[inline]
+pub fn vec3_inplace_add(vec: &mut Vec3, dx: f32, dy: f32, dz: f32) {
+    vec[0] += dx;
+    vec[1] += dy;
+    vec[2] += dz;
+}
+
+/// Add `other` to `vec` in-place.
+#[inline]
+pub fn vec3_inplace_add_vec(vec: &mut Vec3, other: &Vec3) {
+    vec[0] += other[0];
+    vec[1] += other[1];
+    vec[2] += other[2];
+}
+
 /// Zero out components of `vec` with small magnitude (less than `eps`), in-place.
 #[inline]
 pub fn vec3_inplace_zero_small(vec: &mut Vec3, eps: f32) {

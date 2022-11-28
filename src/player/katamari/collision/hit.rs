@@ -5,7 +5,7 @@ use crate::{collision::hit_attribute::HitAttribute, props::prop::WeakPropRef};
 /// Describes a collision between a katamari collision ray and another
 /// surface (which could be on either a prop or the map)
 #[derive(Debug, Default, Clone)]
-pub struct KatamariHit {
+pub struct SurfaceHit {
     /// (??)
     /// offset: 0x0
     pub clip_normal_len: f32,
@@ -22,15 +22,15 @@ pub struct KatamariHit {
     /// in the interval [0, 1], where 0 means the ray's initial point
     /// and 1 means its endpoint.
     /// offset: 0xc
-    pub ray_hit_scaled_pos: f32,
+    pub impact_dist_ratio: f32,
 
     /// The vector from the ray initial point to its endpoint.
     /// offset: 0x10
-    pub ray_vec: Vec3,
+    pub ray: Vec3,
 
     /// The contacted surface's unit normal vector.
     /// offset: 0x20
-    pub surface_normal_unit: Vec3,
+    pub normal_unit: Vec3,
 
     /// (??)
     /// offset: 0x30

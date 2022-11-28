@@ -51,7 +51,7 @@ pub struct KatPhysicsFlags {
 
     /// (??) copy of `in_water`
     /// offset: 0x8
-    pub in_water_copy: bool,
+    pub in_water_0x8: bool,
 
     /// (??) If true, the katamari was hit by a moving prop.
     /// offset: 0x9

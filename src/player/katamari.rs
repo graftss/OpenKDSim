@@ -21,7 +21,7 @@ use crate::{
 
 use self::{
     collision::mesh::KatMesh,
-    collision::{hit::KatamariHit, ray::KatCollisionRays},
+    collision::{hit::SurfaceHit, ray::KatCollisionRays},
     flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,
 };
@@ -189,15 +189,15 @@ pub struct Katamari {
 
     /// A list of all currently hit floor surfaces.
     /// offset: 0x1959f0
-    hit_floors: Vec<KatamariHit>,
+    hit_floors: Vec<SurfaceHit>,
 
     /// (??) A list of all hit floor surfaces on the previous tick.
     /// Seems like it's unused?
     /// offset: 0x1941f0
-    last_hit_floors: Vec<KatamariHit>,
+    last_hit_floors: Vec<SurfaceHit>,
 
     /// A list of all hit wall surfaces.
-    hit_walls: Vec<KatamariHit>,
+    hit_walls: Vec<SurfaceHit>,
 
     /// TODO
     raycast_state: RaycastState,
@@ -315,6 +315,23 @@ pub struct Katamari {
     /// the katamari's diameter. The linear can be different depending on the stage.
     /// offset: 0x19c
     elasticity: f32,
+
+    /// The threshold for the unit normal y coordinate of surfaces that distinguishes
+    /// floors and walls: higher is a floor, lower is a wall.
+    /// offset: 0x1a4
+    surface_threshold_y_normal: f32,
+
+    /// (??) Minimum angle between input and velocity to initiate a brake
+    /// offset: 0x1a8
+    min_brake_angle: f32,
+
+    /// (??)
+    /// offset: 0x1b0
+    min_slope_grade_0x1b0: f32,
+
+    /// (??)
+    /// offset: 0x1b8
+    max_wallclimb_angle: f32,
 
     /// Katamari velocities.
     /// offset: 0x240
@@ -471,19 +488,23 @@ pub struct Katamari {
 
     /// The number of floors contacted by collision rays.
     /// offset: 0x804
-    num_floor_contacts: u16,
+    num_floor_contacts: u8,
 
     /// The number of walls contacted by collision rays.
     /// offset: 0x806
-    num_wall_contacts: u16,
+    num_wall_contacts: u8,
 
     /// The number of floors contacted by collision rays on the previous tick.
     /// offset: 0x808
-    last_num_floor_contacts: u16,
+    last_num_floor_contacts: u8,
 
     /// The number of walls contacted by collision rays on the previous tick.
     /// offset: 0x80a
-    last_num_wall_contacts: u16,
+    last_num_wall_contacts: u8,
+
+    /// (??) A list of ray indices contacting floor points, which probably correlates
+    /// with the list of surfaces.
+    floor_contact_ray_idxs: [i8; 32],
 
     /// When the katamari is underwater, the point on the water surface that's directly
     /// above the katamari center.
@@ -533,6 +554,10 @@ pub struct Katamari {
     /// (??) The lowest y coordinate of all current floor contact points.
     /// offset: 0x8a4
     lowest_floor_contact_y: f32,
+
+    /// The lowest contact point out of all floor contact points.
+    /// offset: 0x8b8
+    lowest_floor_contact_point: Vec3,
 
     /// The katamari's current collision rays.
     /// offset: 0x8d0
@@ -800,7 +825,9 @@ impl Katamari {
         self.mesh_index = 1;
         self.input_push_dir = KatPushDir::Forwards;
 
-        // TODO: `kat_init:36-45`
+        self.min_slope_grade_0x1b0 = self.params.min_slope_grade;
+        self.min_brake_angle = self.params.min_brake_angle;
+        self.max_wallclimb_angle = self.params.max_wallclimb_angle;
 
         self.physics_flags = KatPhysicsFlags::default();
         self.hit_flags = KatHitFlags::default();

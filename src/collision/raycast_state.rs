@@ -144,6 +144,14 @@ impl RaycastState {
         self.hit_dist = vec3::length(&self.ray);
     }
 
+    /// Read the closest hit from the `hit_tris` list.
+    pub fn get_closest_hit(&self) -> Option<&RaycastTriHit> {
+        self.closest_hit_idx
+            .map(|idx| self.hit_tris.get(idx as usize))
+            .flatten()
+    }
+
+    /// Use the unity delegates to find the nearest map hit along the cached ray.
     pub fn find_nearest_unity_hit(
         &mut self,
         call_type: RaycastCallType,
