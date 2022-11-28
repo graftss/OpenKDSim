@@ -2,6 +2,8 @@ pub mod collision;
 mod flags;
 mod params;
 
+use std::{cell::RefCell, rc::Rc};
+
 use gl_matrix::{
     common::{Mat4, Vec3},
     mat4, vec3,
@@ -13,6 +15,7 @@ use crate::{
         FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
+    delegates::Delegates,
     macros::min,
     math::normalize_bounded_angle,
     mission::state::MissionState,
@@ -828,9 +831,16 @@ impl Katamari {
 }
 
 impl Katamari {
-    pub fn init(&mut self, player: u8, init_diam: f32, init_pos: &Vec3) {
+    pub fn init(
+        &mut self,
+        player: u8,
+        delegates: &Rc<RefCell<Delegates>>,
+        init_diam: f32,
+        init_pos: &Vec3,
+    ) {
         // extra stuff not in the original simulation
         self.max_prop_rays = self.params.max_prop_collision_rays;
+        self.raycast_state.set_delegates(delegates);
         // end extra stuff
 
         self.player = player;
@@ -928,7 +938,9 @@ impl Katamari {
         let mission_config = &mission_state.mission_config;
 
         // decrement timers
-        self.wallclimb_cooldown -= 1;
+        if self.wallclimb_cooldown > 0 {
+            self.wallclimb_cooldown -= 1;
+        }
 
         // record the previous values of various fields
         self.last_center = self.center;

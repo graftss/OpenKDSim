@@ -227,13 +227,24 @@ impl Input {
         cross_click: bool,
     ) {
         self.l1_down = l1_down;
-        self.l1_down = l1_held;
+        self.l1_held = l1_held;
         self.l2_down = l2_down;
-        self.l2_down = l2_held;
+        self.l2_held = l2_held;
         self.r1_down = r1_down;
-        self.r1_down = r1_held;
+        self.r1_held = r1_held;
         self.r2_down = r2_down;
-        self.r2_down = r2_held;
+        self.r2_held = r2_held;
         self.cross_click = cross_click;
+    }
+
+    pub fn any_trigger_down(&self) -> bool {
+        self.l1_down
+            || self.l1_held
+            || self.l2_down
+            || self.l2_held
+            || self.r1_down
+            || self.r1_held
+            || self.r2_down
+            || self.r2_held
     }
 }

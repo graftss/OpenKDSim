@@ -1,4 +1,12 @@
-/// Log a formatted strings.
+/// Log a formatted string. Used temporarily while debugging.
+#[allow(unused_macros)]
+macro_rules! temp_debug_log {
+    ($($y: expr),+) => {
+        crate::util::debug_log(&format!($($y),+));
+    }
+}
+
+/// Log a formatted string.
 macro_rules! log {
     ($($y: expr),+) => {
         crate::util::debug_log(&format!($($y),+));
@@ -138,6 +146,7 @@ macro_rules! vec3_minus {
     };
 }
 
+#[allow(unused_imports)]
 pub(crate) use {
     inv_lerp,
     inv_lerp_clamp,
@@ -154,5 +163,6 @@ pub(crate) use {
     read_u16,
     read_u8,
     rescale,
+    temp_debug_log,
     vec3_minus,
 };

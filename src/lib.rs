@@ -481,30 +481,43 @@ pub unsafe extern "C" fn SetStickState(
 #[no_mangle]
 pub unsafe extern "C" fn SetTriggerState(
     player_idx: i32,
-    l1_down: bool,
-    l1_held: bool,
-    l2_down: bool,
-    l2_held: bool,
-    r1_down: bool,
-    r1_held: bool,
-    r2_down: bool,
-    r2_held: bool,
+    l1_down: u8,
+    l1_held: u8,
+    l2_down: u8,
+    l2_held: u8,
+    r1_down: u8,
+    r1_held: u8,
+    r2_down: u8,
+    r2_held: u8,
     cross_click: bool,
 ) {
+    if l1_down + l1_held + l2_down + l2_held + r1_down + r1_held + r2_down + r2_held > 0 {
+        log!(
+            "set trigger state {}, {}, {}, {}, {}, {}, {}, {}",
+            l1_down,
+            l1_held,
+            l2_down,
+            l2_held,
+            r1_down,
+            r1_held,
+            r2_down,
+            r2_held
+        );
+    }
     STATE.with(|state| {
         state
             .borrow_mut()
             .get_mut_player(player_idx as usize)
             .input
             .set_trigger_state(
-                l1_down,
-                l1_held,
-                l2_down,
-                l2_held,
-                r1_down,
-                r1_held,
-                r2_down,
-                r2_held,
+                l1_down != 0,
+                l1_held != 0,
+                l2_down != 0,
+                l2_held != 0,
+                r1_down != 0,
+                r1_held != 0,
+                r2_down != 0,
+                r2_held != 0,
                 cross_click,
             );
     })
@@ -861,6 +874,9 @@ pub unsafe extern "C" fn Tick(delta: f32) {
 #[no_mangle]
 pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission: i32) {
     log!("Init({}, {}, {})", player_idx, override_init_size, mission);
+    std::panic::set_hook(Box::new(|panic_info| {
+        log!("panic: {:?}", panic_info);
+    }));
     STATE.with(|state| {
         state
             .borrow_mut()

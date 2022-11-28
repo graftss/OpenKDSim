@@ -1,5 +1,3 @@
-use crate::macros::log;
-
 use super::{
     config::MissionConfig,
     ending::EndingState,
@@ -73,9 +71,6 @@ impl MissionState {
 
         // initialize the mission and stage configs
         MissionConfig::get(&mut self.mission_config, mission);
-        log!("hi mission");
         StageConfig::get(&mut self.stage_config, stage);
-
-        log!("hi stage");
     }
 }

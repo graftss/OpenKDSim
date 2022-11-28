@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 pub type MonoGenerateDelegate = extern "C" fn(ctrl_idx: i32, name_idx: i32) -> ();
 pub type MotionEndDelegate = extern "C" fn(player: i32) -> ();
 pub type MessageRequestDelegate = extern "C" fn(ctrl_idx: i32) -> ();
@@ -70,6 +72,8 @@ pub struct Delegates {
     pub set_camera: Option<SetCameraDelegate>,
     pub vs_volume_diff: Option<VsVolumeDiffDelegate>,
 }
+
+pub type DelegatesRef = Rc<RefCell<Delegates>>;
 
 impl core::fmt::Debug for Delegates {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

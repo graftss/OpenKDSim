@@ -1,4 +1,5 @@
 use crate::{
+    delegates::DelegatesRef,
     gamestate::GameState,
     mission::{config::MissionConfig, stage::StageConfig},
 };
@@ -23,7 +24,13 @@ pub struct Player {
 
 /// Initialization
 impl Player {
-    pub fn init(&mut self, player: u8, mission: &MissionConfig, override_init_size: f32) {
+    pub fn init(
+        &mut self,
+        player: u8,
+        delegates: &DelegatesRef,
+        mission: &MissionConfig,
+        override_init_size: f32,
+    ) {
         // first initialize the katamari
         let init_pos = &mission.init_kat_pos[player as usize];
         let init_diam = if override_init_size < 0.0 {
@@ -32,7 +39,7 @@ impl Player {
             override_init_size
         };
 
-        self.katamari.init(player, init_diam, init_pos);
+        self.katamari.init(player, delegates, init_diam, init_pos);
 
         // then initialize the prince
         let init_angle = mission.init_prince_angle[player as usize];
@@ -94,11 +101,10 @@ impl GameState {
             player.prince.update_transform(&player.katamari);
             // TODO: self.princes[player].update_animation(); (although animations might want to be their own struct)
 
-            let stage_config = &mission_state.stage_config;
             player.update_royal_warp(
                 self.global.royal_warp_plane_y,
                 mission_state.area,
-                stage_config,
+                &mission_state.stage_config,
             );
         }
     }

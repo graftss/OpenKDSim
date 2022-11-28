@@ -7,7 +7,7 @@ use gl_matrix::{
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log},
+    macros::{inv_lerp, inv_lerp_clamp, log, max, min, panic_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
@@ -405,6 +405,11 @@ pub struct Prince {
     /// The remaining ticks before the gacha count resets.
     /// offset: 0x478
     gacha_window_timer: u16,
+
+    /// True if a gacha has been performed since the last spin.
+    /// (Reset to false after every spin)
+    /// offset: 0x47a
+    did_gacha_since_last_spin: bool,
 
     /// The number of gachas counted without the gacha timer expiring.
     /// offset: 0x47c
@@ -819,8 +824,8 @@ impl Prince {
             // if the gacha timer has expired:
 
             // TODO_VS: `prince_update_gachas:275-316` (vs mode crap)
-            // TODO: `prince_update_gachas:318-334` (i don't get what this does)
-
+            // TODO: `prince_update_gachas:318-329` (update `did_gacha_since_last_spin`, probably a no-op)
+            self.gacha_count = 0;
             self.oujistate.dash = false;
             self.oujistate.wheel_spin = false;
         }
@@ -1247,14 +1252,19 @@ impl Player {
 
         if prince.view_mode == PrinceViewMode::Normal {
             prince.update_gachas(katamari, camera, mission_state);
+            log!(
+                "gachas={}, timer={}, duration={}",
+                prince.gacha_count,
+                prince.gacha_window_timer,
+                prince.gacha_window_duration
+            );
             let angle_tut_move = prince.update_angle(katamari);
 
             if let Some(tut_move) = angle_tut_move {
                 mission_state
                     .tutorial
                     .as_mut()
-                    .unwrap()
-                    .set_move_held(tut_move);
+                    .map(|tut| tut.set_move_held(tut_move));
             }
         }
 

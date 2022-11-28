@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     delegates::Delegates,
     global::GlobalState,
-    macros::{log, panic_log},
+    macros::panic_log,
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
@@ -269,7 +269,12 @@ impl GameState {
             .compute_destroy_invis_diam_ratio(&mission_config);
 
         // initialize the player (katamari, prince, camera)
-        self.players[player_idx].init(player_idx as u8, &mission_config, override_init_size);
+        self.players[player_idx].init(
+            player_idx as u8,
+            &self.delegates,
+            &mission_config,
+            override_init_size,
+        );
 
         self.global.map_loop_rate = 0.0;
 
