@@ -16,6 +16,7 @@ mod player;
 mod props;
 mod util;
 
+use collision::raycast_state::{RaycastCallType, RaycastState};
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
@@ -68,6 +69,17 @@ where
         let mut p = prop.as_ref().borrow_mut();
         cb(&mut p)
     })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn OpenSimTest() {
+    STATE.with(|state| {
+        let mut raycast_state = RaycastState::default();
+        let del = state.borrow().delegates.clone();
+        raycast_state.set_delegates(&del);
+        log!("hellooooo before finding hit");
+        raycast_state.find_nearest_unity_hit(RaycastCallType::Objects, true);
+    });
 }
 
 #[no_mangle]
@@ -240,105 +252,105 @@ pub unsafe extern "C" fn SetKatamariTranslation(player_idx: i32, x: f32, y: f32,
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackMonoGenerate(cb: MonoGenerateDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.mono_generate = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().mono_generate = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackMotionEnd(cb: MotionEndDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.motion_end = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().motion_end = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackMessageRequest(cb: MessageRequestDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.message_request = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().message_request = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackDoHit(cb: DoHitDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.do_hit = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().do_hit = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackGetHitCount(cb: GetHitCountDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.get_hit_count = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().get_hit_count = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackGetImpactPoint(cb: GetImpactPointDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.get_impact_point = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().get_impact_point = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackGetImpactNormal(cb: GetImpactNormalDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.get_impact_normal = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().get_impact_normal = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackGetHitAttribute(cb: GetHitAttributeDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.get_hit_attribute = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().get_hit_attribute = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackPlaySoundFX(cb: PlaySoundFxDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.play_sound_fx = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().play_sound_fx = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackPlayVisualFX(cb: PlayVisualFxDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.play_visual_fx = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().play_visual_fx = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackVibration(cb: VibrationDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.vibration = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().vibration = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackPlayAnimation(cb: PlayAnimationDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.play_animation = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().play_animation = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackLogPropCollected(cb: LogPropCollectedDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.log_prop_collected = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().log_prop_collected = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackSetCamera(cb: SetCameraDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.set_camera = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().set_camera = Some(cb);
     })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackVsVolumeDiff(cb: VsVolumeDiffDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.vs_volume_diff = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().vs_volume_diff = Some(cb);
     })
 }
 

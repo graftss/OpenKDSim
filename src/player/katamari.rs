@@ -1,4 +1,4 @@
-mod collision;
+pub mod collision;
 mod flags;
 mod params;
 

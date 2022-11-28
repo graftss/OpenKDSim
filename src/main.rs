@@ -136,6 +136,11 @@ unsafe fn test() {
 fn main() {
     println!("start");
 
+    // let delegate: fn(a: f32, b: f32) -> i32 = |a, b| 331;
+
+    // let rc_delegate = Rc::new(delegate);
+    // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
+
     unsafe {
         test();
     }

@@ -10,6 +10,14 @@ pub fn vec3_inplace_scale(vec: &mut Vec3, scale: f32) {
     vec[2] *= scale;
 }
 
+/// Subtract `<dx, dy, dz>` from `vec` in-place.
+#[inline]
+pub fn vec3_inplace_subtract(vec: &mut Vec3, dx: f32, dy: f32, dz: f32) {
+    vec[0] -= dx;
+    vec[1] -= dy;
+    vec[2] -= dz;
+}
+
 /// Zero out components of `vec` with small magnitude (less than `eps`), in-place.
 #[inline]
 pub fn vec3_inplace_zero_small(vec: &mut Vec3, eps: f32) {
@@ -30,14 +38,13 @@ pub fn vec3_inplace_normalize(vec: &mut Vec3) {
     let z = vec[2];
 
     let mut len = x * x + y * y + z * z;
-    if len > 0_f32 {
-        //TODO: evaluate use of glm_invsqrt here?
+    if len > 1e-8 {
         len = 1_f32 / f32::sqrt(len);
     }
 
-    vec[0] = vec[0] * len;
-    vec[1] = vec[1] * len;
-    vec[2] = vec[2] * len;
+    vec[0] *= len;
+    vec[1] *= len;
+    vec[2] *= len;
 }
 
 /// Normalize a bounded angle in [-2pi, 2pi] to [-pi, pi].

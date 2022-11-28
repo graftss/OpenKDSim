@@ -1,6 +1,9 @@
 use gl_matrix::vec3;
 
-use crate::mission::{state::MissionState, GameMode};
+use crate::{
+    math::vec3_inplace_subtract,
+    mission::{state::MissionState, GameMode},
+};
 
 use self::ray::KatCollisionRayType;
 
@@ -76,5 +79,16 @@ impl Katamari {
         {
             self.fc_ray_len = self.radius_cm;
         }
+    }
+
+    fn update_surface_contacts(&mut self) {
+        // TODO_VS: `kat_update_surface_contacts:59` (check to not run this in vs mode)
+
+        // Prepare the ray starting from katamari center and cast straight down.
+        let dist_down = self.radius_cm * 3.0;
+        let center = self.center.clone();
+        let mut below = center.clone();
+        vec3_inplace_subtract(&mut below, 0.0, -dist_down, 0.0);
+        self.raycast_state.load_ray(&center, &below);
     }
 }

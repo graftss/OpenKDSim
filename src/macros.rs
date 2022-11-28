@@ -131,6 +131,13 @@ macro_rules! rescale {
     };
 }
 
+/// Create a new `Vec3` obtained from the vector subtraction `a - b`.
+macro_rules! vec3_minus {
+    ($a: expr, $b: expr) => {
+        [$a[0] - $b[0], $a[1] - $b[1], $a[2] - $b[2]]
+    };
+}
+
 pub(crate) use {
     inv_lerp,
     inv_lerp_clamp,
@@ -147,4 +154,5 @@ pub(crate) use {
     read_u16,
     read_u8,
     rescale,
+    vec3_minus,
 };

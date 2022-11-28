@@ -29,7 +29,7 @@ pub struct GameState {
     pub mission_state: MissionState,
 
     /// Delegates which call back into unity code.
-    pub delegates: Delegates,
+    pub delegates: Rc<RefCell<Delegates>>,
 
     /// Constant, geometric data relating to props that's passed to the
     /// simulation from unity (e.g. prop collision meshes, prop random
