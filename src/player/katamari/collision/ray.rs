@@ -34,7 +34,6 @@ pub enum KatCollisionRayType {
     Bottom = 0,
     Mesh = 1,
     Prop = 2,
-    Vec3,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -65,7 +64,7 @@ pub struct KatCollisionRay {
 
     /// Length of the ray.
     /// offset: 0x58
-    pub length: f32,
+    pub ray_len: f32,
 
     /// True if this ray contacts a surface
     /// offset: 0x5d
@@ -80,7 +79,7 @@ impl KatCollisionRay {
         vec3::copy(&mut self.kat_to_endpoint, &VEC3_ZERO);
         vec3::copy(&mut self.ray_local_unit, &VEC3_ZERO);
         vec3::copy(&mut self.prop_ray_local_unit, &VEC3_ZERO);
-        self.length = rad_cm;
+        self.ray_len = rad_cm;
         self.prop = None;
         self.contacts_surface = false;
     }
@@ -127,7 +126,7 @@ impl Katamari {
         } else {
             // if spinning, set the length of each ray to the katamari's radius
             for ray in self.collision_rays.iter_mut() {
-                ray.length = self.radius_cm;
+                ray.ray_len = self.radius_cm;
                 ray.prop = None;
             }
             // TODO: `kat_set_bottom_ray_contact()`.
@@ -159,7 +158,7 @@ impl Katamari {
             // else if the katamari is climbing a wall:
             // TODO: `kat_orient_mesh_rays:125-147`
         }
-        bottom_ray.length = radius;
+        bottom_ray.ray_len = radius;
         vec3_inplace_zero_small(&mut bottom_ray.endpoint, 0.0001);
         vec3::subtract(
             &mut bottom_ray.kat_to_endpoint,
@@ -179,7 +178,7 @@ impl Katamari {
             let mesh_ray = &mut self.collision_rays[i];
             vec3::transform_mat4(&mut mesh_ray.ray_local, mesh_point, &rotation_mat);
             vec3::normalize(&mut mesh_ray.ray_local_unit, &mesh_ray.ray_local);
-            mesh_ray.length = radius;
+            mesh_ray.ray_len = radius;
             self.num_mesh_rays += 1;
         }
 

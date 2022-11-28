@@ -474,8 +474,16 @@ pub struct Katamari {
     contact_floor_normal_unit: Vec3,
 
     /// The unit normal of the active contact wall, if one exists.
-    /// offset: 0x78c
-    u_contact_wall_normal: Vec3,
+    /// offset: 0x79c
+    contact_wall_normal_unit: Vec3,
+
+    /// (??)
+    /// offset: 0x7ac
+    contact_floor_clip: Vec3,
+
+    /// (??)
+    /// offset: 0x7bc
+    contact_wall_clip: Vec3,
 
     /// (??) The length of the primary collision ray contacting the floor.
     /// offset: 0x7fc
@@ -559,6 +567,10 @@ pub struct Katamari {
     /// offset: 0x8b8
     lowest_floor_contact_point: Vec3,
 
+    /// (??)
+    /// offset: 0x8c8
+    climb_radius_cm: f32,
+
     /// The katamari's current collision rays.
     /// offset: 0x8d0
     collision_rays: KatCollisionRays,
@@ -584,10 +596,10 @@ pub struct Katamari {
 
     /// (??) The vector from the katamari center to the primary floor contact.
     /// offset: 0x3954
-    fc_contact_ray: Vec3,
+    fc_ray: Option<Vec3>,
 
     /// (??) The contact point of the primary floor contact.
-    fc_contact_point: Vec3,
+    fc_contact_point: Option<Vec3>,
 
     /// (??) The current vault contact point.
     /// offset: 0x3974

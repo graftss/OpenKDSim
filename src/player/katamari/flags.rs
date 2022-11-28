@@ -1,3 +1,5 @@
+use crate::collision::hit_attribute::HitAttribute;
+
 use super::collision::ray::{KatCollisionRayType, ShellRay};
 
 /// The direction the katamari is moving relative to the slope of
@@ -210,4 +212,58 @@ pub struct KatHitFlags {
     /// (??) True when contacting a "MapSemiTranslucent" surface.
     /// offset: 0xa
     pub map_semi_translucent: bool,
+}
+
+impl KatHitFlags {
+    /// Set all flags to false.
+    pub fn clear(&mut self) {
+        self.force_flatground = false;
+        self.wall_climb_free = false;
+        self.small_ledge_climb = false;
+        self.speed_check_off = false;
+        self.flag_0x4 = false;
+        self.flag_0x5 = false;
+        self.special_camera = false;
+        self.no_reaction_no_slope = false;
+        self.on_turntable = false;
+        self.wall_climb_disabled = false;
+        self.map_semi_translucent = false;
+    }
+
+    /// Turn on flags applicable to the given hit attribute `attr`.
+    /// offset: 0x16d10
+    pub fn apply_hit_attr(&mut self, attr: HitAttribute) {
+        match attr {
+            HitAttribute::BottomOfSea => {
+                self.force_flatground = true;
+            }
+            HitAttribute::NoReactionNoSlope => {
+                self.no_reaction_no_slope = true;
+                self.force_flatground = true;
+            }
+            HitAttribute::WallClimbFree => {
+                self.wall_climb_free = true;
+            }
+            HitAttribute::WallClimbDisabled => {
+                self.wall_climb_disabled = true;
+            }
+            HitAttribute::Turntable => {
+                self.on_turntable = true;
+            }
+            HitAttribute::SmallLedgeClimb0x8 => {
+                self.wall_climb_free = true;
+                self.small_ledge_climb = true;
+            }
+            HitAttribute::SpeedCheckOff => {
+                self.speed_check_off = true;
+            }
+            HitAttribute::MapSemiTranslucent => {
+                self.map_semi_translucent = true;
+            }
+            HitAttribute::SpecialCamera => {
+                self.special_camera = true;
+            }
+            _ => (),
+        }
+    }
 }

@@ -38,6 +38,12 @@ pub struct KatamariParams {
     /// offset: 0x7153c
     pub clip_len_constant: f32,
 
+    /// The threshold on the y component of a floor normal that distinguishes
+    /// flat floors (over this value) to sloped floors (under this value).
+    /// (Note that a y component of 1 would be a completely flat floor)
+    /// offset: 0x71608
+    pub sloped_floor_y_normal_threshold: f32,
+
     /// (??) If two surfaces have normal vectors which dot to above this value, they're not distinguished
     /// by the collision system while the katamari contacts both of them.
     /// offset: 0x7160c
@@ -57,6 +63,7 @@ impl Default for KatamariParams {
             max_wallclimb_angle: (f32::from_bits(0x3ecccccd) * FRAC_PI_2).cos(),
             clip_len_constant: f32::from_bits(0x3a03126f),
             surface_similarity_threshold: f32::from_bits(0x3f7ffeb0),
+            sloped_floor_y_normal_threshold: f32::from_bits(0x3f7ff972),
         }
     }
 }

@@ -75,7 +75,7 @@ impl Katamari {
         } else {
             // TODO: `kat_update_water_contact()`
             self.update_surface_contacts();
-            // TODO: `kat_apply_surface_contacts()`
+            self.process_surface_contacts();
             // TODO: `kat_update_contact_history_and_stuckness()`
             // TODO: `kat_update_vault_and_climb()
 
@@ -328,6 +328,125 @@ impl Katamari {
 
         if !found_old {
             self.inc_num_surface_contacts(surface_type);
+        }
+    }
+
+    fn process_surface_contacts(&mut self) {
+        self.physics_flags.on_flat_floor = false;
+        self.physics_flags.on_sloped_floor = false;
+        self.hit_flags.clear();
+
+        if self.has_map_semi_translucent_hit {
+            // propagate a `MapSemiTranslucent` hit to the hit flags.
+            self.hit_flags.map_semi_translucent = true;
+            self.hit_flags.special_camera = true;
+        }
+
+        // data about the collision ray that's nearest to contacting a floor.
+        let mut fc_ray_idx = None;
+        let mut fc_ray = None;
+        let mut fc_contact_point = None;
+
+        // process contact floors
+        if self.num_floor_contacts == 0 {
+            // if not contacting a floor:
+            vec3::zero(&mut self.contact_floor_normal_unit);
+            vec3::zero(&mut self.contact_floor_clip);
+        } else {
+            // if contacting at least one floor:
+
+            let mut max_ray_len = 0.0;
+            let mut sum_normal_unit = vec3::create();
+            let mut sum_clip_normal = vec3::create();
+            let mut min_ratio = 2.0; // can be anything bigger than 1.0
+
+            for floor in self.hit_floors.iter() {
+                // for each contacted floor:
+
+                // record that we're contacting either a sloped or flat floor
+                // based on the floor's y normal
+                if floor.normal_unit[1] <= self.params.sloped_floor_y_normal_threshold {
+                    self.physics_flags.on_sloped_floor = true;
+                } else {
+                    self.physics_flags.on_flat_floor = true;
+                }
+
+                // maintain running sum of all floor unit normals and clip normals
+                vec3_inplace_add_vec(&mut sum_normal_unit, &floor.normal_unit);
+                vec3_inplace_add_vec(&mut sum_clip_normal, &floor.clip_normal);
+
+                // maintain the max contact floor ray length
+                if floor.ray_len > max_ray_len {
+                    max_ray_len = floor.ray_len;
+                }
+
+                // maintain a bunch of data about the contact floor with the minimum
+                // impact distance ratio
+                if floor.impact_dist_ratio < min_ratio {
+                    min_ratio = floor.impact_dist_ratio;
+                    fc_contact_point = Some(&floor.contact_point);
+                    fc_ray = Some(&floor.ray);
+                    fc_ray_idx = Some(floor.ray_idx);
+                }
+
+                // turn on hit flags based on the contact floor's hit attribute
+                self.hit_flags.apply_hit_attr(floor.hit_attr);
+            }
+
+            self.fc_ray_idx = fc_ray_idx;
+            // TODO: `kat_compute_minmax_floor_clip_normal()`
+            // TODO: `kat_apply_surface_contacts:119-125` (verify what this is doing with cheat engine)
+        }
+
+        // process contact walls
+        if self.num_wall_contacts == 0 {
+            // if not contacting a wall:
+            self.climb_radius_cm = self.radius_cm;
+            vec3::zero(&mut self.contact_wall_normal_unit);
+            vec3::zero(&mut self.contact_wall_clip);
+        } else {
+            // else if contacting at least one wall:
+
+            let mut max_ray_len = 0.0;
+
+            for wall in self.hit_walls.iter() {
+                // TODO: `kat_apply_surface_contacts:145-152` (verify in cheat engine)
+                if wall.ray_len > max_ray_len {
+                    max_ray_len = wall.ray_len;
+                }
+
+                self.hit_flags.apply_hit_attr(wall.hit_attr);
+            }
+
+            // TODO: `kat_apply_surface_contacts:163-169` (verify in cheat engine)
+            // TODO: `kat_compute_minmax_wall_clip_normal`
+            self.climb_radius_cm = max_ray_len;
+        }
+
+        if fc_ray_idx.is_none()
+            || self.physics_flags.vault_ray_type == Some(KatCollisionRayType::Bottom)
+        {
+            // if the primary floor contact point is the bottom ray
+            self.fc_ray_idx = None;
+            self.fc_ray = None;
+            self.fc_contact_point = None;
+            // TODO: is this right
+            self.fc_ray_len = self.collision_rays[0].ray_len;
+        } else if fc_ray_idx == self.vault_ray_idx {
+            self.fc_ray_idx = self.vault_ray_idx;
+        } else {
+            self.fc_ray_idx = fc_ray_idx;
+            self.fc_ray_len = self.collision_rays[fc_ray_idx.unwrap() as usize].ray_len;
+            self.fc_ray = fc_ray.map(|v| v.clone());
+
+            let mut contact_pt = vec3::create();
+            vec3::scale_and_add(
+                &mut contact_pt,
+                &fc_contact_point.unwrap(),
+                &fc_ray.unwrap(),
+                0.005,
+            );
+            self.fc_contact_point = Some(contact_pt);
         }
     }
 }
