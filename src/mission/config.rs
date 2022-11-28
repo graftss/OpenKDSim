@@ -12,7 +12,7 @@ use crate::{
     util::vec3_from_le_bytes,
 };
 
-use super::Mission;
+use super::{stage::Stage, Mission};
 
 static MC_0X60_TABLE: &'static [u8] = include_bytes!("bin/mission_config_0x60_table.bin");
 
@@ -21,7 +21,7 @@ static MC_0X60_TABLE: &'static [u8] = include_bytes!("bin/mission_config_0x60_ta
 /// This piecewise function is encoded as a sequence of control points, each
 /// determining a certain volume penalty at a certain katamari diameter.
 /// offset: 0x5fa20
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct VolPenaltyCtrlPt {
     /// The katamari diameter at which this penalty applies.
     /// offset: 0x0
@@ -91,13 +91,17 @@ lazy_static! {
 }
 
 /// Constant, mission-specific data.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct MissionConfig {
     pub vol_penalty_ctrl_pts: Option<Vec<VolPenaltyCtrlPt>>,
 
     // mission config 0x60 table
     // offset: 0x5f7a0
     // size: 0x60
+    /// The stage (i.e. the map) in which the mission takes place.
+    /// offset: 0x0
+    pub stage: Stage,
+
     /// If true, props can be smaller without being destroyed at alpha 0.
     /// offset: 0x2
     pub keep_smaller_props_alive: bool,
@@ -125,7 +129,7 @@ pub struct MissionConfig {
     /// A list of name indices corresponding to the "theme objects" of the
     /// mission, if the mission is the `NumThemeProps` gametype.
     /// offset: 0x48
-    pub theme_prop_names: Option<Box<Vec<u16>>>,
+    pub theme_prop_names: Option<Vec<u16>>,
 
     /// The number of props to clear the mission in the `ClearNumProps` game type.
     /// offset: 0x58
@@ -133,6 +137,10 @@ pub struct MissionConfig {
 }
 
 impl MissionConfig {
+    pub fn get(out: &mut MissionConfig, mission_idx: u8) {
+        out.clone_from(MISSION_CONFIGS.get(mission_idx as usize).unwrap());
+    }
+
     /// Compute the mission's volume penalty for a katamari of diameter `diam_cm`.
     /// offset: 0x1bd50 (lines 349-375)
     pub fn get_vol_penalty(&self, diam_cm: f32) -> f32 {
@@ -179,6 +187,7 @@ fn read_mission_config_0x60_table(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     for (mission_idx, config) in configs.iter_mut().enumerate() {
         let base = mission_idx * WIDTH;
 
+        config.stage = read_u8!(table, base).into();
         config.keep_smaller_props_alive = read_bool!(table, base + 0x2);
 
         for (i, init_pos) in config.init_kat_pos.iter_mut().enumerate() {

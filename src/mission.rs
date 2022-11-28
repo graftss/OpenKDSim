@@ -42,6 +42,12 @@ pub enum GameType {
     Eternal = 8,
 }
 
+impl Default for GameType {
+    fn default() -> Self {
+        Self::ClearSize
+    }
+}
+
 impl From<u8> for GameType {
     fn from(value: u8) -> Self {
         match value {

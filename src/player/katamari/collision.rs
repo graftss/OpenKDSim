@@ -71,7 +71,7 @@ impl Katamari {
         // TODO: `kat_initial_process_props()`
 
         if mission_state.gamemode == GameMode::Ending {
-            // TODO: `kat_update_collision:105-132
+            // TODO: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
             // TODO: `kat_update_water_contact()`
             self.update_surface_contacts();

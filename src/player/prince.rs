@@ -1232,7 +1232,7 @@ impl Player {
         let katamari = &mut self.katamari;
         let input = &mut self.input;
         let camera = &mut self.camera;
-        let stage_config = mission_state.stage_config.as_ref().unwrap();
+        let stage_config = &mission_state.stage_config;
 
         prince.last_oujistate = prince.oujistate;
 

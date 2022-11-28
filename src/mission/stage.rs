@@ -1,14 +1,15 @@
-use crate::macros::{panic_log, rescale};
+use crate::macros::{log, panic_log, rescale};
 
 /// A stage is a map (notably: House, Town, World).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Stage {
-    House = 1,
-    Town = 2,
-    World = 3,
-    Ending = 9,
-    VsMode = 10,
-    Tutorial = 12,
+    House,
+    Town,
+    World,
+    Ending,
+    VsMode,
+    Tutorial,
+    Unknown(u8),
 }
 
 impl Default for Stage {
@@ -26,6 +27,7 @@ impl Into<u8> for Stage {
             Stage::Ending => 9,
             Stage::VsMode => 10,
             Stage::Tutorial => 12,
+            Self::Unknown(x) => x,
         }
     }
 }
@@ -40,7 +42,8 @@ impl From<u8> for Stage {
             10 => Self::VsMode,
             12 => Self::Tutorial,
             _ => {
-                panic_log!("encountered unknown `Stage` value: {}", value);
+                log!("encountered unknown `Stage` value: {}", value);
+                Self::Unknown(value)
             }
         }
     }
@@ -58,7 +61,7 @@ static SC_ELASTICITY_TABLE: &'static [u8] = include_bytes!("bin/stage_config_ela
 /// Flip duration is computed by lerping the katamari's diameter between
 /// stage-specific minimum and maximum diameters.
 /// offset: 0x60300
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct StageFlipParams {
     /// The minimum flip duration, which occurs when the katamari has diameter
     /// at most `min_diam_cm`.
@@ -159,7 +162,7 @@ pub struct StageRoyalWarps {
 /// for each stage.
 /// This is one of the tricks they use to make the katamari seem "weighty"
 /// when you're big in Town and especially in World.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct StageKatElasticity {
     /// The minimum diameter where the increasing elasticity scaling starts.
     /// offset: 0x0
@@ -193,8 +196,9 @@ impl StageKatElasticity {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct StageConfig {
+    stage_idx: u8,
     flip_params: Option<StageFlipParams>,
     royal_warps: Option<&'static StageRoyalWarps>,
     elasticity: Option<StageKatElasticity>,
@@ -228,15 +232,15 @@ impl StageConfig {
         self.elasticity
             .as_ref()
             .unwrap_or_else(|| {
-                panic_log!("error reading stage elasticity");
+                panic_log!("error reading stage elasticity: {}", self.stage_idx);
             })
             .get_kat_elasticity(diam_cm)
     }
 }
 
 impl StageConfig {
-    pub fn get(stage: Stage) -> &'static StageConfig {
-        &STAGE_CONFIGS[stage as usize]
+    pub fn get(out: &mut StageConfig, stage_idx: u8) {
+        out.clone_from(STAGE_CONFIGS.get(stage_idx as usize).unwrap());
     }
 
     /// Initialize the stage config table from static data.
@@ -244,6 +248,10 @@ impl StageConfig {
         Self::read_flip_params(configs);
         Self::read_royal_warps(configs);
         Self::read_elasticity(configs);
+
+        for (stage_idx, config) in configs.iter_mut().enumerate() {
+            config.stage_idx = stage_idx as u8;
+        }
     }
 
     /// Read the flip params file into the stage config table.
@@ -268,13 +276,20 @@ impl StageConfig {
     }
 
     fn read_elasticity(configs: &mut StageConfigTable) {
-        for (stage_idx, config) in configs.iter_mut().enumerate() {
-            let base = stage_idx * StageKatElasticity::WIDTH;
-            config.elasticity = Some(StageKatElasticity {
-                min_diam_cm: read_f32!(SC_ELASTICITY_TABLE, base + 0x0),
-                max_diam_cm: read_f32!(SC_ELASTICITY_TABLE, base + 0x4),
-                min_diam_elasticity: read_f32!(SC_ELASTICITY_TABLE, base + 0x8),
-                max_diam_elasticity: read_f32!(SC_ELASTICITY_TABLE, base + 0xc),
+        println!(
+            "max elt = {}",
+            SC_ELASTICITY_TABLE.len() / StageKatElasticity::WIDTH
+        );
+        for (stage_idx, chunk) in SC_ELASTICITY_TABLE
+            .chunks(StageKatElasticity::WIDTH)
+            .enumerate()
+        {
+            println!("{:?}", chunk);
+            configs[stage_idx].elasticity = Some(StageKatElasticity {
+                min_diam_cm: read_f32!(chunk, 0x0),
+                max_diam_cm: read_f32!(chunk, 0x4),
+                min_diam_elasticity: read_f32!(chunk, 0x8),
+                max_diam_elasticity: read_f32!(chunk, 0xc),
             });
         }
     }

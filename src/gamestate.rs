@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     delegates::Delegates,
     global::GlobalState,
-    macros::panic_log,
+    macros::{log, panic_log},
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
@@ -47,8 +47,8 @@ impl GameState {
     }
 
     /// The `MissionConfig` for the current mission.
-    pub fn get_mission_config(&self) -> Option<&MissionConfig> {
-        self.mission_state.mission_config.as_ref()
+    pub fn get_mission_config(&self) -> &MissionConfig {
+        &self.mission_state.mission_config
     }
 
     /// Mimicks the `SetGameTime` API function.
@@ -134,7 +134,7 @@ impl GameState {
         let player = self.get_player(player_idx);
         let kat = &player.katamari;
         let mission = &self.mission_state;
-        let mission_config = mission.mission_config.as_ref().unwrap();
+        let mission_config = &mission.mission_config;
 
         let init_rad = kat.get_init_radius();
         let curr_rad = kat.get_radius();
@@ -243,11 +243,11 @@ impl GameState {
     }
 
     /// Mimicks the `Init` API function.
-    pub fn init(&mut self, player_idx: usize, override_init_size: f32, mission: u8) {
+    pub fn init(&mut self, player_idx: usize, override_init_size: f32, mission_idx: u8) {
         let mission_state = &mut self.mission_state;
-        let mission_config = mission_state.mission_config.as_ref().unwrap();
+        let mission_config = &mission_state.mission_config;
 
-        mission_state.mission = mission.into();
+        mission_state.mission = mission_idx.into();
         mission_state.vs_mission_idx = mission_state.mission.vs_mission_idx();
         mission_state.is_vs_mode = mission_state.vs_mission_idx.is_some();
 
@@ -266,10 +266,10 @@ impl GameState {
         self.global.invis_prop_diam_ratio_to_destroy = self
             .props
             .params
-            .compute_destroy_invis_diam_ratio(mission_config);
+            .compute_destroy_invis_diam_ratio(&mission_config);
 
         // initialize the player (katamari, prince, camera)
-        self.players[player_idx].init(player_idx as u8, mission_config, override_init_size);
+        self.players[player_idx].init(player_idx as u8, &mission_config, override_init_size);
 
         self.global.map_loop_rate = 0.0;
 

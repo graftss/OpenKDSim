@@ -131,6 +131,10 @@ unsafe fn test() {
         // println!("{:#?}", x);
         // println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
     });
+
+    let mut s = mission::stage::StageConfig::default();
+    mission::stage::StageConfig::get(&mut s, 1);
+    println!("{:#?}", s);
 }
 
 fn main() {

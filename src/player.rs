@@ -94,7 +94,7 @@ impl GameState {
             player.prince.update_transform(&player.katamari);
             // TODO: self.princes[player].update_animation(); (although animations might want to be their own struct)
 
-            let stage_config = mission_state.stage_config.as_ref().unwrap();
+            let stage_config = &mission_state.stage_config;
             player.update_royal_warp(
                 self.global.royal_warp_plane_y,
                 mission_state.area,

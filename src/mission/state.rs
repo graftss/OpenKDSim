@@ -1,3 +1,5 @@
+use crate::macros::log;
+
 use super::{
     config::MissionConfig,
     ending::EndingState,
@@ -10,10 +12,10 @@ use super::{
 #[derive(Debug, Default)]
 pub struct MissionState {
     /// Mission-specific immutable (presumably) values.
-    pub mission_config: Option<MissionConfig>,
+    pub mission_config: MissionConfig,
 
     /// Stage-specific immutable (presumably) values.
-    pub stage_config: Option<StageConfig>,
+    pub stage_config: StageConfig,
 
     /// Ending-specific state.
     pub ending: Option<EndingState>,
@@ -68,5 +70,12 @@ impl MissionState {
         self.mission = mission.into();
         self.stage = stage.into();
         self.area = area;
+
+        // initialize the mission and stage configs
+        MissionConfig::get(&mut self.mission_config, mission);
+        log!("hi mission");
+        StageConfig::get(&mut self.stage_config, stage);
+
+        log!("hi stage");
     }
 }
