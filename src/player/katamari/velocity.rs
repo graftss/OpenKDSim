@@ -1,12 +1,23 @@
-use gl_matrix::{common::Vec3, vec3};
+use gl_matrix::{
+    common::{Mat4, Vec3},
+    mat4, vec3,
+};
 
 use crate::{
-    math::{vec3_inplace_add_vec, vec3_inplace_zero_small},
+    constants::{FRAC_PI_2, PI, TAU},
+    macros::{max, set_y},
+    math::{
+        normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize,
+        vec3_inplace_zero_small,
+    },
     mission::{stage::Stage, state::MissionState},
     player::prince::Prince,
 };
 
 use super::{collision::ray::KatCollisionRayType, flags::KatInclineMoveType, Katamari};
+
+/// 0.9998
+const ALMOST_1: f32 = f32::from_bits(0x3f7ff2e5);
 
 /// Katamari velocity and acceleration values.
 #[derive(Debug, Default, Copy, Clone)]
@@ -101,7 +112,7 @@ impl Katamari {
             &self.velocity.vel_accel_grav,
         );
 
-        let mut next_vel = &self.velocity.vel_accel;
+        let mut next_vel = self.velocity.vel_accel;
 
         if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom) {
             // if grounded via the "bottom" ray, meaning the katamari isn't vaulting:
@@ -122,13 +133,13 @@ impl Katamari {
             }
 
             if self.physics_flags.airborne {
-                next_vel = &self.velocity.vel_accel_grav;
+                next_vel = self.velocity.vel_accel_grav;
             }
 
             self.speed = vec3::length(&next_vel);
 
             self.cache_sizes();
-            // TODO: `kat_update_rotation_speed(&next_vel)`
+            self.update_rotation_speed(&next_vel);
             self.update_transform_unvaulted();
         } else {
             self.cache_sizes();
@@ -148,5 +159,67 @@ impl Katamari {
         }
     }
 
-    fn update_rotation_speed(&mut self, vel: &Vec3) {}
+    fn update_rotation_speed(&mut self, vel: &Vec3) {
+        if self.physics_flags.braking {
+            return self.spin_rotation_speed = 0.0;
+        }
+
+        let vel_len = vec3::len(vel);
+        let pivot_circumf = max!(self.fc_ray_len, 0.1) * TAU;
+
+        if !self.physics_flags.airborne {
+            let mut net_normal_unit = [0.0, 0.0, 0.0];
+
+            if !self.physics_flags.climbing_wall {
+                // if not airborne and not climbing a wall:
+                vec3::add(
+                    &mut net_normal_unit,
+                    &self.contact_floor_normal_unit,
+                    &self.contact_wall_normal_unit,
+                );
+                vec3_inplace_normalize(&mut net_normal_unit);
+                // TODO: `kat_update_rotation_speed:76-87` (this seems like it's just a no-op)
+            } else {
+                // if not airborne and climbing a wall, set net normal to `<0,1,0>`
+                set_y!(net_normal_unit, 1.0);
+            }
+
+            let mut net_normal_rot = Mat4::default();
+            mat4::from_rotation(&mut net_normal_rot, FRAC_PI_2, &net_normal_unit);
+
+            let mut vel_unit = Vec3::default();
+            if !self.physics_flags.immobile {
+                // if the katamari is not airborne and moving:
+                vec3::normalize(&mut vel_unit, &vel);
+            } else {
+                set_y!(vel_unit, -1.0);
+            }
+
+            if vec3::dot(&vel_unit, &net_normal_unit) >= ALMOST_1 {
+                return self.spin_rotation_speed = 0.0;
+            }
+
+            // compute spin rotation axis
+            vec3::transform_mat4(&mut self.spin_rotation_axis, &vel_unit, &net_normal_rot);
+
+            // set y component to zero and renormalize
+            set_y!(self.spin_rotation_axis, 0.0);
+            let spin_rot_len = vec3::len(&self.spin_rotation_axis);
+
+            if spin_rot_len < 0.5 {
+                vec3::copy(&mut self.spin_rotation_axis, &self.camera_side_vector);
+            }
+
+            if self.speed <= 0.0 {
+                return self.spin_rotation_speed = 0.0;
+            }
+
+            self.spin_rotation_speed = normalize_bounded_angle(vel_len / pivot_circumf);
+        } else {
+            // if katamari is airborne:
+            // TODO: `kat_update_rotation_speed:171-221`
+        }
+
+        self.spin_rotation_speed = self.spin_rotation_speed.clamp(-PI, PI);
+    }
 }

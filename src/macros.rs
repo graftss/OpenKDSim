@@ -146,12 +146,27 @@ macro_rules! vec3_minus {
     };
 }
 
+/// Creates a new `Vec3` obtined by applying the binary operator `$op` to
+/// the elements of the vectors `$a` and `$b`.
+macro_rules! vec3_from {
+    ($op: tt, $a: expr, $b: expr) => {
+        [$a[0] $op $b[0], $a[1] $op $b[1], $a[2] $op $b[2]]
+    }
+}
+
 /// Sets the translation of the matrix `$mat` to the vector `$trans`.
 macro_rules! set_translation {
     ($mat: expr, $trans: expr) => {
         $mat[12] = $trans[0];
         $mat[13] = $trans[1];
         $mat[14] = $trans[2];
+    };
+}
+
+/// Set the `y` coordinate of the vector `$vec` to `$value`.
+macro_rules! set_y {
+    ($vec: expr, $value: expr) => {
+        $vec[1] = $value;
     };
 }
 
@@ -173,6 +188,8 @@ pub(crate) use {
     read_u8,
     rescale,
     set_translation,
+    set_y,
     temp_debug_log,
+    vec3_from,
     vec3_minus,
 };

@@ -74,6 +74,8 @@ pub const FRAC_4PI_3: f32 = PI * 4.0 / 3.0;
 /// offset: 0x716fc
 pub const PI: f32 = f32::from_bits(0x40490fdb);
 
+pub const TAU: f32 = f32::from_bits(0x40c90fdb);
+
 /// 4pi, used for sphere volume
 /// offset: 0x7174c
 pub const _4PI: f32 = f32::from_bits(0x41490fdb);
