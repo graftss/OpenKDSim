@@ -349,8 +349,7 @@ impl GameState {
             // TODO: `update_game:142-173` (update preclear mode camera)
         }
 
-        // TODO: `camera_update_transforms()`
-        // TODO: `camera_update_extra_matrices()`
+        self.players[0].update_camera_transforms();
 
         if !is_vs_mode {
             // TODO: `update_game:176-255` (selectively update props based on their alpha)

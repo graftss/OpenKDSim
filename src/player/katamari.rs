@@ -654,6 +654,10 @@ impl Katamari {
         &self.center
     }
 
+    pub fn get_bottom(&self) -> &Vec3 {
+        &self.bottom
+    }
+
     pub fn set_center(&mut self, center: &Vec3) {
         vec3::copy(&mut self.center, center);
     }
@@ -913,7 +917,7 @@ impl Katamari {
         vec3::transform_mat4(
             &mut self.camera_side_vector,
             &left,
-            &cam_transform.cam_forward_yaw_rot,
+            &cam_transform.yaw_rot_inv,
         );
 
         self.update_collision_rays();
@@ -926,11 +930,6 @@ impl Katamari {
         let mut dist_to_cam = vec3::create();
         vec3::subtract(&mut dist_to_cam, &self.center, &cam_transform.pos);
         self.dist_to_cam = vec3::len(&dist_to_cam);
-
-        // TODO: temporary
-        self.transform[12] = self.center[0];
-        self.transform[13] = self.center[1];
-        self.transform[14] = self.center[2];
 
         // TODO: self.update_vel_relative_to_cam()
 

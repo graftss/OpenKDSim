@@ -4,9 +4,12 @@ use gl_matrix::{
 };
 
 use crate::{
-    constants::{VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    macros::{log, max, min},
-    math::{change_bounded_angle, vec3_inplace_normalize, vec3_inplace_scale},
+    constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
+    macros::{log, max, min, set_translation, temp_debug_log},
+    math::{
+        change_bounded_angle, mat4_compute_yaw_rot, vec3_inplace_normalize, vec3_inplace_scale,
+        vec3_inplace_subtract_vec,
+    },
     mission::config::{CamScaledCtrlPt, MissionConfig},
 };
 
@@ -273,23 +276,23 @@ impl CameraState {
 pub struct CameraTransform {
     /// The transformation matrix of the camera looking at its target.
     /// offset: 0x0
-    transform: Mat4,
+    lookat: Mat4,
 
-    /// (??)
+    /// The yaw rotation component of the `lookat` matrix.
     /// offset: 0x40
-    mat_0x40: Mat4,
+    yaw_rot: Mat4,
 
     /// (??)
     /// offset: 0x80
     mat_0x80: Mat4,
 
-    /// The rotation component of `transform`
+    /// The inverse of the rotation component of the `lookat` matrix.
     /// offset: 0xc0
-    transform_rot: Mat4,
+    lookat_rot_inv: Mat4,
 
-    /// (??)
+    /// The yaw rotation component of `lookat_rot_inv`.
     /// offset: 0x100
-    pub cam_forward_yaw_rot: Mat4,
+    pub yaw_rot_inv: Mat4,
 
     /// The camera's "up" vector (which should always be the y+ axis unit vector)
     /// offset: 0x140
@@ -374,6 +377,35 @@ impl Camera {
         self.state.last_target = target;
         self.state.cam_eff_1P = false;
         self.state.cam_eff_1P_related = false;
+    }
+
+    /// Update the camera transforms using the current state.
+    /// offset: 0x57fd0
+    pub fn update_transforms(&mut self) {
+        // compute the unit vector `target - pos`
+        let mut cam_forward = self.transform.target.clone();
+        vec3_inplace_subtract_vec(&mut cam_forward, &self.transform.pos);
+        vec3_inplace_normalize(&mut cam_forward);
+
+        // compute the lookat matrix of the camera
+        mat4::look_at(
+            &mut self.transform.lookat,
+            &self.transform.pos,
+            &cam_forward,
+            &VEC3_Y_POS,
+        );
+
+        // compute the yaw component of the lookat matrix
+        mat4_compute_yaw_rot(&mut self.transform.yaw_rot, &self.transform.lookat);
+
+        // compute the inverse rotation of the lookat matrix.
+        mat4::transpose(&mut self.transform.lookat_rot_inv, &self.transform.lookat);
+        set_translation!(self.transform.lookat_rot_inv, [0.0, 0.0, 0.0]);
+
+        mat4_compute_yaw_rot(
+            &mut self.transform.yaw_rot_inv,
+            &self.transform.lookat_rot_inv,
+        );
     }
 
     /// Update the camera state during an L1 look with the left stick input `(ls_x, ls_y)`.
@@ -546,19 +578,19 @@ impl Camera {
         tz: &mut f32,
         offset: &mut f32,
     ) {
-        *xx = self.transform.transform[0];
-        *xy = self.transform.transform[1];
-        *xz = self.transform.transform[2];
-        *yx = self.transform.transform[4];
-        *yy = self.transform.transform[5];
-        *yz = self.transform.transform[6];
-        *zx = self.transform.transform[8];
-        *zy = self.transform.transform[9];
-        *zz = self.transform.transform[10];
+        *xx = self.transform.lookat_rot_inv[0];
+        *xy = self.transform.lookat_rot_inv[1];
+        *xz = self.transform.lookat_rot_inv[2];
+        *yx = self.transform.lookat_rot_inv[4];
+        *yy = self.transform.lookat_rot_inv[5];
+        *yz = self.transform.lookat_rot_inv[6];
+        *zx = self.transform.lookat_rot_inv[8];
+        *zy = self.transform.lookat_rot_inv[9];
+        *zz = self.transform.lookat_rot_inv[10];
 
-        *tx = self.transform.pos[0];
-        *ty = self.transform.pos[1];
-        *tz = self.transform.pos[2];
+        *tx = self.transform.pos[0] / UNITY_TO_SIM_SCALE;
+        *ty = self.transform.pos[1] / UNITY_TO_SIM_SCALE;
+        *tz = self.transform.pos[2] / UNITY_TO_SIM_SCALE;
 
         *offset = self.transform.mas4_preclear_offset;
     }

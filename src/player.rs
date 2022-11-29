@@ -76,6 +76,11 @@ impl Player {
 
         // TODO: call `vs_volume_diff_callback` delegate
     }
+
+    pub fn update_camera_transforms(&mut self) {
+        self.camera.update_transforms();
+        // TODO: `camera_update_extra_matrices()` (offset 58e40)
+    }
 }
 
 pub type PlayersState = [Player; MAX_PLAYERS];

@@ -1,8 +1,14 @@
 use std::f32::consts::{PI, TAU};
 
-use gl_matrix::common::Vec3;
+use gl_matrix::{
+    common::{Mat4, Vec3},
+    mat4, vec3,
+};
 
-use crate::constants::{FRAC_1_3, _4PI};
+use crate::{
+    constants::{FRAC_1_3, _4PI},
+    macros::set_y,
+};
 
 /// Scale `vec` by `scale` in-place.
 #[inline]
@@ -18,6 +24,14 @@ pub fn vec3_inplace_subtract(vec: &mut Vec3, dx: f32, dy: f32, dz: f32) {
     vec[0] -= dx;
     vec[1] -= dy;
     vec[2] -= dz;
+}
+
+/// Subtract `other` from `vec` in-place.
+#[inline]
+pub fn vec3_inplace_subtract_vec(vec: &mut Vec3, other: &Vec3) {
+    vec[0] -= other[0];
+    vec[1] -= other[1];
+    vec[2] -= other[2];
 }
 
 /// Add `<dx, dy, dz>` to `vec` in-place.
@@ -63,6 +77,27 @@ pub fn vec3_inplace_normalize(vec: &mut Vec3) {
     vec[0] *= len;
     vec[1] *= len;
     vec[2] *= len;
+}
+
+/// Writes the yaw rotation matrix of `mat` to `out`.
+pub fn mat4_compute_yaw_rot(mut out: &mut Mat4, mat: &Mat4) {
+    let mut left_unit = vec3::create();
+    vec3::transform_mat4(&mut left_unit, &[1.0, 0.0, 0.0], &mat);
+
+    if left_unit[0] == 0.0 && left_unit[2] == 0.0 {
+        // if the left vector is somehow the y+ or y- axis, just set it to x+, apparently
+        left_unit[0] = 1.0;
+    } else {
+        set_y!(left_unit, 0.0);
+        vec3_inplace_normalize(&mut left_unit);
+    }
+
+    // using the left vector, compute the yaw rotation component of the lookat matrix.
+    mat4::identity(&mut out);
+    out[0] = left_unit[0];
+    out[2] = left_unit[2];
+    out[8] = -left_unit[2];
+    out[10] = left_unit[0];
 }
 
 /// Normalize a bounded angle in [-2pi, 2pi] to [-pi, pi].

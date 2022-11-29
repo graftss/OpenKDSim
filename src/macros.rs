@@ -139,13 +139,6 @@ macro_rules! rescale {
     };
 }
 
-/// Create a new `Vec3` obtained from the vector subtraction `a - b`.
-macro_rules! vec3_minus {
-    ($a: expr, $b: expr) => {
-        [$a[0] - $b[0], $a[1] - $b[1], $a[2] - $b[2]]
-    };
-}
-
 /// Creates a new `Vec3` obtined by applying the binary operator `$op` to
 /// the elements of the vectors `$a` and `$b`.
 macro_rules! vec3_from {
@@ -191,5 +184,4 @@ pub(crate) use {
     set_y,
     temp_debug_log,
     vec3_from,
-    vec3_minus,
 };

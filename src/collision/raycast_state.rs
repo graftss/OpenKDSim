@@ -8,7 +8,7 @@ use gl_matrix::{
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     delegates::Delegates,
-    macros::{panic_log, vec3_minus},
+    macros::{panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
@@ -130,7 +130,7 @@ impl RaycastState {
     pub fn load_ray(&mut self, point0: &Vec3, point1: &Vec3) {
         self.point0 = point0.clone();
         self.point1 = point1.clone();
-        self.ray = vec3_minus!(point0, point1);
+        self.ray = vec3_from!(-, point0, point1);
         vec3::normalize(&mut self.ray_unit, &self.ray);
         mat4::look_at(&mut self.ray_lookat, &point0, &self.ray, &VEC3_Y_POS);
 

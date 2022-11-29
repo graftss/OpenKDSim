@@ -1183,8 +1183,7 @@ impl Prince {
 
     /// The main function to update the prince's transform matrix each tick.
     pub fn update_transform(&mut self, katamari: &Katamari) {
-        let kat_offset = katamari.get_prince_offset();
-        let kat_center = katamari.get_center();
+        let kat_offset = -katamari.get_prince_offset();
         self.last_pos = self.pos;
         self.kat_offset_vec[2] = kat_offset;
 
@@ -1192,7 +1191,7 @@ impl Prince {
         if self.oujistate.jump_180 != 0 {
             self.update_flip_transform(kat_offset);
         } else {
-            self.update_nonflip_transform(kat_offset, &kat_center);
+            self.update_nonflip_transform(kat_offset, katamari.get_bottom());
         }
 
         self.flags |= 0x100;
@@ -1204,7 +1203,7 @@ impl Prince {
 
     /// Update the prince's transform matrix while not flipping.
     /// offset: 0x53650
-    fn update_nonflip_transform(&mut self, kat_offset: f32, kat_center: &Vec3) {
+    fn update_nonflip_transform(&mut self, kat_offset: f32, kat_bottom: &Vec3) {
         self.angle = normalize_bounded_angle(self.angle);
         self.angle += self.extra_flat_angle_speed;
         self.angle = normalize_bounded_angle(self.angle);
@@ -1222,7 +1221,7 @@ impl Prince {
 
         // TODO: `prince_update_nonflip_transform:141-243` (vs mode crap)
 
-        vec3::add(&mut self.pos, &local_pos, &kat_center);
+        vec3::add(&mut self.pos, &local_pos, &kat_bottom);
 
         // TODO: `prince_update_nonclip_transform:251-268` (handle r1 jump)
 
