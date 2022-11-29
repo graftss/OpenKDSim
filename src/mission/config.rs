@@ -347,7 +347,7 @@ impl MissionConfig {
         }
     }
 
-    pub fn init_camera_ctrl_points(&self, camera_state: &mut CameraState, diam_cm: f32) {
+    pub fn get_camera_ctrl_point(&self, camera_state: &mut CameraState, diam_cm: f32) {
         if let Some(ctrl_pts) = &self.camera_params_ctrl_pts {
             for (i, ctrl_pt) in ctrl_pts.iter().enumerate() {
                 if diam_cm <= ctrl_pt.diam_cm {

@@ -28,7 +28,7 @@ pub struct OujiState {
     pub wheel_spin_start: bool,
     pub dash: bool,
     pub wheel_spin: bool,
-    pub jump_180: u8,
+    pub jump_180: bool,
     pub sw_speed_disp: u8,
     pub climb_wall: u8,
     pub huff: bool,
@@ -1126,7 +1126,7 @@ impl Prince {
                         let can_view_mode =
                             tutorial.as_ref().map_or(true, |tut| tut.get_page() > 0)
                                 && under_speed_threshold
-                                && !self.oujistate.jump_180 != 0;
+                                && !self.oujistate.jump_180;
 
                         if can_view_mode {
                             if input.l1_down && !input.r1_down {
@@ -1188,7 +1188,7 @@ impl Prince {
         self.kat_offset_vec[2] = kat_offset;
 
         // update transform differently depending on if the prince is flipping
-        if self.oujistate.jump_180 != 0 {
+        if self.oujistate.jump_180 {
             self.update_flip_transform(kat_offset);
         } else {
             self.update_nonflip_transform(kat_offset, katamari.get_bottom());

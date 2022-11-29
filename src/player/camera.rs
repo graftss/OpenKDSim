@@ -5,12 +5,12 @@ use gl_matrix::{
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    macros::{log, max, min, set_translation, temp_debug_log},
+    macros::{log, max, min, set_translation},
     math::{
         change_bounded_angle, mat4_compute_yaw_rot, vec3_inplace_normalize, vec3_inplace_scale,
         vec3_inplace_subtract_vec,
     },
-    mission::config::{CamScaledCtrlPt, MissionConfig},
+    mission::{config::{CamScaledCtrlPt, MissionConfig}, state::MissionState, GameMode},
 };
 
 use self::preclear::PreclearState;
@@ -130,11 +130,26 @@ impl Default for CameraParams {
     }
 }
 
+/// TODO
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CamOverrideType {
+    PrinceLocked,
+}
+
 /// General camera state.
 /// offset: 0x192ee0
 /// width: 0x980
 #[derive(Debug, Default)]
 pub struct CameraState {
+    // START extra fields not in the original simulation
+
+    /// In the original simulation, this was a global variable used to lock the
+    /// camera to the prince after some prop collisions. 
+    /// offset: 0x10ead8
+    override_type: Option<CamOverrideType>,
+
+    // END extra fields not in the original simulation
+
     /// The camera position's offset from the katamari center position.
     /// This value only changes during the "swirl" effect that occurs when the
     /// katamari reaches certain mission-specific size thresholds.
@@ -262,6 +277,153 @@ pub struct CameraState {
 }
 
 impl CameraState {
+    /// Main function to update the camera state.
+    /// offset: 0xb7d0
+    pub fn update_state(&mut self, prince: &Prince, katamari: &Katamari, mission_state: &MissionState, cam_transform: &mut CameraTransform) {
+        self.last_pos = self.pos;
+        self.last_target = self.target;
+
+        match self.mode {
+            CameraMode::Normal => {
+                self.update_main(prince, katamari, true, mission_state, cam_transform);
+                self.update_normal(prince, katamari);
+            },
+            CameraMode::R1Jump => {
+                self.update_r1_jump(prince, katamari);
+            },
+            CameraMode::L1Look => {
+                self.update_main(prince, katamari, false, mission_state, cam_transform);
+            },
+            CameraMode::HitByProp => {
+                // TODO: `camera_update_state:67-115`
+            },
+            CameraMode::Clear => {
+                // TODO: `camera_update_state:116-151`
+            },
+            CameraMode::Shoot => {
+                // TODO_VS: `camera_update_state:152-178`
+            },
+            CameraMode::ShootRet => {
+                // TODO_VS: `camera_update_state:179-188`
+            },
+            CameraMode::Ending1 |
+            CameraMode::Ending2 |
+            CameraMode::Ending3 => {
+                // TODO: call `self.state.update_ending_callback`,
+                // but presumably it would be easier to just call a concrete
+                // function here...
+            },
+            CameraMode::AreaChange => {
+                // TODO: `camera_update_state:196-237`
+            },
+            CameraMode::ClearGoalProp => {
+                self.update_clear_goal_prop();
+            },
+            CameraMode::VsResult => {
+                // TODO_VS: `camera_update_vs_result()`
+            },
+            CameraMode::Unknown(_) => (),
+        }
+    }
+
+    /// The default camera update function that applies to `Normal` mode and several other
+    /// special modes. The camera position and target points are computed, then written to
+    /// the camera transform.
+    /// offset: 0xc500
+    fn update_main(&mut self, prince: &Prince, katamari: &Katamari, is_normal_mode: bool, mission_state: &MissionState, cam_transform: &mut CameraTransform) {
+        self.update_pos_and_target_main(prince, katamari, is_normal_mode, mission_state);
+        cam_transform.pos = self.pos;
+        cam_transform.target = self.target;
+    }
+
+    /// Update this state's camera position and target points.
+    fn update_pos_and_target_main(&mut self, prince: &Prince, katamari: &Katamari, is_normal_mode: bool, mission_state: &MissionState) {
+        if !self.scale_up_in_progress || !is_normal_mode {
+            self.update_area_params(&mission_state.mission_config, katamari.get_diam_cm());
+        } else {
+            // TODO: `camera_update_main:53-140` (scaling up camera after swirl, presumably)
+        }
+
+        let mut pos = [0.0; 3];
+        let mut target = [0.0; 3];
+
+        if prince.oujistate.jump_180 {
+            // if flipping, defer to the flip subroutine and bail
+            self.compute_flip_pos_and_target(&mut pos, &mut target);
+            self.pos = pos;
+            self.target = target;
+            return;
+        } 
+
+        match self.override_type {
+            None => {
+                // if there's no camera override:
+                if mission_state.gamemode == GameMode::Ending || self.mode == CameraMode::Normal {
+                    // in the ending mission or normal mode:
+                    self.compute_normal_pos_and_target(&mut pos, &mut target);
+                } else {
+                    self.compute_abnormal_pos_and_target(&mut pos, &mut target)
+                }
+
+                // TODO: `camera_update_main:174-236` (easing camera)
+
+                // this line is temporary until the easing is added
+                self.pos = pos;
+                self.target = target;
+            }
+            Some(CamOverrideType::PrinceLocked) => {
+                self.compute_normal_pos_and_target(&mut pos, &mut target);
+                self.pos = pos;
+                self.pos = target;
+            }
+        }
+    }
+
+    /// (??) reads the next swirl params from the mission config, but it seems like
+    /// other stuff too
+    /// offset: 0xd0b0
+    fn update_area_params(&mut self, _mission_config: &MissionConfig, _diam_cm: f32) {
+        // TODO
+        // mission_config.get_camera_ctrl_point(self, diam_cm);
+    }
+
+    /// Writes the camera position and target points during normal camera movement
+    /// to the vectors `pos` and `target`.
+    /// offset: 0xd4a0
+    fn compute_normal_pos_and_target(&mut self, _pos: &mut Vec3, _target: &mut Vec3) {
+        // TODO
+    }
+
+    /// Writes the camera position and target points during abnormal camera movement
+    /// to the vectors `pos` and `target`.
+    /// offset: 0xdc80
+    fn compute_abnormal_pos_and_target(&mut self, _pos: &mut Vec3, _target: &mut Vec3) {
+        // TODO
+    }
+
+    /// Writes the camera position and target points during a flip ("jump 180")
+    /// to the vectors `pos` and `target`.
+    /// offset: 0xf5c0
+    fn compute_flip_pos_and_target(&mut self, _pos: &mut Vec3, _target: &mut Vec3) {
+        // TODO
+    }
+
+    /// The camera update function for `Normal` mode.
+    /// offset: 0xe5b0
+    fn update_normal(&mut self, _prince: &Prince, _katamari: &Katamari) {
+
+    }
+
+    /// The camera update function for `R1Jump` mode.
+    /// offset: 0xbe60
+    fn update_r1_jump(&mut self, _prince: &Prince, _katamari: &Katamari) {
+
+    }
+
+    /// TODO: `camera_update_clear_goal_prop`
+    /// offset: 0xebf0
+    fn update_clear_goal_prop(&mut self) {}
+
     /// Set the camera's offsets from the katamari to those described by the control point `pt`.
     pub fn set_offsets(&mut self, pt: &CamScaledCtrlPt) {
         vec3::copy(&mut self.kat_to_pos, &pt.kat_to_pos);
@@ -318,7 +480,7 @@ pub struct CameraTransform {
 #[derive(Debug, Default)]
 pub struct Camera {
     pub state: CameraState,
-    transform: CameraTransform,
+    pub transform: CameraTransform,
     pub params: CameraParams,
     pub preclear: PreclearState,
 }
@@ -344,7 +506,7 @@ impl Camera {
         self.init_transform();
         self.reset_state(katamari, prince);
 
-        mission_config.init_camera_ctrl_points(&mut self.state, katamari.get_diam_cm());
+        mission_config.get_camera_ctrl_point(&mut self.state, katamari.get_diam_cm());
     }
 
     /// Initialize the `CameraState` struct.
@@ -378,7 +540,7 @@ impl Camera {
         self.state.cam_eff_1P = false;
         self.state.cam_eff_1P_related = false;
     }
-
+    
     /// Update the camera transforms using the current state.
     /// offset: 0x57fd0
     pub fn update_transforms(&mut self) {
