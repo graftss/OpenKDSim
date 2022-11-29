@@ -129,7 +129,7 @@ impl Katamari {
 
             self.cache_sizes();
             // TODO: `kat_update_rotation_speed(&next_vel)`
-            // TODO: `kat_update_transform_unvaulted()`
+            self.update_transform_unvaulted();
         } else {
             self.cache_sizes();
             // TODO: `kat_update_transform_vaulted()`
@@ -147,4 +147,6 @@ impl Katamari {
             self.physics_flags.can_emit_smoke = self.diam_cm > 1200.0;
         }
     }
+
+    fn update_rotation_speed(&mut self, vel: &Vec3) {}
 }

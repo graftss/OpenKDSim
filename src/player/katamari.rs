@@ -18,7 +18,7 @@ use crate::{
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     delegates::Delegates,
-    macros::min,
+    macros::{min, set_translation},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
     props::prop::PropRef,
@@ -264,9 +264,13 @@ pub struct Katamari {
     /// offset: 0x3e4
     scaled_params: KatScaledParams,
 
-    /// (??) The unit vector that's pointing "rightwards" relative to the katamari's lateral velocity.
+    /// (??) The amount that the katamari will rotate about its spin rotation axis
+    /// offset: 0x438
+    spin_rotation_speed: f32,
+
+    /// (??) The axis about which the katamari will rotate as it's pushed
     /// offset: 0x440
-    u_right_of_vel: Vec3,
+    spin_rotation_axis: Vec3,
 
     /// (??)
     /// offset: 0x450
@@ -791,7 +795,7 @@ impl Katamari {
         let rad_m = self.radius_cm / 100.0;
         self.vol_m3 = rad_m * rad_m * rad_m * FRAC_4PI_3;
 
-        vec3::copy(&mut self.u_right_of_vel, &VEC3_X_NEG);
+        vec3::copy(&mut self.spin_rotation_axis, &VEC3_X_NEG);
         mat4::identity(&mut self.transform);
         mat4::identity(&mut self.turntable_rotation_mat);
         mat4::identity(&mut self.rotation_mat);
@@ -969,5 +973,29 @@ impl Katamari {
         self.display_radius_cm = self.radius_cm * self.params.display_radius_ratio;
         self.max_wallclimb_height = self.diam_cm * self.params.max_wallclimb_height_ratio;
         self.diam_trunc_mm = (self.diam_cm * 10.0) as i32;
+    }
+
+    pub fn update_transform_unvaulted(&mut self) {
+        // TODO_VS: `kat_update_transform_unvaulted:43-111`
+
+        // apply the spin rotation to the katamari's rotation matrix;
+        let mut spin_rotation_mat = mat4::create();
+        if vec3::length(&self.spin_rotation_axis) > 0.0 {
+            mat4::from_rotation(
+                &mut spin_rotation_mat,
+                self.spin_rotation_speed,
+                &self.spin_rotation_axis,
+            );
+        }
+
+        let rotation_mat = self.rotation_mat.clone();
+        let mut tmp = mat4::create();
+        mat4::multiply(&mut tmp, &spin_rotation_mat, &rotation_mat);
+        mat4::multiply(&mut self.rotation_mat, &self.spin_rotation_mat, &tmp);
+
+        mat4::copy(&mut self.transform, &self.rotation_mat);
+        set_translation!(self.transform, self.center);
+
+        // TODO: `kat_apply_pitch_when_spinning()`
     }
 }

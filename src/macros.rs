@@ -146,6 +146,15 @@ macro_rules! vec3_minus {
     };
 }
 
+/// Sets the translation of the matrix `$mat` to the vector `$trans`.
+macro_rules! set_translation {
+    ($mat: expr, $trans: expr) => {
+        $mat[12] = $trans[0];
+        $mat[13] = $trans[1];
+        $mat[14] = $trans[2];
+    };
+}
+
 #[allow(unused_imports)]
 pub(crate) use {
     inv_lerp,
@@ -163,6 +172,7 @@ pub(crate) use {
     read_u16,
     read_u8,
     rescale,
+    set_translation,
     temp_debug_log,
     vec3_minus,
 };
