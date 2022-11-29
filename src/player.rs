@@ -1,4 +1,8 @@
-use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
+use crate::{
+    delegates::DelegatesRef,
+    gamestate::GameState,
+    mission::{self, state::MissionState},
+};
 
 use self::{
     camera::Camera, constants::MAX_PLAYERS, input::Input, katamari::Katamari, prince::Prince,
@@ -47,6 +51,11 @@ impl Player {
             .init(&self.katamari, &self.prince, &mission_state.mission_config);
     }
 
+    pub fn update_camera(&mut self, mission_state: &MissionState) {
+        self.camera
+            .update(&self.prince, &mut self.katamari, mission_state);
+    }
+
     /// Check if the player needs to royal warp, and if so, perform the warp.
     pub fn update_royal_warp(&mut self, warp_y: f32, area: u8, mission_state: &MissionState) {
         let Player {
@@ -75,11 +84,6 @@ impl Player {
         camera.reset_state(katamari, prince);
 
         // TODO: call `vs_volume_diff_callback` delegate
-    }
-
-    pub fn update_camera_transforms(&mut self) {
-        self.camera.update_transforms();
-        // TODO: `camera_update_extra_matrices()` (offset 58e40)
     }
 }
 
@@ -113,5 +117,9 @@ impl GameState {
                 &mission_state,
             );
         }
+    }
+
+    pub fn update_camera(&mut self, player_idx: usize) {
+        let player = &mut self.players[player_idx];
     }
 }

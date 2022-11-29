@@ -4,13 +4,18 @@ use gl_matrix::{
 };
 
 use crate::{
+    collision::raycast_state::{RaycastCallType, RaycastState},
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    macros::{log, max, min, set_translation},
+    macros::{log, max, min, set_translation, set_y, temp_debug_log, vec3_from},
     math::{
         change_bounded_angle, mat4_compute_yaw_rot, vec3_inplace_normalize, vec3_inplace_scale,
         vec3_inplace_subtract_vec,
     },
-    mission::{config::{CamScaledCtrlPt, MissionConfig}, state::MissionState, GameMode},
+    mission::{
+        config::{CamScaledCtrlPt, MissionConfig},
+        state::MissionState,
+        GameMode,
+    },
 };
 
 use self::preclear::PreclearState;
@@ -142,25 +147,35 @@ pub enum CamOverrideType {
 #[derive(Debug, Default)]
 pub struct CameraState {
     // START extra fields not in the original simulation
-
     /// In the original simulation, this was a global variable used to lock the
-    /// camera to the prince after some prop collisions. 
+    /// camera to the prince after some prop collisions.
     /// offset: 0x10ead8
     override_type: Option<CamOverrideType>,
 
-    // END extra fields not in the original simulation
+    raycast_state: RaycastState,
 
+    // END extra fields not in the original simulation
     /// The camera position's offset from the katamari center position.
-    /// This value only changes during the "swirl" effect that occurs when the
-    /// katamari reaches certain mission-specific size thresholds.
+    /// This vector is usually constant, but changes during "swirl" size-up effects
+    /// and when the camera moves to avoid looking through a wall.
     /// offset: 0x0
     kat_to_pos: Vec3,
 
     /// The camera target's offset from the katamari center position.
-    /// This value only changes during the "swirl" effect that occurs when the
-    /// katamari reaches certain mission-specific size thresholds.
+    /// This vector is usually constant, but changes during "swirl" size-up effects
+    /// and when the camera moves to avoid looking through a wall.
     /// offset: 0x10
     kat_to_target: Vec3,
+
+    /// The camera position's offset from the katamari center position, ignoring
+    /// camera movements to avoid looking through walls.
+    /// offset: 0x20
+    kat_to_pos_noclip: Vec3,
+
+    /// The camera target's offset from the katamari center position, ignoring
+    /// camera movements to avoid looking through walls.
+    /// offset: 0x30
+    kat_to_target_noclip: Vec3,
 
     /// The camera position's velocity (i.e. how much it moves each tick).
     /// offset: 0x40
@@ -277,51 +292,57 @@ pub struct CameraState {
 }
 
 impl CameraState {
-    /// Main function to update the camera state.
+    /// Main function to update the camera state. Computes the next camera position and target,
+    /// and writes that data to the transform.
+    /// TODO_REFACTOR: those two steps should be separated once everything is working
     /// offset: 0xb7d0
-    pub fn update_state(&mut self, prince: &Prince, katamari: &Katamari, mission_state: &MissionState, cam_transform: &mut CameraTransform) {
+    pub fn update(
+        &mut self,
+        prince: &Prince,
+        katamari: &mut Katamari,
+        mission_state: &MissionState,
+        cam_transform: &mut CameraTransform,
+    ) {
         self.last_pos = self.pos;
         self.last_target = self.target;
 
         match self.mode {
             CameraMode::Normal => {
                 self.update_main(prince, katamari, true, mission_state, cam_transform);
-                self.update_normal(prince, katamari);
-            },
+                self.update_clip_pos(prince, katamari);
+            }
             CameraMode::R1Jump => {
                 self.update_r1_jump(prince, katamari);
-            },
+            }
             CameraMode::L1Look => {
                 self.update_main(prince, katamari, false, mission_state, cam_transform);
-            },
+            }
             CameraMode::HitByProp => {
                 // TODO: `camera_update_state:67-115`
-            },
+            }
             CameraMode::Clear => {
                 // TODO: `camera_update_state:116-151`
-            },
+            }
             CameraMode::Shoot => {
                 // TODO_VS: `camera_update_state:152-178`
-            },
+            }
             CameraMode::ShootRet => {
                 // TODO_VS: `camera_update_state:179-188`
-            },
-            CameraMode::Ending1 |
-            CameraMode::Ending2 |
-            CameraMode::Ending3 => {
+            }
+            CameraMode::Ending1 | CameraMode::Ending2 | CameraMode::Ending3 => {
                 // TODO: call `self.state.update_ending_callback`,
                 // but presumably it would be easier to just call a concrete
                 // function here...
-            },
+            }
             CameraMode::AreaChange => {
                 // TODO: `camera_update_state:196-237`
-            },
+            }
             CameraMode::ClearGoalProp => {
                 self.update_clear_goal_prop();
-            },
+            }
             CameraMode::VsResult => {
                 // TODO_VS: `camera_update_vs_result()`
-            },
+            }
             CameraMode::Unknown(_) => (),
         }
     }
@@ -330,14 +351,27 @@ impl CameraState {
     /// special modes. The camera position and target points are computed, then written to
     /// the camera transform.
     /// offset: 0xc500
-    fn update_main(&mut self, prince: &Prince, katamari: &Katamari, is_normal_mode: bool, mission_state: &MissionState, cam_transform: &mut CameraTransform) {
+    fn update_main(
+        &mut self,
+        prince: &Prince,
+        katamari: &Katamari,
+        is_normal_mode: bool,
+        mission_state: &MissionState,
+        cam_transform: &mut CameraTransform,
+    ) {
         self.update_pos_and_target_main(prince, katamari, is_normal_mode, mission_state);
         cam_transform.pos = self.pos;
         cam_transform.target = self.target;
     }
 
     /// Update this state's camera position and target points.
-    fn update_pos_and_target_main(&mut self, prince: &Prince, katamari: &Katamari, is_normal_mode: bool, mission_state: &MissionState) {
+    fn update_pos_and_target_main(
+        &mut self,
+        prince: &Prince,
+        katamari: &Katamari,
+        is_normal_mode: bool,
+        mission_state: &MissionState,
+    ) {
         if !self.scale_up_in_progress || !is_normal_mode {
             self.update_area_params(&mission_state.mission_config, katamari.get_diam_cm());
         } else {
@@ -353,14 +387,14 @@ impl CameraState {
             self.pos = pos;
             self.target = target;
             return;
-        } 
+        }
 
         match self.override_type {
             None => {
                 // if there's no camera override:
                 if mission_state.gamemode == GameMode::Ending || self.mode == CameraMode::Normal {
                     // in the ending mission or normal mode:
-                    self.compute_normal_pos_and_target(&mut pos, &mut target);
+                    self.compute_normal_pos_and_target(&mut pos, &mut target, katamari, prince);
                 } else {
                     self.compute_abnormal_pos_and_target(&mut pos, &mut target)
                 }
@@ -372,7 +406,7 @@ impl CameraState {
                 self.target = target;
             }
             Some(CamOverrideType::PrinceLocked) => {
-                self.compute_normal_pos_and_target(&mut pos, &mut target);
+                self.compute_normal_pos_and_target(&mut pos, &mut target, katamari, prince);
                 self.pos = pos;
                 self.pos = target;
             }
@@ -390,8 +424,39 @@ impl CameraState {
     /// Writes the camera position and target points during normal camera movement
     /// to the vectors `pos` and `target`.
     /// offset: 0xd4a0
-    fn compute_normal_pos_and_target(&mut self, _pos: &mut Vec3, _target: &mut Vec3) {
-        // TODO
+    fn compute_normal_pos_and_target(
+        &mut self,
+        mut pos: &mut Vec3,
+        mut target: &mut Vec3,
+        katamari: &Katamari,
+        prince: &Prince,
+    ) {
+        // compute the lateral unit vector from the prince to the katamari
+        let kat_center = katamari.get_center();
+        let prince_pos = prince.get_pos();
+        let mut pri_to_kat_unit = vec3_from!(-, kat_center, prince_pos);
+        set_y!(pri_to_kat_unit, 0.0);
+        vec3_inplace_normalize(&mut pri_to_kat_unit);
+
+        // TODO: `camera_compute_normal_pos_and_target:65-187` (a bunch of unusual cases)
+
+        vec3::scale_and_add(
+            &mut target,
+            &kat_center,
+            &pri_to_kat_unit,
+            self.kat_to_pos[2],
+        );
+
+        // TODO: `camera_compute_normal_pos_and_target:198-213` (handle `SpecialCamera` flag)
+
+        vec3::scale_and_add(
+            &mut pos,
+            &kat_center,
+            &pri_to_kat_unit,
+            self.kat_to_target[2],
+        );
+
+        // TODO: `camera_compute_normal_pos_and_target:217-221` (special case: in water on world)
     }
 
     /// Writes the camera position and target points during abnormal camera movement
@@ -408,17 +473,54 @@ impl CameraState {
         // TODO
     }
 
-    /// The camera update function for `Normal` mode.
+    /// Check if the camera would look through any walls, and adjust its position if it would.
     /// offset: 0xe5b0
-    fn update_normal(&mut self, _prince: &Prince, _katamari: &Katamari) {
+    fn update_clip_pos(&mut self, prince: &Prince, katamari: &mut Katamari) {
+        // save the current pos and target offsets, then compute the next
+        // pos and target based on the noclip offsets.
+        let _kat_to_pos_init = self.kat_to_pos.clone();
+        let _kat_to_target_init = self.kat_to_target.clone();
+        self.kat_to_pos = self.kat_to_pos_noclip;
+        self.kat_to_target = self.kat_to_target_noclip;
 
+        let mut noclip_pos = [0.0; 3];
+        let mut noclip_target = [0.0; 3];
+
+        if !prince.oujistate.jump_180 {
+            // temporarily set `under_water` and `in_water` flags to false for
+            // the purposes of computing the camera position and target.
+            // TODO: is this necessary?
+            let under_water = katamari.physics_flags.under_water;
+            let in_water = katamari.physics_flags.in_water;
+            katamari.physics_flags.under_water = false;
+            katamari.physics_flags.in_water = false;
+
+            self.compute_normal_pos_and_target(
+                &mut noclip_pos,
+                &mut noclip_target,
+                katamari,
+                prince,
+            );
+
+            katamari.physics_flags.under_water = under_water;
+            katamari.physics_flags.in_water = in_water;
+        } else {
+            self.compute_flip_pos_and_target(&mut noclip_pos, &mut noclip_target);
+        }
+
+        // TODO: `camera_update_normal:103-173` (check if noclip camera clipped)
+        // self.raycast_state.load_ray(katamari.get_center(), &noclip_pos);
+        // if self.raycast_state.find_nearest_unity_hit(RaycastCallType::Stage, true) {
+
+        // }
+
+        // TODO: temporary line until camera clipping is added
+        self.kat_to_pos = self.kat_to_pos_noclip;
     }
 
     /// The camera update function for `R1Jump` mode.
     /// offset: 0xbe60
-    fn update_r1_jump(&mut self, _prince: &Prince, _katamari: &Katamari) {
-
-    }
+    fn update_r1_jump(&mut self, _prince: &Prince, _katamari: &Katamari) {}
 
     /// TODO: `camera_update_clear_goal_prop`
     /// offset: 0xebf0
@@ -475,6 +577,32 @@ pub struct CameraTransform {
     /// The extra zoom out distance as the timer expires at the end of MAS4.
     /// offset: 0x180
     mas4_preclear_offset: f32,
+}
+
+impl CameraTransform {
+    /// Update the camera transform using the current values of `pos` and `target`,
+    /// which should have been already updated.
+    /// offset: 0x57fd0
+    pub fn propagate_pos_and_target(&mut self) {
+        // compute the unit vector `target - pos`
+        let mut cam_forward = self.target.clone();
+        vec3_inplace_subtract_vec(&mut cam_forward, &self.pos);
+        vec3_inplace_normalize(&mut cam_forward);
+
+        // compute the lookat matrix of the camera
+        mat4::look_at(&mut self.lookat, &self.pos, &cam_forward, &VEC3_Y_POS);
+
+        // compute the yaw component of the lookat matrix
+        mat4_compute_yaw_rot(&mut self.yaw_rot, &self.lookat);
+
+        // compute the inverse rotation of the lookat matrix.
+        mat4::transpose(&mut self.lookat_rot_inv, &self.lookat);
+        set_translation!(self.lookat_rot_inv, [0.0, 0.0, 0.0]);
+
+        mat4_compute_yaw_rot(&mut self.yaw_rot_inv, &self.lookat_rot_inv);
+
+        // TODO: `camera_update_extra_matrices()` (offset 0x58e40)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -540,34 +668,19 @@ impl Camera {
         self.state.cam_eff_1P = false;
         self.state.cam_eff_1P_related = false;
     }
-    
-    /// Update the camera transforms using the current state.
-    /// offset: 0x57fd0
-    pub fn update_transforms(&mut self) {
-        // compute the unit vector `target - pos`
-        let mut cam_forward = self.transform.target.clone();
-        vec3_inplace_subtract_vec(&mut cam_forward, &self.transform.pos);
-        vec3_inplace_normalize(&mut cam_forward);
 
-        // compute the lookat matrix of the camera
-        mat4::look_at(
-            &mut self.transform.lookat,
-            &self.transform.pos,
-            &cam_forward,
-            &VEC3_Y_POS,
-        );
-
-        // compute the yaw component of the lookat matrix
-        mat4_compute_yaw_rot(&mut self.transform.yaw_rot, &self.transform.lookat);
-
-        // compute the inverse rotation of the lookat matrix.
-        mat4::transpose(&mut self.transform.lookat_rot_inv, &self.transform.lookat);
-        set_translation!(self.transform.lookat_rot_inv, [0.0, 0.0, 0.0]);
-
-        mat4_compute_yaw_rot(
-            &mut self.transform.yaw_rot_inv,
-            &self.transform.lookat_rot_inv,
-        );
+    /// Update the camera.
+    pub fn update(
+        &mut self,
+        prince: &Prince,
+        katamari: &mut Katamari,
+        mission_state: &MissionState,
+    ) {
+        // TODO_REFACTOR: is it really necessary to propagate the pos and target twice?
+        self.transform.propagate_pos_and_target();
+        self.state
+            .update(prince, katamari, mission_state, &mut self.transform);
+        self.transform.propagate_pos_and_target();
     }
 
     /// Update the camera state during an L1 look with the left stick input `(ls_x, ls_y)`.

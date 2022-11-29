@@ -354,6 +354,7 @@ impl MissionConfig {
                     camera_state.kat_offset_ctrl_pts = ctrl_pts.clone();
                     camera_state.kat_offset_ctrl_pt_idx = i as u8;
                     camera_state.set_offsets(&ctrl_pt);
+                    break;
                 }
             }
         }
