@@ -2,6 +2,8 @@ use std::f32::consts::{PI, TAU};
 
 use gl_matrix::common::Vec3;
 
+use crate::constants::{FRAC_1_3, _4PI};
+
 /// Scale `vec` by `scale` in-place.
 #[inline]
 pub fn vec3_inplace_scale(vec: &mut Vec3, scale: f32) {
@@ -87,4 +89,11 @@ pub fn acos_f32(value: f32) -> f32 {
         _ if value <= -1.0 => PI,
         _ => value.acos(),
     }
+}
+
+// TODO: this should probably be using the janky `power` function defined in
+// the simulation for true accuracy
+#[inline]
+pub fn vol_to_rad(vol: f32) -> f32 {
+    (vol * 3.0 / _4PI).powf(FRAC_1_3)
 }

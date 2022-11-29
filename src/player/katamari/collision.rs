@@ -90,7 +90,7 @@ impl Katamari {
         // TODO: `kat_process_collected_props()`
         // TODO: `kat_update_world_size_threshold??()`
 
-        if self.physics_flags.vault_ray_type == Some(KatCollisionRayType::Bottom)
+        if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
             || self.fc_ray_len < 1.0
         {
             self.fc_ray_len = self.radius_cm;
@@ -425,7 +425,7 @@ impl Katamari {
         }
 
         if fc_ray_idx.is_none()
-            || self.physics_flags.vault_ray_type == Some(KatCollisionRayType::Bottom)
+            || self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
         {
             // if the primary floor contact point is the bottom ray
             self.fc_ray_idx = None;

@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use gl_matrix::common::Vec3;
 use lazy_static::lazy_static;

@@ -6,8 +6,8 @@ use gl_matrix::{
 };
 
 use crate::{
-    constants::VEC3_ZERO,
-    macros::{inv_lerp, inv_lerp_clamp, log, max, min, panic_log},
+    constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
+    macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
@@ -548,9 +548,9 @@ impl Prince {
         *zx = self.transform_rot[8];
         *zy = self.transform_rot[9];
         *zz = self.transform_rot[10];
-        *tx = self.pos[0];
-        *ty = self.pos[1];
-        *tz = self.pos[2];
+        *tx = self.pos[0] / UNITY_TO_SIM_SCALE;
+        *ty = self.pos[1] / UNITY_TO_SIM_SCALE;
+        *tz = self.pos[2] / UNITY_TO_SIM_SCALE;
     }
 
     pub fn set_ignore_input_timer(&mut self, value: i16) {
@@ -1133,7 +1133,7 @@ impl Prince {
                                 // initiate an L1 look
                                 held_tut_move = Some(TutorialMove::LookL1);
                                 self.end_spin_and_boost(katamari);
-                                katamari.set_immobile();
+                                katamari.set_immobile(mission_state);
                                 self.view_mode = PrinceViewMode::L1Look;
                                 camera.set_mode(CameraMode::L1Look);
                             } else if input.r1_down && !input.l1_down {
@@ -1141,7 +1141,7 @@ impl Prince {
                                 held_tut_move = Some(TutorialMove::JumpR1);
                                 self.end_spin_and_boost(katamari);
                                 // TODO: play R1_JUMP sfx
-                                katamari.set_immobile();
+                                katamari.set_immobile(mission_state);
                                 self.view_mode = PrinceViewMode::R1Jump;
                                 camera.set_mode(CameraMode::R1Jump);
                             }
@@ -1252,12 +1252,6 @@ impl Player {
 
         if prince.view_mode == PrinceViewMode::Normal {
             prince.update_gachas(katamari, camera, mission_state);
-            log!(
-                "gachas={}, timer={}, duration={}",
-                prince.gacha_count,
-                prince.gacha_window_timer,
-                prince.gacha_window_duration
-            );
             let angle_tut_move = prince.update_angle(katamari);
 
             if let Some(tut_move) = angle_tut_move {

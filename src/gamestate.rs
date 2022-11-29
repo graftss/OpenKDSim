@@ -119,9 +119,9 @@ impl GameState {
         self.global.freeze = true;
         self.global.map_change_mode = true;
 
-        let player = self.get_mut_player(player_idx);
+        let player = &mut self.players[player_idx];
         player.prince.set_ignore_input_timer(-1);
-        player.katamari.set_immobile();
+        player.katamari.set_immobile(&self.mission_state);
     }
 
     /// Mimicks the `SetMapChangeMode` API function.
@@ -272,7 +272,7 @@ impl GameState {
         self.players[player_idx].init(
             player_idx as u8,
             &self.delegates,
-            &mission_config,
+            mission_state,
             override_init_size,
         );
 

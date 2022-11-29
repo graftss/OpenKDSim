@@ -105,7 +105,7 @@ impl Katamari {
             ray.reset(rad_cm);
         }
 
-        self.physics_flags.vault_ray_type = Some(KatCollisionRayType::Bottom);
+        self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
         self.average_ray_len = rad_cm;
         self.vault_ray_idx = None;
 

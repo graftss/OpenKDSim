@@ -91,7 +91,7 @@ pub struct KatPhysicsFlags {
 
     /// (??) The type of boundary ray currently acting as the pivot.
     /// offset: 0x11
-    pub vault_ray_type: Option<KatCollisionRayType>,
+    pub grounded_ray_type: Option<KatCollisionRayType>,
 
     /// If true, the katamari is contacting a non-flat floor (normal < 0.9999).
     /// offset: 0x12
@@ -132,7 +132,7 @@ pub struct KatPhysicsFlags {
     /// True if the katamari should emit the "puff of smoke" vfx as it moves.
     /// By default this occurs when it's over 12m in the World stage.
     /// offset: 0x1c
-    pub should_emit_smoke: bool,
+    pub can_emit_smoke: bool,
 
     /// (??)
     /// offset: 0x1d

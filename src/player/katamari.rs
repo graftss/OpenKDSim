@@ -19,7 +19,7 @@ use crate::{
     },
     delegates::Delegates,
     macros::min,
-    math::normalize_bounded_angle,
+    math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
     props::prop::PropRef,
 };
@@ -150,7 +150,7 @@ pub struct Katamari {
 
     /// The visual radius of the katamari "ball" (in cm).
     /// offset: 0x70
-    display_rad_cm: f32,
+    display_radius_cm: f32,
 
     /// The circumference of the katamari (in cm).
     /// offset: 0x74
@@ -163,6 +163,17 @@ pub struct Katamari {
     /// The speed of the katamari on the previous tick.
     /// offset: 0x7c
     last_speed: f32,
+
+    /// (??)
+    /// offset: 0x80
+    base_speed: f32,
+
+    /// (??) The ratio of the katamari's current speed to its base speed.
+    /// offset: 0x88
+    base_speed_ratio: f32,
+
+    /// The diameter of the katamari (in m).
+    diam_m: f32,
 
     /// The distance from the camera position to the katamari center.
     /// offset: 0x98
@@ -209,7 +220,7 @@ pub struct Katamari {
 
     /// counts down from 10 after falling from a climb; if still nonzero, can't climb again    
     /// offset: 0x118
-    wallclimb_cooldown: u16,
+    wallclimb_cooldown_timer: u16,
 
     /// "Bounciness" or elasticity multiplier, which is a linear function of
     /// the katamari's diameter. The linear can be different depending on the stage.
@@ -232,6 +243,10 @@ pub struct Katamari {
     /// (??)
     /// offset: 0x1b8
     max_wallclimb_angle: f32,
+
+    /// The maximum height that the katamari can gain during a wallclimb.
+    /// offset: 0x1bc
+    max_wallclimb_height: f32,
 
     /// Katamari velocities.
     /// offset: 0x240
@@ -397,7 +412,7 @@ pub struct Katamari {
     /// A multiplier affecting how fast pivoted props are sucked in towards the center
     /// of the katamari (which also reduces the length of their induced collision ray).
     /// offset: 0x800
-    pivot_prop_decay_mult: f32,
+    vault_prop_decay_mult: f32,
 
     /// The number of floors contacted by collision rays.
     /// offset: 0x804
@@ -604,11 +619,11 @@ impl Katamari {
     }
 
     pub fn get_radius(&self) -> f32 {
-        self.radius_cm
+        self.radius_cm + 0.02
     }
 
     pub fn get_display_radius(&self) -> f32 {
-        self.display_rad_cm
+        self.display_radius_cm
     }
 
     pub fn get_diam_int(&self) -> i32 {
@@ -666,16 +681,13 @@ impl Katamari {
         sy: &mut f32,
         sz: &mut f32,
     ) -> () {
-        // sort of hacky to read the translation directly out of the matrix but whatever.
-        // the builtin `mat4::get_translation` writes the values to a `Vec3` instead of individual floats.
-        // (see: https://docs.rs/gl_matrix/latest/src/gl_matrix/mat4.rs.html#1030-1036)
-        *x = self.transform[12];
-        *y = self.transform[13];
-        *z = self.transform[14];
+        *x = self.transform[12] / UNITY_TO_SIM_SCALE;
+        *y = self.transform[13] / UNITY_TO_SIM_SCALE;
+        *z = self.transform[14] / UNITY_TO_SIM_SCALE;
 
-        *sx = self.shadow_pos[0];
-        *sy = self.shadow_pos[1];
-        *sz = self.shadow_pos[2];
+        *sx = self.shadow_pos[0] / UNITY_TO_SIM_SCALE;
+        *sy = self.shadow_pos[1] / UNITY_TO_SIM_SCALE;
+        *sz = self.shadow_pos[2] / UNITY_TO_SIM_SCALE;
     }
 
     pub fn set_translation(&mut self, x: f32, y: f32, z: f32) {
@@ -724,10 +736,10 @@ impl Katamari {
         self.physics_flags.in_water
     }
 
-    pub fn update_royal_warp(&mut self, dest_pos: &Vec3) {
+    pub fn update_royal_warp(&mut self, dest_pos: &Vec3, mission_state: &MissionState) {
         self.set_center(dest_pos);
         self.reset_collision_rays();
-        self.set_immobile();
+        self.set_immobile(mission_state);
         self.airborne_ticks = 0;
     }
 }
@@ -741,7 +753,7 @@ impl Katamari {
         init_diam: f32,
         init_pos: &Vec3,
         delegates: &Rc<RefCell<Delegates>>,
-        mission_config: &MissionConfig,
+        mission_state: &MissionState,
     ) {
         // extra stuff not in the original simulation
         self.max_prop_rays = self.params.max_prop_collision_rays;
@@ -797,12 +809,9 @@ impl Katamari {
 
         self.prop_ignore_collision_timer = 0;
 
-        // TODO: `kat_init:181-237` (camera initialization using static mission/area params table)
-
-        self.set_immobile();
-
-        self.update_scaled_params(mission_config);
-        // TODO: `kat_init:253`
+        self.set_immobile(mission_state);
+        self.update_scaled_params(&mission_state.mission_config);
+        // TODO: `kat_init:254` (copy vector 0x71a50 to 0xb3240)
 
         self.prop_combo_count = 0;
         self.physics_flags.wheel_spin = false;
@@ -813,7 +822,7 @@ impl Katamari {
         self.is_climbing = 0;
         if self.physics_flags.climbing_wall {
             self.wallclimb_ticks = 0;
-            self.wallclimb_cooldown = self.params.init_wallclimb_cooldown;
+            self.wallclimb_cooldown_timer = self.params.init_wallclimb_cooldown_timer;
         }
 
         self.physics_flags.climbing_wall = false;
@@ -827,8 +836,15 @@ impl Katamari {
 
     /// Forcibly end the katamari's movement, if it's moving.
     /// offset: 0x1f390
-    pub fn set_immobile(&mut self) {
-        // TODO
+    pub fn set_immobile(&mut self, mission_state: &MissionState) {
+        self.physics_flags.immobile = true;
+        self.speed = 0.0;
+        self.wallclimb_cooldown_timer = 10;
+        self.last_speed = self.speed;
+        self.last_center = self.center;
+        self.bottom = self.center;
+        self.bottom[1] -= self.radius_cm;
+        self.apply_acceleration(mission_state);
     }
 }
 
@@ -840,8 +856,8 @@ impl Katamari {
         let mission_config = &mission_state.mission_config;
 
         // decrement timers
-        if self.wallclimb_cooldown > 0 {
-            self.wallclimb_cooldown -= 1;
+        if self.wallclimb_cooldown_timer > 0 {
+            self.wallclimb_cooldown_timer -= 1;
         }
 
         // record the previous values of various fields
@@ -886,7 +902,7 @@ impl Katamari {
 
         self.update_velocity(prince, mission_state);
         // TODO: self.update_friction()
-        // TODO: self.apply_acceleration()
+        self.apply_acceleration(mission_state);
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;
@@ -907,6 +923,11 @@ impl Katamari {
         vec3::subtract(&mut dist_to_cam, &self.center, &cam_transform.pos);
         self.dist_to_cam = vec3::len(&dist_to_cam);
 
+        // TODO: temporary
+        self.transform[12] = self.center[0];
+        self.transform[13] = self.center[1];
+        self.transform[14] = self.center[2];
+
         // TODO: self.update_vel_relative_to_cam()
 
         // TODO: `kat_update:390-415` (self.update_dust_cloud_vfx())
@@ -925,5 +946,28 @@ impl Katamari {
         mission_config.get_kat_scaled_params(&mut self.scaled_params, self.diam_cm);
         // TODO_VS: there's also some crap at the end with `vsAttack` and gravity.
         // (see `kat_update_scaled_params`)
+    }
+
+    /// Using the katamari volume, cache radius- and diameter-based katamari fields.
+    /// offset: 0x1ee70
+    pub fn cache_sizes(&mut self) {
+        // compute radius and diameter from volume
+        let radius_m = vol_to_rad(self.vol_m3);
+        self.radius_cm = radius_m * 100.0 + self.params.radius_boost_cm;
+        self.diam_cm = self.radius_cm + self.radius_cm;
+
+        if self.diam_cm > 99900.0 {
+            // prevent the diameter from exceeding 999m, for some reason.
+            self.radius_cm = 49950.0;
+            self.diam_cm = 99900.0;
+            self.vol_m3 = f32::from_bits(0x4df9abdf);
+        }
+
+        // TODO: `kat_cache_sizes:26-28` (something about `GameShow` mission)
+
+        self.diam_m = self.diam_cm / 100.0;
+        self.display_radius_cm = self.radius_cm * self.params.display_radius_ratio;
+        self.max_wallclimb_height = self.diam_cm * self.params.max_wallclimb_height_ratio;
+        self.diam_trunc_mm = (self.diam_cm * 10.0) as i32;
     }
 }

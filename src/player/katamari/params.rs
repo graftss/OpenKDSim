@@ -4,7 +4,7 @@ use crate::constants::FRAC_PI_2;
 pub struct KatamariParams {
     /// The number of ticks where the katamari can't start a second climb after falling out
     /// of a first climb.
-    pub init_wallclimb_cooldown: u16,
+    pub init_wallclimb_cooldown_timer: u16,
 
     /// The maximum number of collision rays that can be induced by props.
     pub max_prop_collision_rays: u16,
@@ -79,12 +79,33 @@ pub struct KatamariParams {
     /// the katamari is stuck between walls.
     /// offset: 0x715bc (used at 0x17742)
     pub stuck_detached_prop_vol_mult: f32,
+
+    /// A multiplier on the rate at which vaulted props decay towards the center.
+    /// default: 0.015
+    /// offset: 0x7b218
+    pub vault_prop_pull_to_center_mult: f32,
+
+    /// For some reason when they convert the katamari's volume to its radius,
+    /// they also add 0.01 to the radius. What the hell were they thinking?
+    /// offset: 0x7155c (used at 0x1eec2)
+    pub radius_boost_cm: f32,
+
+    /// The ratio between the display radius (aka the radius of the actual katamari model)
+    /// and the "true" katamari radius computed from its volume.
+    /// default: 0.38
+    /// offset: 0x7b234
+    pub display_radius_ratio: f32,
+
+    /// The ratio of the katamari's diameter that it's able to climb up a wall.
+    /// default: 0.7
+    /// offset: 0x719f8
+    pub max_wallclimb_height_ratio: f32,
 }
 
 impl Default for KatamariParams {
     fn default() -> Self {
         Self {
-            init_wallclimb_cooldown: 10,
+            init_wallclimb_cooldown_timer: 10,
             max_prop_collision_rays: 12,
             prop_attached_alpha: 0.995,
             prop_attach_vol_ratio: f32::from_bits(0x3dcccccd), // 0.1
@@ -100,6 +121,10 @@ impl Default for KatamariParams {
             detach_cooldown_when_stuck_btwn_walls: 15,
             base_detached_prop_vol_mult: f32::from_bits(0x3cf5c28f),
             stuck_detached_prop_vol_mult: 0.5,
+            vault_prop_pull_to_center_mult: f32::from_bits(0x3c75c28f), // 0.015
+            radius_boost_cm: f32::from_bits(0x3c23d70a),                // 0.01
+            display_radius_ratio: f32::from_bits(0x3ec28f5c),           // 0.38
+            max_wallclimb_height_ratio: f32::from_bits(0x3f333333),     // 0.7
         }
     }
 }
