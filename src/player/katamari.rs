@@ -18,7 +18,7 @@ use crate::{
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     delegates::Delegates,
-    macros::{min, set_translation},
+    macros::{min, set_translation, temp_debug_log},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
     props::prop::PropRef,
@@ -877,7 +877,7 @@ impl Katamari {
 
         if self.num_floor_contacts > 0 {
             // if the katamari has a ground contact, update the `last_hit_flags`
-            self.last_hit_flags[0] = self.hit_flags
+            self.last_hit_flags[0] = self.hit_flags;
         }
 
         let oujistate = prince.get_oujistate();

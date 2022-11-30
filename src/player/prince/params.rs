@@ -25,6 +25,8 @@ pub struct PrinceParams {
 
     /// (??) TODO
     pub prince_roll_forwards_angle_threshold: f32,
+
+    pub global_turn_speed_mult: f32,
 }
 
 impl Default for PrinceParams {
@@ -53,6 +55,7 @@ impl Default for PrinceParams {
                 },
             ],
             prince_roll_forwards_angle_threshold: f32::from_bits(0x3f060a92), // 0.5235988
+            global_turn_speed_mult: 1.0,
         }
     }
 }

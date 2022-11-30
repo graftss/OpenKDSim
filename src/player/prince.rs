@@ -7,7 +7,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
-    macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log},
+    macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log, temp_debug_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
@@ -754,9 +754,9 @@ impl Prince {
         let push = self.push_dirs;
         let new_gacha =
             // left stick push dir just changed to the opposite of the right stick push dir 
-            (change.left != None && change.left != push.right) ||
+            (change.left != None && push.right != None && change.left != push.right) ||
             // right stick push dir just changed to the opposite of the left stick push dir
-            (change.right != None && change.right != push.left);
+            (change.right != None && push.left != None && change.right != push.left);
 
         let new_gacha_dir = if !new_gacha {
             None
@@ -897,6 +897,7 @@ impl Prince {
                 // case 3 (left stick neutral, right stick down)
                 self.turn_type = PrinceTurnType::RightStickDown;
                 self.angle_speed = self.one_stick_down_turn_speed
+                    * 0.7
                     * inv_lerp!(self.input_rs_abs.y(), min_push, 1.0);
                 change_bounded_angle(&mut self.angle, self.angle_speed);
             }
@@ -910,8 +911,10 @@ impl Prince {
             } else {
                 // case 5 (right stick neutral, left stick down)
                 self.turn_type = PrinceTurnType::LeftStickDown;
-                self.angle_speed = self.one_stick_down_turn_speed
+                self.angle_speed = -self.one_stick_down_turn_speed
+                    * 0.7
                     * inv_lerp!(self.input_ls_abs.y(), min_push, 1.0);
+                change_bounded_angle(&mut self.angle, self.angle_speed);
             }
         } else {
             // case 6 (neither stick neutral)
@@ -928,7 +931,7 @@ impl Prince {
                 }
 
                 // TODO: move this to prince params
-                // self.update_angle_from_quick_shift(global.prince_turn_speed_mult);
+                self.update_angle_from_quick_shift(self.params.global_turn_speed_mult);
                 return Some(TutorialMove::QuickShift);
             }
 
@@ -973,8 +976,7 @@ impl Prince {
 
             let id = mat4::create();
             mat4::rotate_y(&mut self.push_rotation_mat, &id, push_angle);
-            // TODO: move this to prince params
-            // self.update_angle_from_push(global.prince_turn_speed_mult, push_angle_len);
+            self.update_angle_from_push(self.params.global_turn_speed_mult, push_angle_len);
         }
 
         tut_move_held
@@ -1274,8 +1276,7 @@ impl Player {
                 mission_state
                     .tutorial
                     .as_mut()
-                    .unwrap()
-                    .set_move_held(tut_move);
+                    .map(|tut| tut.set_move_held(tut_move));
             }
         }
     }

@@ -186,9 +186,9 @@ impl Input {
     /// Dequantize this input's analog axes from i8 to f32.
     pub fn dequantize(&self, ls: &mut StickInput, rs: &mut StickInput) {
         ls.axes[0] = dequantize!(self.ls_x);
-        ls.axes[1] = dequantize!(self.ls_y);
+        ls.axes[1] = dequantize!(-self.ls_y);
         rs.axes[0] = dequantize!(self.rs_x);
-        rs.axes[1] = dequantize!(self.rs_y);
+        rs.axes[1] = dequantize!(-self.rs_y);
     }
 
     pub fn set_stick_state(
