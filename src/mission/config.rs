@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     constants::{NUM_MISSIONS, PI},
-    macros::{panic_log, read_bool, read_f32, read_u16, read_u8, rescale},
+    macros::{panic_log, read_bool, read_f32, read_u16, read_u8, rescale, temp_debug_log},
     math::vec3_inplace_scale,
     mission::GameType,
     player::{
@@ -349,14 +349,19 @@ impl MissionConfig {
 
     pub fn get_camera_ctrl_point(&self, camera_state: &mut CameraState, diam_cm: f32) {
         if let Some(ctrl_pts) = &self.camera_params_ctrl_pts {
+            let mut used_idx = 0;
             for (i, ctrl_pt) in ctrl_pts.iter().enumerate() {
                 if diam_cm <= ctrl_pt.diam_cm {
-                    camera_state.kat_offset_ctrl_pts = ctrl_pts.clone();
-                    camera_state.kat_offset_ctrl_pt_idx = i as u8;
-                    camera_state.set_offsets(&ctrl_pt);
+                    // find the first control point with a diameter larger than `diam_cm`, then
+                    // use the control point before that.
+                    used_idx = i - 1;
                     break;
                 }
             }
+
+            // write the selected control point's offsets to the camera state
+            camera_state.kat_offset_ctrl_pt_idx = used_idx as u8;
+            camera_state.set_kat_offsets(&ctrl_pts[used_idx]);
         }
     }
 }

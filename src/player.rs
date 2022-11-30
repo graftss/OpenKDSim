@@ -1,8 +1,4 @@
-use crate::{
-    delegates::DelegatesRef,
-    gamestate::GameState,
-    mission::{self, state::MissionState},
-};
+use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
 
 use self::{
     camera::Camera, constants::MAX_PLAYERS, input::Input, katamari::Katamari, prince::Prince,
@@ -120,6 +116,6 @@ impl GameState {
     }
 
     pub fn update_camera(&mut self, player_idx: usize) {
-        let player = &mut self.players[player_idx];
+        let _player = &mut self.players[player_idx];
     }
 }

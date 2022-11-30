@@ -1,5 +1,5 @@
 #![feature(const_float_bits_conv)]
-#![allow(non_snake_case, dead_code)]
+#![allow(non_snake_case, dead_code, unused_imports)]
 
 // reference this first so it's available to all other modules
 mod macros;

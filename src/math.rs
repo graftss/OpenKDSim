@@ -7,7 +7,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{FRAC_1_3, _4PI},
-    macros::set_y,
+    macros::{set_translation, set_y},
 };
 
 /// Scale `vec` by `scale` in-place.
@@ -82,7 +82,12 @@ pub fn vec3_inplace_normalize(vec: &mut Vec3) {
 /// Writes the yaw rotation matrix of `mat` to `out`.
 pub fn mat4_compute_yaw_rot(mut out: &mut Mat4, mat: &Mat4) {
     let mut left_unit = vec3::create();
-    vec3::transform_mat4(&mut left_unit, &[1.0, 0.0, 0.0], &mat);
+    let mut mat_rot = mat.clone();
+    set_translation!(mat_rot, [0.0, 0.0, 0.0]);
+    vec3::transform_mat4(&mut left_unit, &[1.0, 0.0, 0.0], &mat_rot);
+
+    println!("mat_rot: {mat_rot:#?}");
+    println!("left_unit: {left_unit:#?}");
 
     if left_unit[0] == 0.0 && left_unit[2] == 0.0 {
         // if the left vector is somehow the y+ or y- axis, just set it to x+, apparently
@@ -98,6 +103,59 @@ pub fn mat4_compute_yaw_rot(mut out: &mut Mat4, mat: &Mat4) {
     out[2] = left_unit[2];
     out[8] = -left_unit[2];
     out[10] = left_unit[0];
+}
+
+/// This is kind of janky but it seems to match the simulation.
+pub fn mat4_look_at(out: &mut Mat4, eye: &Vec3, target: &Vec3, up: &Vec3) -> Mat4 {
+    let eyex = eye[0];
+    let eyey = eye[1];
+    let eyez = eye[2];
+    let upx = up[0];
+    let upy = up[1];
+    let upz = up[2];
+
+    let mut z0 = eyex - target[0];
+    let mut z1 = eyey - target[1];
+    let mut z2 = eyez - target[2];
+
+    let mut len = z0 * z0 + z1 * z1 + z2 * z2;
+    if len > 0_f32 {
+        len = 1. / f32::sqrt(len);
+        z0 *= len;
+        z1 *= len;
+        z2 *= len;
+    }
+
+    let mut x0 = upy * z2 - upz * z1;
+    let mut x1 = upz * z0 - upx * z2;
+    let mut x2 = upx * z1 - upy * z0;
+
+    len = x0 * x0 + x1 * x1 + x2 * x2;
+    if len > 0_f32 {
+        len = 1. / f32::sqrt(len);
+        x0 *= len;
+        x1 *= len;
+        x2 *= len;
+    }
+
+    out[0] = -x0;
+    out[4] = -x1;
+    out[8] = -x2;
+    out[3] = 0.;
+    out[1] = z1 * x2 - z2 * x1;
+    out[5] = z2 * x0 - z0 * x2;
+    out[9] = z0 * x1 - z1 * x0;
+    out[7] = 0.;
+    out[2] = -z0; // neg
+    out[6] = -z1;
+    out[10] = -z2;
+    out[11] = 0.;
+    out[12] = eyex;
+    out[13] = eyey;
+    out[14] = eyez;
+    out[15] = 1.;
+
+    *out
 }
 
 /// Normalize a bounded angle in [-2pi, 2pi] to [-pi, pi].

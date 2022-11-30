@@ -1,15 +1,15 @@
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4, vec3,
+    mat4, quat, vec3, vec4,
 };
 
 use crate::{
-    collision::raycast_state::{RaycastCallType, RaycastState},
+    collision::raycast_state::RaycastState,
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     macros::{log, max, min, set_translation, set_y, temp_debug_log, vec3_from},
     math::{
-        change_bounded_angle, mat4_compute_yaw_rot, vec3_inplace_normalize, vec3_inplace_scale,
-        vec3_inplace_subtract_vec,
+        change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
+        vec3_inplace_scale, vec3_inplace_subtract_vec,
     },
     mission::{
         config::{CamScaledCtrlPt, MissionConfig},
@@ -309,7 +309,7 @@ impl CameraState {
         match self.mode {
             CameraMode::Normal => {
                 self.update_main(prince, katamari, true, mission_state, cam_transform);
-                self.update_clip_pos(prince, katamari);
+                // TODO: self.update_clip_pos(prince, katamari);
             }
             CameraMode::R1Jump => {
                 self.update_r1_jump(prince, katamari);
@@ -416,9 +416,9 @@ impl CameraState {
     /// (??) reads the next swirl params from the mission config, but it seems like
     /// other stuff too
     /// offset: 0xd0b0
-    fn update_area_params(&mut self, _mission_config: &MissionConfig, _diam_cm: f32) {
+    fn update_area_params(&mut self, mission_config: &MissionConfig, diam_cm: f32) {
         // TODO
-        // mission_config.get_camera_ctrl_point(self, diam_cm);
+        mission_config.get_camera_ctrl_point(self, diam_cm);
     }
 
     /// Writes the camera position and target points during normal camera movement
@@ -440,21 +440,21 @@ impl CameraState {
 
         // TODO: `camera_compute_normal_pos_and_target:65-187` (a bunch of unusual cases)
 
-        vec3::scale_and_add(
-            &mut target,
-            &kat_center,
-            &pri_to_kat_unit,
-            self.kat_to_pos[2],
-        );
+        let pos_offset = [
+            pri_to_kat_unit[0] * self.kat_to_pos[2],
+            self.kat_to_pos[1],
+            pri_to_kat_unit[2] * self.kat_to_pos[2],
+        ];
+
+        vec3::add(&mut pos, &kat_center, &pos_offset);
 
         // TODO: `camera_compute_normal_pos_and_target:198-213` (handle `SpecialCamera` flag)
-
-        vec3::scale_and_add(
-            &mut pos,
-            &kat_center,
-            &pri_to_kat_unit,
-            self.kat_to_target[2],
-        );
+        let target_offset = [
+            pri_to_kat_unit[0] * self.kat_to_target[2],
+            self.kat_to_target[1],
+            pri_to_kat_unit[2] * self.kat_to_target[2],
+        ];
+        vec3::add(&mut target, &kat_center, &target_offset);
 
         // TODO: `camera_compute_normal_pos_and_target:217-221` (special case: in water on world)
     }
@@ -527,9 +527,11 @@ impl CameraState {
     fn update_clear_goal_prop(&mut self) {}
 
     /// Set the camera's offsets from the katamari to those described by the control point `pt`.
-    pub fn set_offsets(&mut self, pt: &CamScaledCtrlPt) {
+    pub fn set_kat_offsets(&mut self, pt: &CamScaledCtrlPt) {
         vec3::copy(&mut self.kat_to_pos, &pt.kat_to_pos);
         vec3::copy(&mut self.kat_to_target, &pt.kat_to_target);
+        self.kat_to_pos[1] *= -1.0;
+        self.kat_to_target[1] *= -1.0;
     }
 }
 
@@ -540,11 +542,11 @@ impl CameraState {
 pub struct CameraTransform {
     /// The transformation matrix of the camera looking at its target.
     /// offset: 0x0
-    lookat: Mat4,
+    pub lookat: Mat4,
 
     /// The yaw rotation component of the `lookat` matrix.
     /// offset: 0x40
-    yaw_rot: Mat4,
+    pub lookat_yaw_rot: Mat4,
 
     /// (??)
     /// offset: 0x80
@@ -584,24 +586,23 @@ impl CameraTransform {
     /// which should have been already updated.
     /// offset: 0x57fd0
     pub fn propagate_pos_and_target(&mut self) {
-        // compute the unit vector `target - pos`
-        let mut cam_forward = self.target.clone();
-        vec3_inplace_subtract_vec(&mut cam_forward, &self.pos);
-        vec3_inplace_normalize(&mut cam_forward);
-
         // compute the lookat matrix of the camera
-        mat4::look_at(&mut self.lookat, &self.pos, &cam_forward, &VEC3_Y_POS);
+        mat4_look_at(&mut self.lookat, &self.pos, &self.target, &VEC3_Y_POS);
 
         // compute the yaw component of the lookat matrix
-        mat4_compute_yaw_rot(&mut self.yaw_rot, &self.lookat);
+        mat4_compute_yaw_rot(&mut self.lookat_yaw_rot, &self.lookat);
 
         // compute the inverse rotation of the lookat matrix.
         mat4::transpose(&mut self.lookat_rot_inv, &self.lookat);
-        set_translation!(self.lookat_rot_inv, [0.0, 0.0, 0.0]);
+        self.lookat_rot_inv[3] = 0.0;
+        self.lookat_rot_inv[7] = 0.0;
+        self.lookat_rot_inv[11] = 0.0;
 
         mat4_compute_yaw_rot(&mut self.yaw_rot_inv, &self.lookat_rot_inv);
 
         // TODO: `camera_update_extra_matrices()` (offset 0x58e40)
+        //       this is a separate function in the simulation, but it's always called immediately
+        //       after the 0x57fd0 function, so they should probably just be combined
     }
 }
 
@@ -711,8 +712,8 @@ impl Camera {
         &mut self,
         katamari: &Katamari,
         prince: &Prince,
-        pos: &mut Vec3,
-        target: &mut Vec3,
+        mut pos: &mut Vec3,
+        mut target: &mut Vec3,
     ) {
         let mat4_id = mat4::create();
         let mut mat2 = mat4::create();
@@ -743,8 +744,7 @@ impl Camera {
 
             // compute camera target
             let target_offset = self.state.kat_to_target[2];
-            target[0] = kat_center[0] + target_offset * prince_to_kat[0];
-            target[2] = kat_center[2] + target_offset * prince_to_kat[2];
+            vec3::scale_and_add(&mut target, &kat_center, &prince_to_kat, target_offset);
 
             let pos_offset = self.state.kat_to_pos[2];
             let mut kat_to_cam_pos = vec3::create();
@@ -772,8 +772,7 @@ impl Camera {
             };
 
             // compute camera position
-            pos[0] = kat_center[0] + kat_to_cam_pos[0];
-            pos[2] = kat_center[2] + kat_to_cam_pos[2];
+            vec3::add(&mut pos, &kat_center, &kat_to_cam_pos);
 
             // TODO: `camera_compute_normal_pos_and_target:217-221` (extra weird check)
         }

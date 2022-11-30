@@ -623,7 +623,7 @@ impl Katamari {
     }
 
     pub fn get_radius(&self) -> f32 {
-        self.radius_cm + 0.02
+        self.radius_cm
     }
 
     pub fn get_display_radius(&self) -> f32 {

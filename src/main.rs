@@ -1,14 +1,15 @@
 #![feature(const_float_bits_conv)]
 #![feature(vec_into_raw_parts)]
-#![allow(non_snake_case, dead_code)]
+#![allow(non_snake_case, dead_code, unused_imports)]
 
 use std::cell::RefCell;
 
 use gamestate::GameState;
+use gl_matrix::{common::Vec3, mat4, quat, vec3};
 use props::prop::AddPropArgs;
 
 // reference this first so it's available to all other modules
-mod macros;
+pub mod macros;
 
 mod collision;
 mod constants;
@@ -136,8 +137,38 @@ unsafe fn test() {
     mission::config::MissionConfig::get(&mut s, 1);
     // let mut params = mission::config::CamScaledCtrlPt::default()
 
-    println!("{:#?}", s.camera_params_ctrl_pts);
     // println!("max size: {:#?}", s.scaled_params_max_size);
+}
+
+fn test_cam_pos(
+    mut pos: &mut Vec3,
+    mut target: &mut Vec3,
+    kat_center: &Vec3,
+    prince_pos: &Vec3,
+    kat_to_pos: &Vec3,
+    kat_to_target: &Vec3,
+) {
+    let mut pri_to_kat_unit = [0.0; 3];
+    vec3::sub(&mut pri_to_kat_unit, &kat_center, &prince_pos);
+    pri_to_kat_unit[1] = 0.0;
+    math::vec3_inplace_normalize(&mut pri_to_kat_unit);
+
+    // TODO: `camera_compute_normal_pos_and_target:65-187` (a bunch of unusual cases)
+    let mut scaled_pos_offset = [0.0; 3];
+    scaled_pos_offset[0] = pri_to_kat_unit[0] * kat_to_pos[2];
+    scaled_pos_offset[1] = kat_to_pos[1];
+    scaled_pos_offset[2] = pri_to_kat_unit[2] * kat_to_pos[2];
+
+    vec3::add(&mut pos, &kat_center, &scaled_pos_offset);
+
+    // TODO: `camera_compute_normal_pos_and_target:198-213` (handle `SpecialCamera` flag)
+
+    let scaled_target_offset = [
+        pri_to_kat_unit[0] * kat_to_target[2],
+        kat_to_target[1],
+        pri_to_kat_unit[2] * kat_to_target[2],
+    ];
+    vec3::add(&mut target, &kat_center, &scaled_target_offset);
 }
 
 fn main() {
