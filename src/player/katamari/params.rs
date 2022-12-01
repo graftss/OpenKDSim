@@ -145,6 +145,28 @@ pub struct KatamariParams {
     /// The number of ticks between brake vfx plays (while braking).
     /// default: 10
     pub brake_vfx_cooldown: u8,
+
+    /// (??) used in `update_friction`
+    /// default: 0.01
+    /// offset: 0x7155c (used at 0x21645)
+    pub min_speed_to_move: f32,
+
+    /// The value that scales the acceleration effect of friction when grounded
+    /// by katamari's bottom collision ray.
+    /// default: 0.0352
+    /// offset: 0x7b200
+    pub bottom_ray_friction: f32,
+
+    /// A value that scales the acceleration effect of friction when grounded
+    /// by one of the katamari's mesh or prop collision rays.
+    /// default: 0.005
+    /// offset: 0x7b214
+    pub nonbottom_ray_friction: f32,
+
+    /// The factor by which friction is reduced when moving downhill on a `SpeedCheckOff` surface.
+    /// default: 0.55
+    /// offset: 0x715c8
+    pub speed_check_off_friction_reduction: f32,
 }
 
 impl Default for KatamariParams {
@@ -180,6 +202,10 @@ impl Default for KatamariParams {
             boost_speed_mult: 1.0,
             brakeable_max_speed_ratio: f32::from_bits(0x3ee66666),
             brake_vfx_cooldown: 10,
+            min_speed_to_move: f32::from_bits(0x3c23d70a),
+            bottom_ray_friction: f32::from_bits(0x3d10d2e0), // 0.0352
+            nonbottom_ray_friction: f32::from_bits(0x3ba3d70a), // 0.005
+            speed_check_off_friction_reduction: f32::from_bits(0x3f0ccccd), // 0.55
         }
     }
 }

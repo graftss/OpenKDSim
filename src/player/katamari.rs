@@ -548,6 +548,10 @@ pub struct Katamari {
     /// offset: 0x399c
     fc_ray_idx: Option<u16>,
 
+    /// (??) The ratio of the current vaulted ray's length to the maximum vaulted ray length
+    /// (the maximum such length is 2.5 times the katamari's radius)
+    vault_ray_max_len_ratio: f32,
+
     /// (??) The maximum allowed length of any collision ray.
     /// offset: 0x39ac
     max_allowed_ray_len: f32,
@@ -939,7 +943,7 @@ impl Katamari {
         );
 
         self.update_velocity(prince, camera, mission_state);
-        // TODO: self.update_friction()
+        self.apply_friction(prince, mission_state);
         self.apply_acceleration(mission_state);
 
         let cam_transform = camera.get_transform();
@@ -969,6 +973,12 @@ impl Katamari {
         if !camera.preclear.get_enabled() {
             // TODO: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
+
+        temp_debug_log!(
+            "center: {:?}, velocity:{:?}",
+            self.center,
+            self.velocity.velocity
+        );
     }
 
     /// Update the katamari's scaled params by interpolating the mission's param control points.

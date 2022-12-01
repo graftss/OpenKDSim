@@ -5,7 +5,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Z_POS},
-    macros::{lerp, max, set_y, vec3_from},
+    macros::{inv_lerp, lerp, max, panic_log, set_y, vec3_from},
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract_vec,
@@ -518,6 +518,75 @@ impl Katamari {
     fn compute_spline_accel_mult(&self, _prince: &Prince) -> f32 {
         // TODO
         1.0
+    }
+
+    /// Compute the katamari's acceleration due to friction.
+    /// offset: 0x21590
+    pub(super) fn apply_friction(&mut self, prince: &Prince, mission_state: &MissionState) {
+        if !self.physics_flags.airborne {
+            // if not airborne:
+            // next velocity is `velocity + accel_incline + bonus_vel`
+            let mut next_vel = vec3_from!(+, self.velocity.velocity, self.velocity.accel_incline);
+            vec3_inplace_add_vec(&mut next_vel, &self.bonus_vel);
+            let next_speed = vec3::length(&next_vel);
+
+            if next_speed > self.params.min_speed_to_move || next_speed - self.last_speed > 0.0 {
+                // if the katamari is moving fast enough to apply friction:
+                self.physics_flags.immobile = false;
+                let bottom_friction = self.params.bottom_ray_friction * self.speed;
+
+                let mut t = match self.physics_flags.grounded_ray_type {
+                    Some(KatCollisionRayType::Bottom) => {
+                        // TODO_VS: `kat_update_friction:41-45`
+                        bottom_friction
+                    }
+                    Some(_) => {
+                        let t = match prince.oujistate.dash {
+                            true => {
+                                inv_lerp!(self.speed, self.max_forwards_speed, self.max_boost_speed)
+                                    .clamp(0.0, 1.0)
+                            }
+                            false => 1.0,
+                        };
+
+                        // TODO: remove this when `kat_try_init_vault_speed` is implemented
+                        let max_length_ratio = 1.0;
+                        let angle_btwn_rejs = 1.0;
+                        let k =
+                            max_length_ratio * angle_btwn_rejs * self.params.nonbottom_ray_friction;
+                        lerp!(t, bottom_friction, bottom_friction * k)
+                    }
+                    None => {
+                        panic_log!("this should not happen");
+                    }
+                };
+
+                // TODO: ??
+                if prince.get_flags() & 0x40000 != 0 {
+                    t *= 0.1234
+                }
+
+                vec3::scale(
+                    &mut self.velocity.accel_ground_friction,
+                    &self.velocity.vel_accel_unit,
+                    -t,
+                );
+            } else {
+                self.set_immobile(mission_state);
+            }
+        } else {
+            // if airborne:
+            vec3::zero(&mut self.velocity.accel_ground_friction);
+        }
+
+        if self.hit_flags.speed_check_off
+            && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill
+        {
+            vec3_inplace_scale(
+                &mut self.velocity.accel_ground_friction,
+                self.params.speed_check_off_friction_reduction,
+            );
+        }
     }
 
     pub(super) fn apply_acceleration(&mut self, mission_state: &MissionState) {
