@@ -26,6 +26,10 @@ pub struct PrinceParams {
     /// (??) TODO
     pub prince_roll_forwards_angle_threshold: f32,
 
+    /// Global multiplier on the prince's turn speed around the katamari.
+    /// Set by the API function `SetKatamariSpeed`.
+    /// default: 1.0
+    /// offset: 0x7acf4
     pub global_turn_speed_mult: f32,
 }
 

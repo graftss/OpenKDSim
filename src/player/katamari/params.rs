@@ -1,4 +1,4 @@
-use crate::constants::FRAC_PI_2;
+use crate::{constants::FRAC_PI_2, player::prince::PushDir};
 
 #[derive(Debug)]
 pub struct KatamariParams {
@@ -100,6 +100,41 @@ pub struct KatamariParams {
     /// default: 0.7
     /// offset: 0x719f8
     pub max_wallclimb_height_ratio: f32,
+
+    /// (??)
+    /// default: 0.95
+    /// offset: 0x719fc
+    pub wallclimb_speed_penalty: f32,
+
+    /// The number of ticks that the katamari can be in the `KatBoostEffectState::Build` state.
+    pub boost_build_duration: u16,
+
+    /// The number of ticks that the katamari can be in the `KatBoostEffectState::Release` state.
+    pub boost_release_duration: u16,
+
+    /// The number of ticks that the katamari can be in the `KatBoostEffectState::Release` state
+    /// while it's in water.
+    pub boost_release_duration_in_water: u16,
+
+    /// Multiplier to katamari speed when pushing forwards.
+    /// default: 1.0
+    /// offset: 0x7b0ec
+    pub forwards_speed_mult: f32,
+
+    /// Multiplier to katamari speed when pushing backwards.
+    /// default: 1.0
+    /// offset: 0x7b124
+    pub sideways_speed_mult: f32,
+
+    /// Multiplier to katamari speed when pushing sideways.
+    /// default: 1.0
+    /// offset: 0x7b128
+    pub backwards_speed_mult: f32,
+
+    /// Multiplier to katamari speed when boosting.
+    /// default: 1.0
+    /// offset: 0x7a25c
+    pub boost_speed_mult: f32,
 }
 
 impl Default for KatamariParams {
@@ -124,7 +159,25 @@ impl Default for KatamariParams {
             vault_prop_pull_to_center_mult: f32::from_bits(0x3c75c28f), // 0.015
             radius_boost_cm: f32::from_bits(0x3c23d70a),                // 0.01
             display_radius_ratio: f32::from_bits(0x3ec28f5c),           // 0.38
-            max_wallclimb_height_ratio: f32::from_bits(0x3f333333),     // 0.7
+            max_wallclimb_height_ratio: f32::from_bits(0x3f333333),
+            wallclimb_speed_penalty: f32::from_bits(0x3f733333), // 0.95
+            boost_build_duration: 14,
+            boost_release_duration: 15,
+            boost_release_duration_in_water: 10,
+            forwards_speed_mult: 1.0,
+            sideways_speed_mult: 1.0,
+            backwards_speed_mult: 1.0,
+            boost_speed_mult: 1.0,
+        }
+    }
+}
+
+impl KatamariParams {
+    pub fn get_speed_mult(&self, push_dir: PushDir) -> f32 {
+        match push_dir {
+            PushDir::Forwards => self.forwards_speed_mult,
+            PushDir::Backwards => self.backwards_speed_mult,
+            PushDir::Sideways => self.sideways_speed_mult,
         }
     }
 }

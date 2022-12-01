@@ -5,16 +5,21 @@ use gl_matrix::{
 
 use crate::{
     constants::{FRAC_PI_2, PI, TAU},
-    macros::{max, set_y},
+    macros::{lerp, max, set_y},
     math::{
         normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize,
         vec3_inplace_zero_small,
     },
     mission::{stage::Stage, state::MissionState},
-    player::prince::Prince,
+    player::{
+        camera::Camera,
+        prince::{Prince, PushDir},
+    },
 };
 
-use super::{collision::ray::KatCollisionRayType, flags::KatInclineMoveType, Katamari};
+use super::{
+    collision::ray::KatCollisionRayType, flags::KatInclineMoveType, KatBoostEffectState, Katamari,
+};
 
 /// 0.9998
 const ALMOST_1: f32 = f32::from_bits(0x3f7ff2e5);
@@ -76,10 +81,224 @@ pub struct KatVelocity {
 }
 
 impl Katamari {
-    pub(super) fn update_velocity(&mut self, _prince: &Prince, mission: &MissionState) {
-        mission
+    pub(super) fn update_velocity(
+        &mut self,
+        prince: &mut Prince,
+        camera: &Camera,
+        mission_state: &MissionState,
+    ) {
+        let vel_accel_len = vec3::length(&self.velocity.vel_accel);
+
+        mission_state
             .mission_config
             .get_kat_scaled_params(&mut self.scaled_params, self.diam_cm);
+
+        if self.physics_flags.vs_mode_state == 2 {
+            return;
+        }
+
+        if prince.oujistate.dash_start {
+            // TODO: self.init_boost();
+            self.boost_effect_state = Some(super::KatBoostEffectState::Build);
+            self.boost_effect_timer = 0;
+        }
+
+        prince.oujistate.dash_effect = false;
+        if prince.oujistate.dash || prince.oujistate.dash_start {
+            // if dashing:
+            if let Some(state) = self.boost_effect_state {
+                match state {
+                    KatBoostEffectState::Build => {
+                        if !self.physics_flags.in_water || self.boost_effect_timer > 0 {
+                            prince.oujistate.dash_effect = true;
+                            self.boost_effect_timer += 1;
+                            if self.boost_effect_timer > self.params.boost_build_duration {
+                                self.boost_effect_state = Some(KatBoostEffectState::StopBuilding);
+                            }
+                            if self.physics_flags.in_water {
+                                self.boost_effect_state = Some(KatBoostEffectState::Release);
+                                self.boost_effect_timer =
+                                    self.params.boost_release_duration_in_water;
+                            }
+                        }
+                    }
+                    KatBoostEffectState::StopBuilding => {
+                        prince.oujistate.dash_effect = true;
+                        if self.physics_flags.braking || !prince.oujistate.wheel_spin {
+                            self.boost_effect_state = Some(KatBoostEffectState::Release);
+                            self.boost_effect_timer = self.params.boost_release_duration;
+                        }
+                        if self.physics_flags.in_water {
+                            self.boost_effect_state = Some(KatBoostEffectState::Release);
+                            self.boost_effect_timer = self.params.boost_release_duration_in_water;
+                        }
+                    }
+                    KatBoostEffectState::Release => {
+                        prince.oujistate.dash_effect = false;
+                        self.boost_effect_timer -= 1;
+                        if self.boost_effect_timer == 0 {
+                            self.boost_effect_state = Some(KatBoostEffectState::End);
+                        }
+                    }
+                    KatBoostEffectState::End => {
+                        prince.oujistate.dash_effect = false;
+                    }
+                }
+            }
+
+            // update `oujistate.sw_speed_disp` and its associated timer
+            if !mission_state.is_vs_mode && prince.oujistate.dash {
+                if !prince.oujistate.wheel_spin && self.sw_speed_disp_timer > 0 {
+                    self.sw_speed_disp_timer -= 1;
+                    prince.oujistate.sw_speed_disp = self.sw_speed_disp_timer > 0;
+                }
+            } else {
+                prince.oujistate.sw_speed_disp = false;
+            }
+        }
+
+        prince.oujistate.camera_mode = camera.get_mode().into();
+        prince.oujistate.climb_wall = self.physics_flags.climbing_wall;
+        prince.oujistate.hit_water = self.physics_flags.in_water;
+        prince.oujistate.submerge = self.physics_flags.under_water;
+        prince.oujistate.camera_state = camera.get_r1_jump_state().map_or(0, |s| s.into());
+        prince.oujistate.vs_attack = self.physics_flags.vs_attack;
+
+        if mission_state.is_tutorial() {
+            // TODO_TUTORIAL: `kat_update_velocity:155-165`
+        }
+
+        let (mut push_accel, push_mag) = if !prince.oujistate.dash {
+            // if not boosting:
+            let accel = if let Some(push_dir) = prince.get_push_dir() {
+                self.scaled_params.get_push_accel(push_dir)
+            } else {
+                vel_accel_len
+            };
+
+            (accel, prince.input_avg_push_len)
+        } else {
+            // if boosting:
+            let accel = if prince.oujistate.wheel_spin {
+                0.0
+            } else {
+                self.scaled_params.boost_accel
+            };
+
+            (accel, 1.0)
+        };
+
+        self.physics_flags.no_input_push = push_mag <= 0.0;
+
+        if prince.get_flags() & 0x40000 != 0 {
+            // if quick shifting:
+            // TODO: (or pinching?)
+            // rotate the `vel_accel` velocity by the angle the prince is turning
+            let mut yaw_rot = [0.0; 16];
+            mat4::from_y_rotation(&mut yaw_rot, prince.get_angle_speed());
+            let vel_accel = self.velocity.vel_accel;
+            vec3::transform_mat4(&mut self.velocity.vel_accel, &vel_accel, &yaw_rot);
+        }
+
+        // (??) compute speed multiplier
+        let mut base_speed_mult = if !prince.oujistate.dash {
+            let sideways_speed = self.scaled_params.get_push_max_speed(PushDir::Sideways)
+                * self.params.get_speed_mult(PushDir::Sideways);
+
+            let push_speed = if prince.get_push_dir() == Some(PushDir::Forwards) {
+                self.scaled_params.get_push_max_speed(PushDir::Forwards)
+                    * self.params.get_speed_mult(PushDir::Forwards)
+            } else {
+                self.scaled_params.get_push_max_speed(PushDir::Backwards)
+                    * self.params.get_speed_mult(PushDir::Backwards)
+            };
+
+            let pre_speed = lerp!(prince.get_push_strength(), sideways_speed, push_speed);
+            // TODO: `kat_update_velocity:240-256` (annoying lerp crap)
+            pre_speed
+        } else {
+            self.scaled_params.max_boost_speed * self.params.boost_speed_mult
+        };
+
+        // apply a max speed penalty while huffing
+        base_speed_mult *= prince.get_huff_speed_penalty();
+
+        if self.physics_flags.airborne {
+            // if the katamari is airborne, its speed shouldn't change
+            push_accel = 0.0;
+            base_speed_mult = 1.0;
+        }
+
+        let climb_mult = match self.physics_flags.climbing_wall {
+            true => self.params.wallclimb_speed_penalty,
+            false => 1.0,
+        };
+
+        let _speed = self.scaled_params.base_max_speed * base_speed_mult * climb_mult;
+
+        // TODO_VS: `kat_update_velocity:304-324`
+
+        // compute max speeds from scaled params
+        let base_speed = self.scaled_params.base_max_speed;
+        self.base_speed = base_speed;
+        self.max_forwards_speed = base_speed * self.scaled_params.max_forwards_speed;
+        self.max_boost_speed = base_speed * self.scaled_params.max_boost_speed;
+        self.max_sideways_speed = base_speed * self.scaled_params.max_sideways_speed;
+        self.max_backwards_speed = base_speed * self.scaled_params.max_backwards_speed;
+
+        // TODO: `kat_compute_brake_state()`
+        // TODO: `kat_update_velocity:342-494` (use result of computing brake state)
+        // note that the above code will modify `accel` if the katamari is braking
+        // TODO: hopefully this block also modifies `vel_accel`??
+        let _is_vs_mode_shoot = false; // TODO_VS: this value is updated above
+
+        if !self.physics_flags.braking {
+            self.input_push_dir = prince.get_push_dir();
+        }
+        prince.oujistate.brake = self.physics_flags.braking;
+
+        // compute acceleration penalty when moving uphill
+        let incline_accel_mult = match self.physics_flags.incline_move_type {
+            KatInclineMoveType::MoveUphill => prince.get_uphill_accel_penalty(),
+            _ => 1.0,
+        };
+
+        // compute spine-derived acceleration multiplier (used to smooth the acceleration
+        // out i guess)
+        let spline_mult = match self.physics_flags.braking {
+            true => 1.0,
+            false => self.compute_spline_accel_mult(prince),
+        };
+
+        let _accel = push_accel * push_mag * incline_accel_mult * spline_mult;
+
+        // TODO: `kat_update_velocity:508-586` (apply acceleration from ground contact)
+
+        self.velocity.last_vel_accel = self.velocity.vel_accel;
+
+        // TODO: `kat_update_velocity:595-601`
+
+        // the katamari's speed cap is greatly increased when moving downhill on floors
+        // with the `SpeedCheckOff` hit attribute. (e.g. the mas5/mas8 hill)
+        let _uncap_speed = self.hit_flags.speed_check_off
+            && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill;
+
+        // TODO: `kat_update_velocity:608-639`
+
+        // if the katamari just bonked, set velocity equal to the initial bonk velocity
+        if self.physics_flags.bonked {
+            self.velocity.velocity = self.init_bonk_velocity;
+            self.physics_flags.bonked = false;
+        }
+
+        vec3::normalize(&mut self.velocity.velocity_unit, &self.velocity.velocity);
+    }
+
+    /// Computes a multiplier on the katamari's acceleration derived from a spline.
+    /// offset: 0x232d0
+    fn compute_spline_accel_mult(&self, _prince: &Prince) -> f32 {
+        // TODO
+        1.0
     }
 
     pub(super) fn apply_acceleration(&mut self, mission_state: &MissionState) {

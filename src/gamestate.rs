@@ -51,6 +51,33 @@ impl GameState {
         &self.mission_state.mission_config
     }
 
+    /// Mimicks `SetKatamariSpeed` API function.
+    /// Note that the four acceleration values are unused (as they are in the
+    /// original simulation).
+    pub fn set_katamari_speed(
+        &mut self,
+        forw_s: f32,
+        side_s: f32,
+        backw_s: f32,
+        boost_s: f32,
+        _forw_a: f32,
+        _side_a: f32,
+        _back_a: f32,
+        _boost_a: f32,
+        rot_s: f32,
+        dp_y: f32,
+        cam_x: f32,
+        cam_y: f32,
+        cam_z: f32,
+    ) {
+        self.global.royal_warp_plane_y = dp_y;
+        self.players[0]
+            .katamari
+            .set_speed(forw_s, side_s, backw_s, boost_s);
+        self.players[0].prince.set_global_turn_speed(rot_s);
+        self.players[0].camera.set_delay(cam_x, cam_y, cam_z);
+    }
+
     /// Mimicks the `SetGameTime` API function.
     pub fn set_game_time(
         &mut self,

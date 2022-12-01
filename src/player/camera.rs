@@ -18,127 +18,41 @@ use crate::{
     },
 };
 
-use self::preclear::PreclearState;
+use self::{mode::CameraMode, params::CameraParams, preclear::PreclearState};
 
 use super::{katamari::Katamari, prince::Prince};
 
+pub mod mode;
+pub mod params;
 pub mod preclear;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum CameraMode {
-    Normal,
-    R1Jump,
-    L1Look,
-    HitByProp,
-    Clear,
-    Shoot,
-    ShootRet,
-    Ending1,
-    Ending2,
-    Ending3,
-    AreaChange,
-    ClearGoalProp,
-    VsResult,
-    Unknown(i32),
-}
-
-impl Default for CameraMode {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
-impl From<i32> for CameraMode {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => CameraMode::Normal,
-            1 => CameraMode::R1Jump,
-            2 => CameraMode::L1Look,
-            3 => CameraMode::HitByProp,
-            4 => CameraMode::Clear,
-            5 => CameraMode::Shoot,
-            6 => CameraMode::ShootRet,
-            7 => CameraMode::Ending1,
-            8 => CameraMode::Ending2,
-            9 => CameraMode::Ending3,
-            10 => CameraMode::AreaChange,
-            11 => CameraMode::ClearGoalProp,
-            12 => CameraMode::VsResult,
-            _ => {
-                log!("encountered unknown `CameraMode` value: {}", value);
-                CameraMode::Unknown(value)
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct CameraParams {
-    /// (??) A duration when the camera is zooming out.
-    /// offset: 0x7a0b4
-    pub scale_up_duration_long: i32,
-
-    /// (??) A duration when the camera is zooming out.
-    /// offset: 0x7a0b8
-    pub scale_up_duration_short: i32,
-
-    /// (??) The initial timer when changing to Shoot mode.
-    pub shoot_timer_init: u16,
-
-    /// (??) The initial timer when changing to Shootret mode.
-    pub shoot_ret_timer_init: u16,
-
-    /// (??)
-    /// offset: 0xd345e8
-    pub param_0xd345e8: f32,
-
-    /// (??)
-    /// offset: 0xd345ec
-    pub param_0xd345ec: f32,
-
-    /// A factor controlling how much the "special camera" move closer
-    /// *laterally* to the katamari.
-    pub special_camera_tighten: f32,
-
-    /// The vertical speed of the L1 look camera.
-    /// offset: 0x7a058
-    pub l1_look_speed_y: f32,
-
-    /// The horizontal speed of the L1 look camera.
-    /// offset: 0x7a05c
-    pub l1_look_speed_x: f32,
-
-    /// The max y angle of the L1 look camera.
-    /// offset: 0x7a050
-    pub l1_look_max_y: f32,
-
-    /// The min y angle of the L1 look camera.
-    /// offset: 0x7a054
-    pub l1_look_min_y: f32,
-}
-
-impl Default for CameraParams {
-    fn default() -> Self {
-        Self {
-            scale_up_duration_long: 100,
-            scale_up_duration_short: 60,
-            shoot_timer_init: 0x3c,
-            shoot_ret_timer_init: 0x14,
-            param_0xd345e8: f32::from_bits(0xff027d4b),
-            param_0xd345ec: 0.0,
-            special_camera_tighten: 0.75,
-            l1_look_speed_x: f32::from_bits(0x3d0ef998),
-            l1_look_speed_y: f32::from_bits(0x3cc82be9),
-            l1_look_max_y: f32::from_bits(0x3f860a7c),
-            l1_look_min_y: f32::from_bits(0x3e71465f),
-        }
-    }
-}
 
 /// TODO
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CamOverrideType {
     PrinceLocked,
+}
+
+/// Different camera states when transitioning into and out of an R1 jump.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CamR1JumpState {
+    /// At the start of a jump when the prince is gaining height.
+    Rising,
+
+    /// During a jump when the prince is at max height.
+    AtPeak,
+
+    /// At the end of a jump when the prince loses height.
+    Falling,
+}
+
+impl Into<u8> for CamR1JumpState {
+    fn into(self) -> u8 {
+        match self {
+            CamR1JumpState::Rising => 0,
+            CamR1JumpState::AtPeak => 1,
+            CamR1JumpState::Falling => 2,
+        }
+    }
 }
 
 /// General camera state.
@@ -232,6 +146,34 @@ pub struct CameraState {
     /// The camera target in world space.
     /// offset: 0xb0
     target: Vec3,
+
+    /// The initial camera position at the start of the r1 jump.
+    /// offset: 0x844
+    r1_jump_init_pos: Vec3,
+
+    /// offset: 0x854
+    r1_jump_target: Vec3,
+
+    /// offset: 0x864
+    r1_jump_extra_height: Vec3,
+
+    /// offset: 0x874
+    r1_jump_last_extra_height: Vec3,
+
+    /// offset: 0x884
+    r1_jump_timer: u16,
+
+    /// offset: 0x888
+    r1_jump_duration: u16,
+
+    /// offset: 0x88c
+    r1_jump_peak_height: f32,
+
+    /// offset: 0x890
+    r1_jump_height_ratio: f32,
+
+    /// offset: 0x894
+    r1_jump_state: Option<CamR1JumpState>,
 
     /// (??)
     /// offset: 0x8a8
@@ -625,6 +567,16 @@ impl Camera {
 
     pub fn is_scaling_up(&self) -> bool {
         self.state.scale_up_in_progress
+    }
+
+    pub fn get_r1_jump_state(&self) -> Option<CamR1JumpState> {
+        self.state.r1_jump_state
+    }
+
+    pub fn set_delay(&mut self, x: f32, y: f32, z: f32) {
+        self.params.delay_x = x;
+        self.params.delay_y = y;
+        self.params.delay_z = z;
     }
 }
 

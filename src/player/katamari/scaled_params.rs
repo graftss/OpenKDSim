@@ -1,6 +1,7 @@
 use crate::{
     macros::{inv_lerp, lerp},
     mission::config::KatScaledParamsCtrlPt,
+    player::prince::PushDir,
 };
 
 /// Katamari parameters which vary based on the katamari's current size.
@@ -131,6 +132,22 @@ impl KatScaledParams {
             lerp_param!(self, min_pt, max_pt, t, alarm_closest_range);
             lerp_param!(self, min_pt, max_pt, t, alarm_closer_range);
             lerp_param!(self, min_pt, max_pt, t, alarm_close_range);
+        }
+    }
+
+    pub fn get_push_accel(&self, push_dir: PushDir) -> f32 {
+        match push_dir {
+            PushDir::Forwards => self.forwards_accel,
+            PushDir::Backwards => self.sideways_accel,
+            PushDir::Sideways => self.backwards_accel,
+        }
+    }
+
+    pub fn get_push_max_speed(&self, push_dir: PushDir) -> f32 {
+        match push_dir {
+            PushDir::Forwards => self.max_forwards_speed,
+            PushDir::Backwards => self.max_backwards_speed,
+            PushDir::Sideways => self.max_sideways_speed,
         }
     }
 }

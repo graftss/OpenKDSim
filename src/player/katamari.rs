@@ -35,21 +35,8 @@ use self::{
 
 use super::{
     camera::Camera,
-    prince::{Prince, PrincePushDir},
+    prince::{Prince, PushDir},
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KatPushDir {
-    Forwards,
-    Backwards,
-    Sideways,
-}
-
-impl Default for KatPushDir {
-    fn default() -> Self {
-        Self::Forwards
-    }
-}
 
 /// (??) not sure about this
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +44,15 @@ pub enum AlarmType {
     Closest,
     Closer,
     Close,
+}
+
+/// TODO
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KatBoostEffectState {
+    Build,
+    StopBuilding,
+    Release,
+    End,
 }
 
 #[derive(Debug, Default)]
@@ -202,11 +198,11 @@ pub struct Katamari {
 
     /// (??)
     /// offset: 0x10d
-    brake_push_dir: KatPushDir,
+    brake_push_dir: Option<PushDir>,
 
     /// (??)
     /// offset: 0x10e
-    input_push_dir: KatPushDir,
+    input_push_dir: Option<PushDir>,
 
     /// The number of ticks the katamari has been airborne.
     /// Resets to 0 each time the katamari starts being airborne.
@@ -303,6 +299,10 @@ pub struct Katamari {
     /// (??) Extra flat velocity??
     /// offset: 0x660
     bonus_vel: Vec3,
+
+    /// (??) velocity after a bonk??
+    /// offset: 0x670
+    init_bonk_velocity: Vec3,
 
     /// The top point of the katamari sphere.
     /// offset: 0x680
@@ -608,6 +608,19 @@ pub struct Katamari {
     /// offset: 0x3b38
     is_look_l1: bool,
 
+    /// (??)
+    /// offset:
+    boost_effect_state: Option<KatBoostEffectState>,
+
+    /// (??)
+    /// offset: 0x3b6e
+    boost_effect_timer: u16,
+
+    /// When >0, `oujistate.sw_speed_disp` is true. When the timer reaches 0, `oujistate.sw_speed_disp`
+    /// is set to false.
+    /// offset: 0x3b70
+    sw_speed_disp_timer: u16,
+
     /// Whether or not the "something's coming" alarm is going off.
     /// offset: 0x3b84
     alarm_mode: bool,
@@ -668,11 +681,11 @@ impl Katamari {
 
     /// Computes the ratio of the katamari's current speed to its "max" speed,
     /// which varies with the prince's push direction.
-    pub fn get_speed_ratio(&self, push_dir: PrincePushDir) -> f32 {
+    pub fn get_speed_ratio(&self, push_dir: PushDir) -> f32 {
         match push_dir {
-            PrincePushDir::Forwards => self.speed / self.max_forwards_speed,
-            PrincePushDir::Backwards => self.speed / self.max_backwards_speed,
-            PrincePushDir::Sideways => self.speed / self.max_sideways_speed,
+            PushDir::Forwards => self.speed / self.max_forwards_speed,
+            PushDir::Backwards => self.speed / self.max_backwards_speed,
+            PushDir::Sideways => self.speed / self.max_sideways_speed,
         }
     }
 
@@ -770,7 +783,6 @@ impl Katamari {
 
         self.player = player;
         self.mesh_index = 1;
-        self.input_push_dir = KatPushDir::Forwards;
 
         self.min_slope_grade_0x1b0 = self.params.min_slope_grade;
         self.min_brake_angle = self.params.min_brake_angle;
@@ -842,6 +854,14 @@ impl Katamari {
         // TODO: `kat_init:286-288` (compute initial airborne prop gravity)
     }
 
+    /// Set global katamari speed multipliers, as in the API function `SetKatamariSpeed`.
+    pub fn set_speed(&mut self, forw: f32, side: f32, backw: f32, boost: f32) {
+        self.params.forwards_speed_mult = forw;
+        self.params.forwards_speed_mult = side;
+        self.params.forwards_speed_mult = backw;
+        self.params.forwards_speed_mult = boost;
+    }
+
     /// Forcibly end the katamari's movement, if it's moving.
     /// offset: 0x1f390
     pub fn set_immobile(&mut self, mission_state: &MissionState) {
@@ -859,7 +879,7 @@ impl Katamari {
 impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
-    pub fn update(&mut self, prince: &Prince, camera: &Camera, mission_state: &MissionState) {
+    pub fn update(&mut self, prince: &mut Prince, camera: &Camera, mission_state: &MissionState) {
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -908,7 +928,7 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
-        self.update_velocity(prince, mission_state);
+        self.update_velocity(prince, camera, mission_state);
         // TODO: self.update_friction()
         self.apply_acceleration(mission_state);
 

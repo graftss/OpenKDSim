@@ -7,11 +7,11 @@ use gl_matrix::{
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
-    macros::{inv_lerp, inv_lerp_clamp, max, min, panic_log, temp_debug_log},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, temp_debug_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
-        camera::{Camera, CameraMode},
+        camera::{mode::CameraMode, Camera},
         input::{AnalogPushDirs, GachaDir, Input, StickInput, StickPushDir},
         katamari::Katamari,
         Player,
@@ -29,16 +29,16 @@ pub struct OujiState {
     pub dash: bool,
     pub wheel_spin: bool,
     pub jump_180: bool,
-    pub sw_speed_disp: u8,
-    pub climb_wall: u8,
+    pub sw_speed_disp: bool,
+    pub climb_wall: bool,
     pub huff: bool,
     pub camera_mode: u8,
-    pub dash_effect: u8,
-    pub hit_water: u8,
-    pub submerge: u8,
+    pub dash_effect: bool,
+    pub hit_water: bool,
+    pub submerge: bool,
     pub camera_state: u8,
     pub jump_180_leap: u8,
-    pub brake: u8,
+    pub brake: bool,
     pub tutorial_flag_1: u8,
     pub tutorial_flag_2: u8,
     pub tutorial_trigger_1: u8,
@@ -50,7 +50,7 @@ pub struct OujiState {
     pub attack_2: u8,
     pub tarai: u8,
     pub attack_wait: u8,
-    pub vs_attack: u8,
+    pub vs_attack: bool,
 }
 
 impl OujiState {
@@ -77,7 +77,7 @@ impl Default for PrinceViewMode {
 
 /// The directions that the prince can push the katamari.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrincePushDir {
+pub enum PushDir {
     Forwards,
     Backwards,
     Sideways,
@@ -304,7 +304,7 @@ pub struct Prince {
 
     /// (??)
     /// offset: 0x300
-    init_uphill_strength: f32,
+    max_push_uphill_strength: f32,
 
     /// (??)
     /// offset: 0x304
@@ -368,7 +368,7 @@ pub struct Prince {
 
     /// (??) too lazy
     /// offset: 0x3c0
-    input_avg_push_len: f32,
+    pub input_avg_push_len: f32,
 
     /// 0 if moving sideways, [0,1] if forwards/backwards depending on y angle of net input
     /// offset: 0x3c4
@@ -430,11 +430,11 @@ pub struct Prince {
     /// The strength with which the katamari can be pushed uphill. Decreases while
     /// pushing uphill. (Seems to start at 100 and decrease from there, so maybe it's a percentage)
     /// offset: 0x488
-    uphill_strength: f32,
+    push_uphill_strength: f32,
 
     /// The direction the prince is pushing the katamari, if any.
     /// offset: 0x48c
-    push_dir: Option<PrincePushDir>,
+    push_dir: Option<PushDir>,
 
     /// The direction the prince is pushing the katamari sideways, if any.
     /// offset: 0x48d
@@ -465,6 +465,49 @@ impl Prince {
     pub fn get_oujistate(&self) -> OujiState {
         self.oujistate.clone()
     }
+
+    pub fn get_push_dir(&self) -> Option<PushDir> {
+        self.push_dir
+    }
+
+    pub fn get_flags(&self) -> u32 {
+        self.flags
+    }
+
+    pub fn get_angle_speed(&self) -> f32 {
+        self.angle_speed
+    }
+
+    pub fn set_global_turn_speed(&mut self, value: f32) {
+        self.params.global_turn_speed_mult = value;
+    }
+
+    pub fn get_push_strength(&self) -> f32 {
+        self.push_strength
+    }
+
+    pub fn get_is_huffing(&self) -> bool {
+        self.is_huffing
+    }
+
+    /// Returns the max speed reduction while huffing. This penalty eases off
+    /// as the huff progresses, smoothly leading to into no penalty when the huff ends.
+    /// offset: 0x226be (in `kat_update_velocity`)
+    pub fn get_huff_speed_penalty(&self) -> f32 {
+        if self.is_huffing {
+            // TODO: this might not be right, double check
+            lerp!(self.huff_timer_ratio, 1.0, self.huff_init_speed_penalty)
+        } else {
+            // if not huffing, there's no speed penalty
+            1.0
+        }
+    }
+
+    /// (??) Returns the accel (?) penalty while moving uphill.
+    /// offset: 0x226fc (in `kat_update_velocity`)
+    pub fn get_uphill_accel_penalty(&self) -> f32 {
+        self.push_uphill_strength / self.max_push_uphill_strength
+    }
 }
 
 impl Prince {
@@ -486,7 +529,7 @@ impl Prince {
         // TODO: make this a `PrinceParams` struct or something
         self.huff_init_speed_penalty = 0.4;
         self.huff_duration = 240; // TODO: some weird potential off-by-one issue here.
-        self.init_uphill_strength = 100.0;
+        self.max_push_uphill_strength = 100.0;
         self.uphill_strength_loss = 0.7649993;
         self.forward_push_angle_cutoff = 0.8733223;
         self.backward_push_angle_cutoff = 2.270252;
@@ -508,7 +551,7 @@ impl Prince {
         self.update_transform(kat);
 
         self.boost_energy = self.boost_max_energy;
-        self.uphill_strength = self.init_uphill_strength;
+        self.push_uphill_strength = self.max_push_uphill_strength;
         self.view_mode = PrinceViewMode::Normal;
         self.ignore_input_timer = 0;
 
@@ -875,7 +918,7 @@ impl Prince {
         // turn off `self.flags & 0x40000`
         self.flags &= 0xfffbffff;
 
-        if self.input_avg_len <= 0.0 || katamari.physics_flags.vs_mode_some_state == 2 {
+        if self.input_avg_len <= 0.0 || katamari.physics_flags.vs_mode_state == 2 {
             // if no analog input:
             self.angle_speed = 0.0;
             self.quick_shifting = false;
@@ -1070,7 +1113,7 @@ impl Prince {
         // compute the push direction and push strength
         if push_angle <= forw_max {
             // case 1: angle in `[0, forw_max]` (pushing forwards):
-            self.push_dir = Some(PrincePushDir::Forwards);
+            self.push_dir = Some(PushDir::Forwards);
 
             // TODO: simplify this, it should be a single clamped inverse lerp
             let scaled_str = (forw_max - push_angle) / forw_max;
@@ -1082,11 +1125,11 @@ impl Prince {
         } else if push_angle < back_min {
             // case 2: angle in `[forw_max, back_min]` (pushing sideways):
             // when pushing sideways, we have zero push strength
-            self.push_dir = Some(PrincePushDir::Sideways);
+            self.push_dir = Some(PushDir::Sideways);
             self.push_strength = 0.0;
         } else {
             // case 3: angle in `[back_min, pi]` (pushing backwards):
-            self.push_dir = Some(PrincePushDir::Backwards);
+            self.push_dir = Some(PushDir::Backwards);
             self.push_strength = inv_lerp!(push_angle, back_min, PI);
         };
     }
@@ -1124,7 +1167,7 @@ impl Prince {
                             true
                         } else if !self.oujistate.dash && katamari.physics_flags.contacts_floor {
                             let speed_ratio = katamari
-                                .get_speed_ratio(self.push_dir.unwrap_or(PrincePushDir::Forwards))
+                                .get_speed_ratio(self.push_dir.unwrap_or(PushDir::Forwards))
                                 .clamp(0.0, 1.0);
                             speed_ratio <= self.params.max_speed_for_view_mode
                         } else {
@@ -1273,7 +1316,7 @@ impl Player {
         prince.update_boost_push_rotation_mat(mission_state.is_vs_mode);
 
         if mission_state.gamemode.can_update_view_mode()
-            && katamari.physics_flags.vs_mode_some_state != 2
+            && katamari.physics_flags.vs_mode_state != 2
         {
             prince.update_impact_lock();
             let view_mode_tut_move =

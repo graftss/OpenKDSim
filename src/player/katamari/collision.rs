@@ -57,7 +57,7 @@ impl Katamari {
         self.lowest_floor_contact_y = 100000.0;
 
         // don't check collision when you're in whatever vsmode state this is
-        if self.physics_flags.vs_mode_some_state == 2 {
+        if self.physics_flags.vs_mode_state == 2 {
             return;
         }
 

@@ -140,11 +140,11 @@ pub struct KatPhysicsFlags {
 
     /// (??)
     /// offset: 0x1e
-    pub vs_attack: u8,
+    pub vs_attack: bool,
 
     /// (??)
     /// offset: 0x1f
-    pub vs_mode_some_state: u8,
+    pub vs_mode_state: u8,
 }
 
 impl KatPhysicsFlags {

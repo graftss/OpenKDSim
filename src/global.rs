@@ -128,40 +128,6 @@ impl Display for GlobalState {
 }
 
 impl GlobalState {
-    pub fn set_speeds(
-        &mut self,
-        forw_s: f32,
-        side_s: f32,
-        back_s: f32,
-        boost_s: f32,
-        forw_a: f32,
-        side_a: f32,
-        back_a: f32,
-        boost_a: f32,
-        rot_s: f32,
-        dp_y: f32,
-        cam_x: f32,
-        cam_y: f32,
-        cam_z: f32,
-    ) {
-        self.forwards_speed = forw_s;
-        self.sideways_speed = side_s;
-        self.backwards_speed = back_s;
-        self.boost_speed = boost_s;
-
-        self.forwards_accel = forw_a;
-        self.sideways_accel = side_a;
-        self.backwards_accel = back_a;
-        self.boost_accel = boost_a;
-
-        self.prince_turn_speed_mult = rot_s;
-        self.royal_warp_plane_y = dp_y;
-
-        self.camera_delay[0] = cam_x;
-        self.camera_delay[1] = cam_y;
-        self.camera_delay[2] = cam_z;
-    }
-
     pub fn set_gravity(&mut self, x: f32, y: f32, z: f32) {
         self.gravity[0] = x;
         self.gravity[1] = y;

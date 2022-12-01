@@ -1,7 +1,7 @@
 use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
 
 use self::{
-    camera::{Camera, CameraMode},
+    camera::{mode::CameraMode, Camera},
     constants::MAX_PLAYERS,
     input::Input,
     katamari::Katamari,
@@ -116,7 +116,7 @@ impl GameState {
             player.update_prince(mission_state);
             player
                 .katamari
-                .update(&player.prince, &player.camera, mission_state);
+                .update(&mut player.prince, &player.camera, mission_state);
 
             // update the prince's transform now that the katamari is updated
             player.prince.update_transform(&player.katamari);
