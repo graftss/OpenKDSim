@@ -377,7 +377,7 @@ pub struct Katamari {
 
     /// The unit normal of the wall being climbed.
     /// offset: 0x774
-    wallclimb_wall_unorm: Vec3,
+    wallclimb_normal_unit: Vec3,
 
     /// The number of ticks since the katamari started climbing a wall.
     /// offset: 0x784

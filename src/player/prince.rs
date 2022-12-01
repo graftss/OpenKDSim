@@ -490,6 +490,10 @@ impl Prince {
         self.is_huffing
     }
 
+    pub fn get_boost_push_yaw_rot(&self) -> &Mat4 {
+        &self.boost_push_yaw_rot
+    }
+
     pub fn get_nonboost_push_yaw_rot(&self) -> &Mat4 {
         &self.nonboost_push_yaw_rot
     }

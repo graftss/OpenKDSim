@@ -50,6 +50,14 @@ pub fn vec3_inplace_add_vec(vec: &mut Vec3, other: &Vec3) {
     vec[2] += other[2];
 }
 
+/// Add `scale * other` to `vec` in-place.
+#[inline]
+pub fn vec3_inplace_add_scaled(vec: &mut Vec3, other: &Vec3, scale: f32) {
+    vec[0] += other[0] * scale;
+    vec[1] += other[1] * scale;
+    vec[2] += other[2] * scale;
+}
+
 /// Zero out components of `vec` with small magnitude (less than `eps`), in-place.
 #[inline]
 pub fn vec3_inplace_zero_small(vec: &mut Vec3, eps: f32) {

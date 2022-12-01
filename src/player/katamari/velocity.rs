@@ -5,9 +5,10 @@ use gl_matrix::{
 
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Z_POS},
-    macros::{lerp, max, set_y},
+    macros::{lerp, max, set_y, vec3_from},
     math::{
-        acos_f32, normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize,
+        acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
+        vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract_vec,
         vec3_inplace_zero_small,
     },
     mission::{stage::Stage, state::MissionState},
@@ -101,7 +102,7 @@ impl Katamari {
         camera: &Camera,
         mission_state: &MissionState,
     ) {
-        let vel_accel_len = vec3::length(&self.velocity.vel_accel);
+        let init_vel_accel_len = vec3::length(&self.velocity.vel_accel);
 
         mission_state
             .mission_config
@@ -187,7 +188,7 @@ impl Katamari {
             let accel = if let Some(push_dir) = prince.get_push_dir() {
                 self.scaled_params.get_push_accel(push_dir)
             } else {
-                vel_accel_len
+                init_vel_accel_len
             };
 
             (accel, prince.input_avg_push_len)
@@ -248,7 +249,7 @@ impl Katamari {
             false => 1.0,
         };
 
-        let _speed = self.scaled_params.base_max_speed * base_speed_mult * climb_mult;
+        let max_speed = self.scaled_params.base_max_speed * base_speed_mult * climb_mult;
 
         // TODO_VS: `kat_update_velocity:304-324`
 
@@ -260,11 +261,50 @@ impl Katamari {
         self.max_sideways_speed = base_speed * self.scaled_params.max_sideways_speed;
         self.max_backwards_speed = base_speed * self.scaled_params.max_backwards_speed;
 
-        // TODO: `kat_compute_brake_state()`
-        // TODO: `kat_update_velocity:342-494` (use result of computing brake state)
-        // note that the above code will modify `accel` if the katamari is braking
-        // TODO: hopefully this block also modifies `vel_accel`??
-        let _is_vs_mode_shoot = false; // TODO_VS: this value is updated above
+        let mut accel = [0.0; 3];
+        let mut is_shoot_brake = false;
+        match self.compute_brake_state(prince, camera) {
+            BrakeState::NoPush => {
+                // case 1: katamari isn't pushing very hard
+                self.brake_accel = 0.0;
+                let mut cam_forward = [0.0; 3];
+                vec3::transform_mat4(
+                    &mut cam_forward,
+                    &VEC3_Z_POS,
+                    &camera.transform.lookat_yaw_rot_inv,
+                );
+                vec3::transform_mat4(&mut accel, &cam_forward, &prince.get_boost_push_yaw_rot());
+            }
+            BrakeState::PushBrake => {
+                // case 2: katamari is pushing against the velocity, and hard enough to brake
+                let mut vel_unit = self.velocity.vel_accel;
+                vec3_inplace_normalize(&mut vel_unit);
+                push_accel = self.brake_accel;
+                vec3::scale(&mut accel, &vel_unit, -1.0);
+            }
+            BrakeState::PushNoBrake => {
+                // case 3: katamari is pushing with the velocity
+                self.brake_accel = 0.0;
+                let mut cam_forward = [0.0; 3];
+                vec3::transform_mat4(
+                    &mut cam_forward,
+                    &VEC3_Z_POS,
+                    &camera.transform.lookat_yaw_rot_inv,
+                );
+                vec3::transform_mat4(
+                    &mut accel,
+                    &cam_forward,
+                    &prince.get_nonboost_push_yaw_rot(),
+                );
+            }
+            BrakeState::Shoot => {
+                // TODO_VS: `kat_update_velocity:433-481`
+                is_shoot_brake = true;
+            }
+        };
+
+        self.brake_accel *= prince.get_uphill_accel_penalty();
+        vec3_inplace_normalize(&mut accel);
 
         if !self.physics_flags.braking {
             self.input_push_dir = prince.get_push_dir();
@@ -284,20 +324,61 @@ impl Katamari {
             false => self.compute_spline_accel_mult(prince),
         };
 
-        let _accel = push_accel * push_mag * incline_accel_mult * spline_mult;
+        let accel_magnitude = push_accel * push_mag * incline_accel_mult * spline_mult;
 
-        // TODO: `kat_update_velocity:508-586` (apply acceleration from ground contact)
+        if self.physics_flags.contacts_floor {
+            // if the katamari contacts a floor, adjust the acceleration direction to be the
+            // rejection of the floor from the original acceleration direction.
+            let vel_dot_floor = vec3::dot(&accel, &self.contact_floor_normal_unit);
+            vec3_inplace_add_scaled(&mut accel, &self.contact_floor_normal_unit, -vel_dot_floor);
+            vec3_inplace_zero_small(&mut accel, 1e-05);
+            vec3_inplace_normalize(&mut accel);
+        }
+
+        if !self.physics_flags.no_input_push {
+            // if input is pushing the katamari:
+            self.velocity.push_vel_on_floor_unit = accel;
+        } else {
+            // else if input isn't pushing the katamari:
+            vec3::zero(&mut self.velocity.push_vel_on_floor_unit);
+            vec3::zero(&mut accel);
+        }
+
+        if !self.physics_flags.climbing_wall {
+            // if not climbing wall, use the acceleration computed above, scaled by the
+            // acceleration magnitude also computed above.
+            vec3_inplace_scale(&mut accel, accel_magnitude)
+        } else {
+            // if climbing wall, accelerate in the opposite direction of the wall normal (??)
+            vec3::copy(&mut accel, &self.wallclimb_normal_unit);
+            vec3_inplace_scale(&mut accel, -1.0);
+        }
 
         self.velocity.last_vel_accel = self.velocity.vel_accel;
 
-        // TODO: `kat_update_velocity:595-601`
+        let mut next_velocity = vec3_from!(+, accel, self.velocity.vel_accel);
+        let next_speed = vec3::len(&next_velocity);
 
         // the katamari's speed cap is greatly increased when moving downhill on floors
         // with the `SpeedCheckOff` hit attribute. (e.g. the mas5/mas8 hill)
-        let _uncap_speed = self.hit_flags.speed_check_off
+        let uncap_speed = self.hit_flags.speed_check_off
             && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill;
 
-        // TODO: `kat_update_velocity:608-639`
+        if !is_shoot_brake {
+            if !uncap_speed && next_speed > max_speed && next_speed > init_vel_accel_len {
+                // apply the speed cap by rescaling the next velocity to `max_speed`
+                // TODO: ghidra has two cases here but they seem equivalent? (line ~630)
+                let capped_speed = match self.physics_flags.climbing_wall {
+                    true => max_speed,
+                    false => init_vel_accel_len,
+                };
+
+                vec3_inplace_normalize(&mut next_velocity);
+                vec3_inplace_scale(&mut next_velocity, capped_speed);
+            }
+
+            self.velocity.velocity = next_velocity;
+        }
 
         // if the katamari just bonked, set velocity equal to the initial bonk velocity
         if self.physics_flags.bonked {
