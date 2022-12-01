@@ -515,13 +515,20 @@ impl Prince {
         // TODO: `prince_init:100-123` (vs mode crap)
     }
 
+    /// Copy the prince's `OujiState` to the `oujistate` pointer (which is passed from unity).
     pub fn copy_oujistate_ptr(&mut self, oujistate: &mut *mut OujiState, data_size: &mut i32) {
         *data_size = 0x1b;
         *oujistate = &mut self.oujistate as *mut OujiState;
     }
 
+    /// Get the prince's view mode.
     pub fn get_view_mode(&self) -> PrinceViewMode {
         self.view_mode
+    }
+
+    /// Set the prince's view mode.
+    pub fn set_view_mode(&mut self, view_mode: PrinceViewMode) {
+        self.view_mode = view_mode;
     }
 
     pub fn get_matrix(

@@ -20,6 +20,7 @@ use collision::raycast_state::{RaycastCallType, RaycastState};
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
+use macros::temp_debug_log;
 use player::prince::OujiState;
 use props::{
     config::NamePropConfig,
@@ -828,6 +829,16 @@ pub unsafe extern "C" fn SetCameraCheckScaleUp(player_idx: i32, flag: i32) {
             .get_mut_player(player_idx as usize)
             .camera
             .check_scale_up(flag != 0)
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn SetShootingMode(player_idx: i32, fg: i32, reset: i32) {
+    STATE.with(|state| {
+        state
+            .borrow_mut()
+            .get_mut_player(player_idx as usize)
+            .set_shooting_mode(fg != 0, reset != 0)
     });
 }
 

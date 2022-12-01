@@ -1,7 +1,11 @@
 use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
 
 use self::{
-    camera::Camera, constants::MAX_PLAYERS, input::Input, katamari::Katamari, prince::Prince,
+    camera::{Camera, CameraMode},
+    constants::MAX_PLAYERS,
+    input::Input,
+    katamari::Katamari,
+    prince::{Prince, PrinceViewMode},
 };
 
 pub mod camera;
@@ -18,7 +22,6 @@ pub struct Player {
     pub input: Input,
 }
 
-/// Initialization
 impl Player {
     pub fn init(
         &mut self,
@@ -80,6 +83,18 @@ impl Player {
         camera.reset_state(katamari, prince);
 
         // TODO: call `vs_volume_diff_callback` delegate
+    }
+
+    /// Mimicks the `SetShootingMode` API function.
+    /// While the original simulation saves the `fg` argument to the `Prince` struct, it
+    /// appears to be unused.
+    /// offset: 0x3d60
+    pub fn set_shooting_mode(&mut self, _fg: bool, reset: bool) {
+        if reset {
+            self.prince.set_view_mode(PrinceViewMode::Normal);
+            self.prince.set_ignore_input_timer(0);
+            self.camera.set_mode(CameraMode::Normal);
+        }
     }
 }
 
