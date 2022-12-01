@@ -31,6 +31,12 @@ pub struct PrinceParams {
     /// default: 1.0
     /// offset: 0x7acf4
     pub global_turn_speed_mult: f32,
+
+    /// (??) If the angle between the stick is greater than this, the prince is not considered
+    /// to be pushing the katamari.
+    /// default: pi/6
+    /// offset: 0x715c4
+    pub max_angle_btwn_sticks_for_push: f32,
 }
 
 impl Default for PrinceParams {
@@ -58,8 +64,10 @@ impl Default for PrinceParams {
                     num_gachas: 5,
                 },
             ],
+
             prince_roll_forwards_angle_threshold: f32::from_bits(0x3f060a92), // 0.5235988
             global_turn_speed_mult: 1.0,
+            max_angle_btwn_sticks_for_push: f32::from_bits(0x3f060a92), // pi/6
         }
     }
 }

@@ -135,6 +135,16 @@ pub struct KatamariParams {
     /// default: 1.0
     /// offset: 0x7a25c
     pub boost_speed_mult: f32,
+
+    /// The katamari can only brake if it's moving at least this ratio of its max speed.
+    /// This stops the katamari from triggering a brake when it's moving very slowly.
+    /// default: 0.45
+    /// offset: 0x7b250
+    pub brakeable_max_speed_ratio: f32,
+
+    /// The number of ticks between brake vfx plays (while braking).
+    /// default: 10
+    pub brake_vfx_cooldown: u8,
 }
 
 impl Default for KatamariParams {
@@ -168,6 +178,8 @@ impl Default for KatamariParams {
             sideways_speed_mult: 1.0,
             backwards_speed_mult: 1.0,
             boost_speed_mult: 1.0,
+            brakeable_max_speed_ratio: f32::from_bits(0x3ee66666),
+            brake_vfx_cooldown: 10,
         }
     }
 }

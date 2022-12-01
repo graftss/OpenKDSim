@@ -4,15 +4,15 @@ use gl_matrix::{
 };
 
 use crate::{
-    constants::{FRAC_PI_2, PI, TAU},
+    constants::{FRAC_PI_2, PI, TAU, VEC3_Z_POS},
     macros::{lerp, max, set_y},
     math::{
-        normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize,
+        acos_f32, normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize,
         vec3_inplace_zero_small,
     },
     mission::{stage::Stage, state::MissionState},
     player::{
-        camera::Camera,
+        camera::{mode::CameraMode, Camera},
         prince::{Prince, PushDir},
     },
 };
@@ -23,6 +23,20 @@ use super::{
 
 /// 0.9998
 const ALMOST_1: f32 = f32::from_bits(0x3f7ff2e5);
+
+enum BrakeState {
+    /// Not pushing hard enough to elicit katamari movement
+    NoPush,
+
+    /// Pushing against velocity
+    PushBrake,
+
+    /// Pushing towards velocity
+    PushNoBrake,
+
+    /// TODO_VS: i have no clue
+    Shoot,
+}
 
 /// Katamari velocity and acceleration values.
 #[derive(Debug, Default, Copy, Clone)]
@@ -292,6 +306,130 @@ impl Katamari {
         }
 
         vec3::normalize(&mut self.velocity.velocity_unit, &self.velocity.velocity);
+    }
+
+    fn compute_brake_state(&mut self, prince: &mut Prince, camera: &Camera) -> BrakeState {
+        // early exit when the camera is in the "shoot" mode
+        if camera.get_mode() == CameraMode::Shoot {
+            return BrakeState::Shoot;
+        }
+
+        // early exit when the prince isn't pushing the katamari
+        if !prince.is_pushing_for_brake() || self.physics_flags.airborne {
+            self.physics_flags.braking = false;
+            return BrakeState::NoPush;
+        }
+
+        // from here, the prince is pushing the katamari and the katamari is grounded.
+        let mut vel_accel_unit = self.velocity.vel_accel;
+        vec3_inplace_normalize(&mut vel_accel_unit);
+
+        // compute the "unit push forward" direction by taking into account both the camera's forward
+        // direction and the prince's input push direction.
+        let mut cam_forward = [0.0; 3];
+        let mut push_forward_unit = [0.0; 3];
+        vec3::transform_mat4(
+            &mut cam_forward,
+            &VEC3_Z_POS,
+            &camera.transform.lookat_yaw_rot_inv,
+        );
+        vec3::transform_mat4(
+            &mut push_forward_unit,
+            &cam_forward,
+            prince.get_nonboost_push_yaw_rot(),
+        );
+        vec3_inplace_normalize(&mut push_forward_unit);
+
+        if vec3::dot(&vel_accel_unit, &push_forward_unit) < 0.0 {
+            // if the katamari's velocity and the direction being pushed have a negative dot
+            // product, that means we're pushing *against* the katamari's velocity, i.e. braking.
+            let vel_to_cam_angle = acos_f32(vec3::dot(&vel_accel_unit, &cam_forward));
+            let angle = prince.push_sideways_angle_threshold;
+
+            // compute max speed and brake acceleration based on input push direction
+            let (max_speed, brake_accel) = if prince.oujistate.dash {
+                // braking boost movement
+                (self.max_boost_speed, self.scaled_params.brake_boost_force)
+            } else if vel_to_cam_angle >= FRAC_PI_2 + angle {
+                // braking forwards movement with backwards input
+                (
+                    self.max_backwards_speed,
+                    self.scaled_params.brake_backwards_force,
+                )
+            } else if vel_to_cam_angle < FRAC_PI_2 - angle {
+                // braking backwards movement with forwards input
+                (
+                    self.max_forwards_speed,
+                    self.scaled_params.brake_forwards_force,
+                )
+            } else {
+                // braking sideways movement with sideways input
+                (
+                    self.max_sideways_speed,
+                    self.scaled_params.brake_sideways_force,
+                )
+            };
+
+            let min_brakeable_speed = max_speed * self.params.brakeable_max_speed_ratio;
+            if self.physics_flags.braking || self.speed >= min_brakeable_speed {
+                // if either: - the katamari is already braking, or
+                //            - it's moving fast enough to start a brake:
+                let vel_dot_cam_lateral = -(vel_accel_unit[0] * push_forward_unit[0]
+                    + vel_accel_unit[2] * push_forward_unit[2]);
+
+                if self.params.min_brake_angle <= vel_dot_cam_lateral {
+                    // if the angle between velocity and push is past the threshold:
+                    // all conditions to be braking are satisfied.
+
+                    if !self.physics_flags.braking {
+                        // if we aren't already braking:
+                        // begin a new brake
+                        if !prince.oujistate.wheel_spin {
+                            // TODO: compute a VFX id in the above `(max_speed, brake_accel)`
+                            // computation, and play that VFX here with the vfx delegate
+                        }
+
+                        self.brake_push_dir = prince.get_push_dir();
+                        self.brake_accel = brake_accel;
+                        // TODO: there's a bunch of random flag checks here, probably no-ops though
+                        // (`kat_compute_brake_state:191-193)
+
+                        let _brake_volume = match self.brake_push_dir {
+                            Some(PushDir::Forwards) => 0.5,
+                            _ => 0.7,
+                        };
+                        // TODO: play the brake SFX here with volume `brake_volume`
+
+                        // TODO: the simulation sets this timer to 0 here, but does that just mean the brake
+                        // vfx plays twice in a row? should this be the regular cooldown?
+                        self.brake_vfx_timer = 1;
+                    } else {
+                        self.brake_vfx_timer -= 1;
+                        if self.brake_vfx_timer == 0 {
+                            self.brake_vfx_timer = self.params.brake_vfx_cooldown as u16;
+                        }
+                    }
+
+                    self.physics_flags.braking = true;
+                    BrakeState::PushBrake
+                } else {
+                    // if the angle between velocity and push doesn't yield a brake:
+                    // stop braking.
+                    self.physics_flags.braking = false;
+                    BrakeState::NoPush
+                }
+            } else {
+                // if we're not already braking and we're moving too slow to start a brake,
+                // apparently that qualifies as the "no push" result.
+                BrakeState::NoPush
+            }
+        } else {
+            // if the dot product was nonnegative, that means the katamari velocity is
+            // moving in the same direction as the input push, so we're pushing, but not braking.
+            self.physics_flags.braking = false;
+            prince.oujistate.dash = false;
+            BrakeState::PushNoBrake
+        }
     }
 
     /// Computes a multiplier on the katamari's acceleration derived from a spline.

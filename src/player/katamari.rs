@@ -196,7 +196,9 @@ pub struct Katamari {
     /// offset: 0xf5
     pub last_hit_flags: [KatHitFlags; 2],
 
-    /// (??)
+    /// The input direction the player is pushing during a brake.
+    /// (e.g. if this direction is forwards, then the katamari is moving backwards and the
+    /// player is braking by pushing forwards)
     /// offset: 0x10d
     brake_push_dir: Option<PushDir>,
 
@@ -228,9 +230,10 @@ pub struct Katamari {
     /// offset: 0x1a4
     surface_threshold_y_normal: f32,
 
-    /// (??) Minimum angle between input and velocity to initiate a brake
+    /// Minimum angle between input and velocity to initiate a brake
+    /// (NOTE: migrated to `KatamariParams`)
     /// offset: 0x1a8
-    min_brake_angle: f32,
+    // min_brake_angle: f32,
 
     /// (??)
     /// offset: 0x1b0
@@ -355,6 +358,10 @@ pub struct Katamari {
     /// The katamari's "boost" forward speed
     /// offset: 0x75c
     max_boost_speed: f32,
+
+    /// (??) Acceleration while braking
+    /// offset: 0x760
+    brake_accel: f32,
 
     /// The katamari's radius when it started climbing.
     /// offset: 0x768
@@ -621,6 +628,9 @@ pub struct Katamari {
     /// offset: 0x3b70
     sw_speed_disp_timer: u16,
 
+    /// When braking, acts as a cooldown timer for playing the brake vfx.
+    brake_vfx_timer: u16,
+
     /// Whether or not the "something's coming" alarm is going off.
     /// offset: 0x3b84
     alarm_mode: bool,
@@ -785,7 +795,7 @@ impl Katamari {
         self.mesh_index = 1;
 
         self.min_slope_grade_0x1b0 = self.params.min_slope_grade;
-        self.min_brake_angle = self.params.min_brake_angle;
+        // self.min_brake_angle = self.params.min_brake_angle; (migrated to `KatamariParams`)
         self.max_wallclimb_angle = self.params.max_wallclimb_angle;
 
         self.physics_flags = KatPhysicsFlags::default();
@@ -937,7 +947,7 @@ impl Katamari {
         vec3::transform_mat4(
             &mut self.camera_side_vector,
             &left,
-            &cam_transform.yaw_rot_inv,
+            &cam_transform.lookat_yaw_rot_inv,
         );
 
         self.update_collision_rays();

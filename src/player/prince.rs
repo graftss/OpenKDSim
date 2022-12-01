@@ -222,7 +222,7 @@ pub struct Prince {
     /// The threshold on the angle between the two analog sticks that differentiates
     /// "rolling fowards/backwards" and "rolling sideways". Whatever that means.
     /// offset: 0x288
-    push_sideways_angle_threshold: f32,
+    pub push_sideways_angle_threshold: f32,
 
     /// The prince's turn speed while not moving backwards.
     /// offset: 0x28c
@@ -376,11 +376,11 @@ pub struct Prince {
 
     /// The matrix encoding a y-axis rotation by the input push angle.
     /// offset: 0x3cc
-    push_rotation_mat: Mat4,
+    nonboost_push_yaw_rot: Mat4,
 
     /// (??) The value of the `0x3cc` matrix when not boosting, otherwise it's the identity matrix.
     /// offset: 0x40c
-    boost_push_rotation_mat: Mat4,
+    boost_push_yaw_rot: Mat4,
 
     /// The number of ticks remaining in the current flip animation.
     /// offset: 0x44c
@@ -458,6 +458,10 @@ pub struct Prince {
 }
 
 impl Prince {
+    pub fn set_global_turn_speed(&mut self, value: f32) {
+        self.params.global_turn_speed_mult = value;
+    }
+
     pub fn get_pos(&self) -> &Vec3 {
         &self.pos
     }
@@ -478,16 +482,20 @@ impl Prince {
         self.angle_speed
     }
 
-    pub fn set_global_turn_speed(&mut self, value: f32) {
-        self.params.global_turn_speed_mult = value;
-    }
-
     pub fn get_push_strength(&self) -> f32 {
         self.push_strength
     }
 
     pub fn get_is_huffing(&self) -> bool {
         self.is_huffing
+    }
+
+    pub fn get_nonboost_push_yaw_rot(&self) -> &Mat4 {
+        &self.nonboost_push_yaw_rot
+    }
+
+    pub fn get_params(&self) -> &PrinceParams {
+        &self.params
     }
 
     /// Returns the max speed reduction while huffing. This penalty eases off
@@ -508,6 +516,14 @@ impl Prince {
     pub fn get_uphill_accel_penalty(&self) -> f32 {
         self.push_uphill_strength / self.max_push_uphill_strength
     }
+
+    /// If false, the input is not considered "pushing" the katamari for the purposes
+    /// of `Katamari::compute_brake_state`.
+    /// offset: 0x21962 (in `kat_compute_brake_state`)
+    pub fn is_pushing_for_brake(&self) -> bool {
+        self.input_angle_btwn_sticks <= self.params.max_angle_btwn_sticks_for_push
+            && self.input_avg_push_len > 0.0
+    }
 }
 
 impl Prince {
@@ -522,8 +538,8 @@ impl Prince {
         self.kat_offset_vec[2] = kat.get_prince_offset();
         self.push_dir = None;
         self.angle_speed = 0.0;
-        mat4::identity(&mut self.push_rotation_mat);
-        mat4::identity(&mut self.boost_push_rotation_mat);
+        mat4::identity(&mut self.nonboost_push_yaw_rot);
+        mat4::identity(&mut self.boost_push_yaw_rot);
         mat4::identity(&mut self.transform_rot);
 
         // TODO: make this a `PrinceParams` struct or something
@@ -1025,7 +1041,7 @@ impl Prince {
             }
 
             let id = mat4::create();
-            mat4::rotate_y(&mut self.push_rotation_mat, &id, push_angle);
+            mat4::rotate_y(&mut self.nonboost_push_yaw_rot, &id, push_angle);
             self.update_angle_from_push(self.params.global_turn_speed_mult, push_angle_len);
         }
 
@@ -1137,11 +1153,11 @@ impl Prince {
     /// The bottom chunk of `prince_update_input_features_and_gachas` in ghidra,
     /// after `prince_update_angle` is called.
     pub fn update_boost_push_rotation_mat(&mut self, is_vs_mode: bool) {
-        mat4::copy(&mut self.boost_push_rotation_mat, &self.push_rotation_mat);
+        mat4::copy(&mut self.boost_push_yaw_rot, &self.nonboost_push_yaw_rot);
         if self.oujistate.dash {
             self.extra_flat_angle_speed = 0.0;
             if !is_vs_mode {
-                mat4::identity(&mut self.push_rotation_mat);
+                mat4::identity(&mut self.nonboost_push_yaw_rot);
             }
         }
     }

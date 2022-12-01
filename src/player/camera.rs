@@ -500,7 +500,7 @@ pub struct CameraTransform {
 
     /// The yaw rotation component of `lookat_rot_inv`.
     /// offset: 0x100
-    pub yaw_rot_inv: Mat4,
+    pub lookat_yaw_rot_inv: Mat4,
 
     /// The camera's "up" vector (which should always be the y+ axis unit vector)
     /// offset: 0x140
@@ -540,7 +540,7 @@ impl CameraTransform {
         self.lookat_rot_inv[7] = 0.0;
         self.lookat_rot_inv[11] = 0.0;
 
-        mat4_compute_yaw_rot(&mut self.yaw_rot_inv, &self.lookat_rot_inv);
+        mat4_compute_yaw_rot(&mut self.lookat_yaw_rot_inv, &self.lookat_rot_inv);
 
         // TODO: `camera_update_extra_matrices()` (offset 0x58e40)
         //       this is a separate function in the simulation, but it's always called immediately
