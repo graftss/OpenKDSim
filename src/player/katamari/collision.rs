@@ -2,10 +2,11 @@ use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
     collision::raycast_state::RaycastCallType,
-    macros::panic_log,
+    macros::{panic_log, set_translation, set_y, vec3_from, vec3_unit_xz},
     math::{
-        acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_scale,
-        vec3_inplace_subtract, vec3_inplace_zero_small,
+        acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_normalize,
+        vec3_inplace_scale, vec3_inplace_subtract, vec3_inplace_subtract_vec,
+        vec3_inplace_zero_small,
     },
     mission::{state::MissionState, GameMode},
     props::prop::WeakPropRef,
@@ -78,7 +79,7 @@ impl Katamari {
             self.update_surface_contacts();
             self.process_surface_contacts();
             self.resolve_being_stuck();
-            // TODO: `kat_update_vault_and_climb()
+            self.update_vault_and_climb();
 
             if self.physics_flags.airborne && self.raycast_state.closest_hit_idx.is_some() {
                 // TODO: `kat_update_collision:159-220` (update active hit before airborne?)
@@ -503,7 +504,7 @@ impl Katamari {
             // if stuck between walls, try to push the katamari away from the wall
             // (i.e. push it in the direction of the wall's normal).
             vec3::copy(
-                &mut self.stuck_btwn_walls_push,
+                &mut self.stuck_btwn_walls_push_unit,
                 &self.contact_wall_normal_unit,
             );
             self.stuck_ticks += 1;
@@ -541,4 +542,97 @@ impl Katamari {
     /// TODO
     /// offset: 0x26f10
     fn detach_props(&mut self, _vol: f32, _prop_speed: f32) {}
+
+    /// (??) Update the katamari's vault and climbing state.
+    /// offset: 0x14c80
+    fn update_vault_and_climb(&mut self) {
+        if self.physics_flags.hit_shell_ray == Some(ray::ShellRay::TopCenter)
+            && self.physics_flags.contacts_floor
+            && !self.physics_flags.contacts_wall
+            && self.num_floor_contacts == 1
+        {
+            self.physics_flags.contacts_floor = false;
+            vec3::zero(&mut self.contact_floor_clip);
+        }
+
+        // TODO: `kat_apply_turntable_contact()`
+        self.update_clip_translation();
+    }
+
+    /// (??) I think this is trying to clip the katamari away from walls when the game
+    /// thinks that it's stuck.
+    /// TODO: there are some SHUFPS instructions here that might not be decompiled correctly.
+    /// offset: 0x183f0
+    fn update_clip_translation(&mut self) {
+        let moving_into_wall = if self.physics_flags.contacts_wall {
+            if self.physics_flags.immobile {
+                // if contacting a wall and immobile, i guess we're moving into a wall
+                true
+            } else {
+                // compute unit lateral katamari movement
+                let move_xz = vec3_from!(-, self.center, self.last_center);
+                let move_xz_unit = vec3_unit_xz!(move_xz);
+
+                // compute unit lateral wall normal
+                let wall_normal_xz_unit = vec3_unit_xz!(self.contact_wall_normal_unit);
+
+                // the katamari is moving towards the wall if its velocity dot the wall normal is
+                // below the similarity threshold (since the wall normal should be pointing away
+                // from katamari movement, any negative similarity should work)
+                vec3::dot(&move_xz_unit, &wall_normal_xz_unit)
+                    <= self.params.move_into_wall_similarity
+            }
+        } else {
+            // if the katamari doesn't contact a wall, it's not moving into one either.
+            false
+        };
+
+        if self.physics_flags.stuck_between_walls && !self.last_physics_flags.stuck_between_walls {
+            // if the katamari has just gotten stuck between walls:
+            // push the katamari away from the wall to try to get unstuck
+            let push_distance = self.scaled_params.base_max_speed * self.params.unstuck_bump_speed;
+            let mut push_velocity = self.stuck_btwn_walls_push_unit;
+            vec3_inplace_scale(&mut push_velocity, push_distance);
+
+            // forcibly set the katamari's velocity to push it away from the wall
+            self.set_velocity(&push_velocity);
+        }
+
+        // TODO: double check these shufps vector operations
+        vec3::zero(&mut self.clip_translation);
+        vec3_inplace_add_vec(&mut self.clip_translation, &self.contact_floor_clip);
+
+        if moving_into_wall {
+            vec3_inplace_add_vec(&mut self.clip_translation, &self.contact_wall_clip);
+        }
+
+        if !self.physics_flags.stuck_between_walls {
+            // if not stuck between walls:
+            if self.physics_flags.contacts_down_slanted_ceiling
+                && self.physics_flags.contacts_floor
+                && !self.physics_flags.contacts_prop_0xa
+            {
+                // weird collision edge case where we're not stuck between walls but we are contacting
+                // a down-slanted wall/ceiling. no clue what to make of this
+                if !self.last_physics_flags.contacts_down_slanted_ceiling {
+                    vec3::normalize(&mut self.delta_pos_unit, &self.delta_pos);
+                }
+                let mut clip_translation = self.delta_pos_unit;
+                vec3_inplace_scale(&mut clip_translation, -self.speed);
+                self.set_velocity(&clip_translation);
+                vec3_inplace_add_vec(&mut self.center, &clip_translation);
+                self.clip_translation = clip_translation;
+            }
+        } else {
+            // if stuck between walls:
+            self.clip_translation[0] += self.center[0] - self.last_center[0];
+            self.clip_translation[2] += self.center[2] - self.last_center[2];
+            vec3_inplace_subtract_vec(&mut self.center, &self.clip_translation);
+        }
+
+        // update center, bottom, and top points
+        set_translation!(self.transform, self.center);
+        self.bottom = self.center;
+        self.bottom[1] -= self.radius_cm;
+    }
 }

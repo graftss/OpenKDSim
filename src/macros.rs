@@ -139,12 +139,21 @@ macro_rules! rescale {
     };
 }
 
-/// Creates a new `Vec3` obtined by applying the binary operator `$op` to
+/// Creates a new `Vec3` obtained by applying the binary operator `$op` to
 /// the elements of the vectors `$a` and `$b`.
 macro_rules! vec3_from {
     ($op: tt, $a: expr, $b: expr) => {
         [$a[0] $op $b[0], $a[1] $op $b[1], $a[2] $op $b[2]]
     }
+}
+
+/// Creates a new `Vec3` obtained
+macro_rules! vec3_unit_xz {
+    ($vec: expr) => {{
+        let mut unit_xz = [$vec[0], 0.0, $vec[2]];
+        crate::math::vec3_inplace_normalize(&mut unit_xz);
+        unit_xz
+    }};
 }
 
 /// Sets the translation of the matrix `$mat` to the vector `$trans`.
@@ -184,4 +193,5 @@ pub(crate) use {
     set_y,
     temp_debug_log,
     vec3_from,
+    vec3_unit_xz,
 };

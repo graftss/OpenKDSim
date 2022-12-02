@@ -589,6 +589,8 @@ impl Katamari {
         }
     }
 
+    /// Updates the katamari's velocity by applying its acceleration.
+    /// offset: 0x1e6a0
     pub(super) fn apply_acceleration(&mut self, mission_state: &MissionState) {
         vec3::zero(&mut self.bonus_vel);
 
@@ -608,6 +610,7 @@ impl Katamari {
             // TODO: `kat_apply_acceleration:44-61` (speedcheckoff acceleration)
         }
 
+        self.velocity.vel_accel = next_vel;
         vec3::normalize(&mut self.velocity.vel_accel_unit, &self.velocity.vel_accel);
         vec3::add(
             &mut self.velocity.vel_accel_grav,
@@ -728,5 +731,24 @@ impl Katamari {
         }
 
         self.spin_rotation_speed = self.spin_rotation_speed.clamp(-PI, PI);
+    }
+
+    /// Forcibly set the katamari's velocity to `vel`.
+    /// offset: 0x1fd70
+    pub fn set_velocity(&mut self, vel: &Vec3) {
+        self.physics_flags.immobile = false;
+
+        // compute speed
+        self.speed = vec3::len(vel);
+
+        // compute unit velocity
+        let mut vel_unit = *vel;
+        vec3_inplace_normalize(&mut vel_unit);
+
+        // set cached velocities
+        self.velocity.vel_accel = *vel;
+        self.velocity.vel_accel_unit = vel_unit;
+        self.velocity.vel_accel_grav = *vel;
+        self.velocity.vel_accel_grav_unit = vel_unit;
     }
 }

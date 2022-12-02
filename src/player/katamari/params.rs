@@ -167,6 +167,18 @@ pub struct KatamariParams {
     /// default: 0.55
     /// offset: 0x715c8
     pub speed_check_off_friction_reduction: f32,
+
+    /// If the dot product of the katamari's velocity and a contact wall's normal is below this
+    /// value, the katamari is considered to be moving "towards" the wall.
+    /// default: 0.01
+    /// offset: 0x7155c (used at 0x18549)
+    pub move_into_wall_similarity: f32,
+
+    /// The proportion of the katamari's max speed that it's bumped by when stuck between walls,
+    /// in an attempt to get it unstuck.
+    /// default: 0.05
+    /// offset: 0x71578 (used at 0x185ab)
+    pub unstuck_bump_speed: f32,
 }
 
 impl Default for KatamariParams {
@@ -202,10 +214,12 @@ impl Default for KatamariParams {
             boost_speed_mult: 1.0,
             brakeable_max_speed_ratio: f32::from_bits(0x3ee66666),
             brake_vfx_cooldown: 10,
-            min_speed_to_move: f32::from_bits(0x3c23d70a),
+            min_speed_to_move: f32::from_bits(0x3c23d70a), // 0.01
             bottom_ray_friction: f32::from_bits(0x3d10d2e0), // 0.0352
             nonbottom_ray_friction: f32::from_bits(0x3ba3d70a), // 0.005
             speed_check_off_friction_reduction: f32::from_bits(0x3f0ccccd), // 0.55
+            move_into_wall_similarity: f32::from_bits(0x3c23d70a), // 0.01
+            unstuck_bump_speed: f32::from_bits(0x3d4ccccd), // 0.05
         }
     }
 }

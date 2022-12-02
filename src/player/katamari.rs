@@ -411,10 +411,18 @@ pub struct Katamari {
     /// offset: 0x7bc
     contact_wall_clip: Vec3,
 
+    /// (??)
+    /// offset: 0x7cc
+    clip_translation: Vec3,
+
     /// The direction the katamari is pushed when stuck between walls.
     /// In practice it's just the last-contacted wall's normal.
     /// offset: 0x7dc
-    stuck_btwn_walls_push: Vec3,
+    stuck_btwn_walls_push_unit: Vec3,
+
+    /// (??) used in some weird collision edge case, where it's set to the unit of `delta_pos`
+    /// offset: 0x7ec
+    delta_pos_unit: Vec3,
 
     /// (??) The length of the primary collision ray contacting the floor.
     /// offset: 0x7fc
@@ -975,9 +983,10 @@ impl Katamari {
         }
 
         temp_debug_log!(
-            "center: {:?}, velocity:{:?}",
+            "center: {:?}, velocity:{:?}, vel_accel:{:?}",
             self.center,
-            self.velocity.velocity
+            self.velocity.velocity,
+            self.velocity.vel_accel
         );
     }
 
