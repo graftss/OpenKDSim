@@ -120,6 +120,7 @@ struct Test {
 }
 
 unsafe fn test() {
+    use mission::stage::*;
     // let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
 
     STATE.with(|_state| {
@@ -131,6 +132,10 @@ unsafe fn test() {
         // println!("{}", prop.max_aabb_y());
         // println!("{:#?}", x);
         // println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
+
+        let mut sc = StageConfig::default();
+        StageConfig::get(&mut sc, 2);
+        println!("stage config: {sc:?}");
     });
 
     let mut s = mission::config::MissionConfig::default();

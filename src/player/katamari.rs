@@ -248,6 +248,12 @@ pub struct Katamari {
     /// offset: 0x1bc
     max_wallclimb_height: f32,
 
+    /// The gravity acceleration applied to props which have been knocked airborne by the
+    /// katamari. This value is a piecewise linear function of the katamari's diameter, and
+    /// the particular function used depends on the current stage.
+    /// offset: 0x1c4
+    airborne_prop_gravity: f32,
+
     /// Katamari velocities.
     /// offset: 0x240
     velocity: KatVelocity,
@@ -878,7 +884,9 @@ impl Katamari {
         self.wallclimb_max_height_ticks = 0;
 
         // TODO: `kat_init:284-285` (not sure what this is about)
-        // TODO: `kat_init:286-288` (compute initial airborne prop gravity)
+        self.airborne_prop_gravity = mission_state
+            .stage_config
+            .get_airborne_prop_gravity(self.diam_cm);
     }
 
     /// Set global katamari speed multipliers, as in the API function `SetKatamariSpeed`.
@@ -907,6 +915,12 @@ impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
     pub fn update(&mut self, prince: &mut Prince, camera: &Camera, mission_state: &MissionState) {
+        temp_debug_log!(
+            "num_surfaces={}, airborne={}",
+            self.num_wall_contacts + self.num_floor_contacts,
+            self.physics_flags.airborne
+        );
+        temp_debug_log!("vel_accel={:?}", self.velocity.vel_accel);
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -930,7 +944,7 @@ impl Katamari {
         let oujistate = prince.get_oujistate();
         self.physics_flags.wheel_spin = oujistate.wheel_spin;
 
-        // TODO: `kat_update_incline_accel()`
+        self.update_incline_accel(mission_state);
 
         self.elasticity = stage_config.get_kat_elasticity(self.diam_cm);
 

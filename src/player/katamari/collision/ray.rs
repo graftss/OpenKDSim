@@ -243,8 +243,6 @@ impl Katamari {
         );
         vec3::normalize(&mut bottom_ray.ray_local_unit, &bottom_ray.kat_to_endpoint);
 
-        temp_debug_log!("center: {:?}, bottom_ray: {:?}", self.center, bottom_ray);
-
         // TODO: `kat_orient_mesh_rays:164-174`
 
         // orient the mesh collision rays

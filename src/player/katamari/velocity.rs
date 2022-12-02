@@ -96,6 +96,16 @@ pub struct KatVelocity {
 }
 
 impl Katamari {
+    /// offset: 0x20cd0
+    pub(super) fn update_incline_accel(&mut self, mission_state: &MissionState) {
+        // TODO: if gamemode is Ending, do nothing
+
+        self.airborne_prop_gravity = mission_state
+            .stage_config
+            .get_airborne_prop_gravity(self.diam_cm);
+    }
+
+    /// offset: 0x22130
     pub(super) fn update_velocity(
         &mut self,
         prince: &mut Prince,

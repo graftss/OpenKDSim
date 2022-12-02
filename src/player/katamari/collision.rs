@@ -72,7 +72,6 @@ impl Katamari {
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
         // TODO: `kat_initial_process_props()`
-
         if mission_state.gamemode == GameMode::Ending {
             // TODO: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
@@ -178,11 +177,11 @@ impl Katamari {
                 let found_hit = self
                     .raycast_state
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
-                temp_debug_log!(
-                    "ray_idx={ray_idx}, endpt={:?}, len={:?}, found_hit={found_hit}",
-                    ray.endpoint,
-                    ray.ray_len
-                );
+                // temp_debug_log!(
+                //     "ray_idx={ray_idx}, endpt={:?}, len={:?}, found_hit={found_hit}",
+                //     ray.endpoint,
+                //     ray.ray_len
+                // );
 
                 if found_hit {
                     // TODO: there's a flag being ignored here
@@ -214,11 +213,6 @@ impl Katamari {
         vec3_inplace_zero_small(&mut normal_unit, 1e-05);
 
         // use the y component of the hit surface's unit normal to decide if it's a wall or floor
-        temp_debug_log!(
-            "---surface normal unit:{:?}, threshold={}",
-            normal_unit,
-            self.params.surface_normal_y_threshold
-        );
         let surface_type = if self.params.surface_normal_y_threshold < normal_unit[1] {
             if ray_idx == -1 || ray_idx == -5 || ray_idx == -6 {
                 return None;
@@ -519,13 +513,6 @@ impl Katamari {
             true
         };
 
-        temp_debug_log!(
-            "&&& stuck btn walls: {}, walls={}, floors={}",
-            stuck_btwn_walls,
-            self.num_wall_contacts,
-            self.num_floor_contacts
-        );
-
         // TODO: `kat_update_stuckness:304-335` (a case that's too annoying right now)
 
         if stuck_btwn_walls {
@@ -755,11 +742,6 @@ impl Katamari {
             // if the katamari doesn't contact a wall, it's not moving into one either.
             false
         };
-        temp_debug_log!(
-            "=== intowall={:?}, stuck={}",
-            moving_into_wall,
-            self.physics_flags.stuck_between_walls
-        );
 
         if self.physics_flags.stuck_between_walls && !self.last_physics_flags.stuck_between_walls {
             // if the katamari has just gotten stuck between walls:

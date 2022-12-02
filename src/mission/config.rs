@@ -40,7 +40,7 @@ pub struct VolPenaltyCtrlPt {
 
 impl VolPenaltyCtrlPt {
     /// Convert a list of floats to a list of volume penalty control points.
-    pub fn from_floats(raw_data: &Vec<f32>) -> Vec<VolPenaltyCtrlPt> {
+    pub fn from_bytes(raw_data: &Vec<f32>) -> Vec<VolPenaltyCtrlPt> {
         let mut result = vec![];
 
         for chunk in raw_data.chunks(2) {
@@ -56,11 +56,11 @@ impl VolPenaltyCtrlPt {
     /// Sanity-check the ray float array making up a mission's volume penalty control points.
     pub fn validate_mission_ctrl_pts(raw_data: &Vec<f32>) {
         if raw_data.len() % 2 != 0 {
-            panic_log!("Invalid data length passed to `VolPenaltyCtrlPt::from_floats`.");
+            panic_log!("Invalid data length passed to `VolPenaltyCtrlPt::from_bytes`.");
         } else if raw_data[0] != 0.0 {
             // by forcing the first control point diameter to be 0.0, we can guarantee that
             // the katamari's diameter will never be smaller than all control points.
-            panic_log!("Invalid data passed to `VolPenaltyCtrlPt::from_floats`: first element should be `0.0`.");
+            panic_log!("Invalid data passed to `VolPenaltyCtrlPt::from_bytes`: first element should be `0.0`.");
         }
     }
 }
@@ -126,7 +126,7 @@ impl KatScaledParamsCtrlPt {
     /// ragged table of control points extracted from the simulation.
     /// The end of a mission's control point list is detected from a control
     /// point's size being `-1.0`.
-    fn from_floats(raw_data: &[u8]) -> Vec<Vec<KatScaledParamsCtrlPt>> {
+    fn from_bytes(raw_data: &[u8]) -> Vec<Vec<KatScaledParamsCtrlPt>> {
         let mut result = vec![];
         let mut mission_ctrl_pts = vec![];
 
@@ -194,7 +194,7 @@ impl CamScaledCtrlPt {
     /// ragged table of control points extracted from the simulation.
     /// The end of a mission's control point list is detected from a control
     /// point's size being `-1.0`.
-    fn from_floats(raw_data: &[u8]) -> Vec<Vec<CamScaledCtrlPt>> {
+    fn from_bytes(raw_data: &[u8]) -> Vec<Vec<CamScaledCtrlPt>> {
         let mut result = vec![];
         let mut mission_ctrl_pts = vec![];
 
@@ -415,13 +415,13 @@ fn read_vol_penalty_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
     for (mission_idx, config) in configs.iter_mut().enumerate() {
         if let Some(raw_data) = MC_VOL_PENALTY_CTRL_PTS.get(&(mission_idx as u8).into()) {
             VolPenaltyCtrlPt::validate_mission_ctrl_pts(raw_data);
-            config.vol_penalty_ctrl_pts = Some(VolPenaltyCtrlPt::from_floats(raw_data));
+            config.vol_penalty_ctrl_pts = Some(VolPenaltyCtrlPt::from_bytes(raw_data));
         }
     }
 }
 
 fn read_scaled_params_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
-    let parsed_scaled_params = KatScaledParamsCtrlPt::from_floats(MC_SCALING_PARAMS_TABLE);
+    let parsed_scaled_params = KatScaledParamsCtrlPt::from_bytes(MC_SCALING_PARAMS_TABLE);
 
     // println!("{:?}", parsed_scaled_params);
     for (config, params) in configs.iter_mut().zip(parsed_scaled_params) {
@@ -436,7 +436,7 @@ fn read_scaled_max_sizes(configs: &mut [MissionConfig; NUM_MISSIONS]) {
 }
 
 fn read_camera_params_ctrl_pts(configs: &mut [MissionConfig; NUM_MISSIONS]) {
-    let parsed_scaled_params = CamScaledCtrlPt::from_floats(MC_CAMERA_PARAMS_TABLE);
+    let parsed_scaled_params = CamScaledCtrlPt::from_bytes(MC_CAMERA_PARAMS_TABLE);
 
     // println!("{:?}", parsed_scaled_params);
     for (config, params) in configs.iter_mut().zip(parsed_scaled_params) {

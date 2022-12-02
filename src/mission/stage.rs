@@ -57,6 +57,8 @@ use lazy_static::lazy_static;
 
 static SC_FLIP_PARAMS_TABLE: &'static [u8] = include_bytes!("bin/stage_config_flip_params.bin");
 static SC_ELASTICITY_TABLE: &'static [u8] = include_bytes!("bin/stage_config_elasticity.bin");
+static SC_AIRBORNE_PROP_GRAVITY_TABLE: &'static [u8] =
+    include_bytes!("bin/stage_config_airborne_prop_gravity.bin");
 
 /// Flip duration is computed by lerping the katamari's diameter between
 /// stage-specific minimum and maximum diameters.
@@ -196,12 +198,83 @@ impl StageKatElasticity {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct AirbornePropGravityCtrlPt {
+    /// The katamari diameter at which this prop gravity is applied.
+    /// offset: 0x0
+    pub diam_cm: f32,
+
+    /// The prop gravity applied at the given katamari diameter.
+    pub gravity: f32,
+}
+
+/// The gravity imparted on airborne props is a piecewise linear function of the
+/// katamari's diameter. The particular piecewise linear function is encoded as a
+/// list of `StageAirbornePropGravity` control points, which varies with the stage.
+#[derive(Debug, Default, Clone)]
+pub struct StageAirbornePropGravity {
+    pub ctrl_pts: Vec<AirbornePropGravityCtrlPt>,
+}
+
+impl StageAirbornePropGravity {
+    pub const WIDTH: usize = 0x8;
+
+    pub fn get_airborne_prop_gravity(&self, diam_cm: f32) -> f32 {
+        for (i, ctrl_pt) in self.ctrl_pts.iter().enumerate() {
+            if diam_cm <= ctrl_pt.diam_cm {
+                // find the first control point with a diameter larger than `diam_cm`.
+                // Then compute the result by interpolating `diam_cm` between this control
+                // point's diameter (which is just bigger than `diam_cm`) and the previous
+                // control point's diameter (which is just smaller than `diam_cm`).
+                if i == 0 {
+                    return ctrl_pt.gravity;
+                } else {
+                    let last_pt = &self.ctrl_pts[i - 1];
+                    return rescale!(
+                        diam_cm,
+                        last_pt.diam_cm,
+                        ctrl_pt.diam_cm,
+                        last_pt.gravity,
+                        ctrl_pt.gravity
+                    );
+                }
+            }
+        }
+
+        1.0
+    }
+
+    pub fn from_bytes(raw_data: &[u8]) -> Vec<StageAirbornePropGravity> {
+        let mut result = vec![];
+        let mut mission_ctrl_pts = vec![];
+
+        for chunk in raw_data.chunks(Self::WIDTH) {
+            let diam_cm = read_f32!(chunk, 0);
+
+            if diam_cm < 0.0 {
+                result.push(StageAirbornePropGravity {
+                    ctrl_pts: mission_ctrl_pts,
+                });
+                mission_ctrl_pts = vec![];
+            } else {
+                mission_ctrl_pts.push(AirbornePropGravityCtrlPt {
+                    diam_cm,
+                    gravity: read_f32!(chunk, 4),
+                });
+            }
+        }
+
+        result
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct StageConfig {
     stage_idx: u8,
     flip_params: Option<StageFlipParams>,
     royal_warps: Option<&'static StageRoyalWarps>,
     elasticity: Option<StageKatElasticity>,
+    airborne_prop_gravity: Option<StageAirbornePropGravity>,
 }
 
 impl StageConfig {
@@ -232,9 +305,21 @@ impl StageConfig {
         self.elasticity
             .as_ref()
             .unwrap_or_else(|| {
-                panic_log!("error reading stage elasticity: {}", self.stage_idx);
+                panic_log!("error reading stage elasticity: stage {}", self.stage_idx);
             })
             .get_kat_elasticity(diam_cm)
+    }
+
+    pub fn get_airborne_prop_gravity(&self, diam_cm: f32) -> f32 {
+        self.airborne_prop_gravity
+            .as_ref()
+            .unwrap_or_else(|| {
+                panic_log!(
+                    "error reading airborne prop gravity: stage {}",
+                    self.stage_idx
+                );
+            })
+            .get_airborne_prop_gravity(diam_cm)
     }
 }
 
@@ -248,6 +333,7 @@ impl StageConfig {
         Self::read_flip_params(configs);
         Self::read_royal_warps(configs);
         Self::read_elasticity(configs);
+        Self::read_airborne_prop_gravity(configs);
 
         for (stage_idx, config) in configs.iter_mut().enumerate() {
             config.stage_idx = stage_idx as u8;
@@ -276,21 +362,24 @@ impl StageConfig {
     }
 
     fn read_elasticity(configs: &mut StageConfigTable) {
-        println!(
-            "max elt = {}",
-            SC_ELASTICITY_TABLE.len() / StageKatElasticity::WIDTH
-        );
         for (stage_idx, chunk) in SC_ELASTICITY_TABLE
             .chunks(StageKatElasticity::WIDTH)
             .enumerate()
         {
-            println!("{:?}", chunk);
             configs[stage_idx].elasticity = Some(StageKatElasticity {
                 min_diam_cm: read_f32!(chunk, 0x0),
                 max_diam_cm: read_f32!(chunk, 0x4),
                 min_diam_elasticity: read_f32!(chunk, 0x8),
                 max_diam_elasticity: read_f32!(chunk, 0xc),
             });
+        }
+    }
+
+    fn read_airborne_prop_gravity(configs: &mut StageConfigTable) {
+        let table = StageAirbornePropGravity::from_bytes(SC_AIRBORNE_PROP_GRAVITY_TABLE);
+
+        for (config, gravity) in configs.iter_mut().zip(table) {
+            config.airborne_prop_gravity = Some(gravity);
         }
     }
 }
