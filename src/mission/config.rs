@@ -141,7 +141,7 @@ impl KatScaledParamsCtrlPt {
                     diam_cm,
                     params: KatScaledParams {
                         base_max_speed: read_f32!(chunk, 0x4),
-                        gravity_accel: read_f32!(chunk, 0x8),
+                        accel_grav: read_f32!(chunk, 0x8),
                         brake_forwards_force: read_f32!(chunk, 0xc),
                         brake_backwards_force: read_f32!(chunk, 0x10),
                         brake_sideways_force: read_f32!(chunk, 0x14),

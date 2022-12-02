@@ -237,8 +237,9 @@ pub struct Katamari {
     // min_brake_angle: f32,
 
     /// (??)
+    /// (NOTE: migrated to `KatamariParams`)
     /// offset: 0x1b0
-    min_slope_grade_0x1b0: f32,
+    // min_slope_grade_0x1b0: f32,
 
     /// (??)
     /// offset: 0x1b8
@@ -817,7 +818,7 @@ impl Katamari {
         self.player = player;
         self.mesh_index = 1;
 
-        self.min_slope_grade_0x1b0 = self.params.min_slope_grade;
+        // self.min_slope_grade_0x1b0 = self.params.min_slope_grade; (migrated to `KatamariParams`)
         // self.min_brake_angle = self.params.min_brake_angle; (migrated to `KatamariParams`)
         self.max_wallclimb_angle = self.params.max_wallclimb_angle;
 
@@ -920,7 +921,12 @@ impl Katamari {
             self.num_wall_contacts + self.num_floor_contacts,
             self.physics_flags.airborne
         );
-        temp_debug_log!("vel_accel={:?}", self.velocity.vel_accel);
+        temp_debug_log!(
+            "vel_accel={:?}, grav={:?}, grav_accel={}",
+            self.velocity.vel_accel,
+            self.velocity.vel_grav,
+            self.scaled_params.accel_grav
+        );
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -944,7 +950,7 @@ impl Katamari {
         let oujistate = prince.get_oujistate();
         self.physics_flags.wheel_spin = oujistate.wheel_spin;
 
-        self.update_incline_accel(mission_state);
+        self.update_incline_accel_and_gravity(prince, mission_state);
 
         self.elasticity = stage_config.get_kat_elasticity(self.diam_cm);
 

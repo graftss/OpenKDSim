@@ -521,6 +521,17 @@ impl Prince {
         self.push_uphill_strength / self.max_push_uphill_strength
     }
 
+    pub fn reset_push_uphill_strength(&mut self) {
+        self.push_uphill_strength = self.max_push_uphill_strength;
+    }
+
+    pub fn decrease_push_uphill_strength(&mut self, t: f32) {
+        self.push_uphill_strength -= t * self.uphill_strength_loss;
+        if self.push_uphill_strength < 0.0 {
+            self.push_uphill_strength = 0.0;
+        }
+    }
+
     /// If false, the input is not considered "pushing" the katamari for the purposes
     /// of `Katamari::compute_brake_state`.
     /// offset: 0x21962 (in `kat_compute_brake_state`)

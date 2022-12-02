@@ -13,7 +13,7 @@ pub struct KatScaledParams {
 
     /// Downward acceleration from gravity.
     /// offset: 0x4
-    pub gravity_accel: f32,
+    pub accel_grav: f32,
 
     /// (??) The force exerted when braking with forwards movement.
     /// offset: 0x8
@@ -113,7 +113,7 @@ impl KatScaledParams {
         } else {
             let t = inv_lerp!(diam_cm, min_pt.diam_cm, max_pt.diam_cm);
             lerp_param!(self, min_pt, max_pt, t, base_max_speed);
-            lerp_param!(self, min_pt, max_pt, t, gravity_accel);
+            lerp_param!(self, min_pt, max_pt, t, accel_grav);
             lerp_param!(self, min_pt, max_pt, t, brake_forwards_force);
             lerp_param!(self, min_pt, max_pt, t, brake_backwards_force);
             lerp_param!(self, min_pt, max_pt, t, brake_sideways_force);

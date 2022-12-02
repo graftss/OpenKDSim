@@ -4,14 +4,17 @@ use gl_matrix::{
 };
 
 use crate::{
-    constants::{FRAC_PI_2, PI, TAU, VEC3_Z_POS},
-    macros::{inv_lerp, lerp, max, panic_log, set_y, temp_debug_log, vec3_from},
+    constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Z_POS},
+    macros::{
+        inv_lerp, inv_lerp_clamp, lerp, max, panic_log, set_y, temp_debug_log, vec3_from,
+        vec3_unit_xz,
+    },
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract_vec,
-        vec3_inplace_zero_small,
+        vec3_inplace_zero_small, vec3_projection,
     },
-    mission::{stage::Stage, state::MissionState},
+    mission::{self, stage::Stage, state::MissionState, GameMode},
     player::{
         camera::{mode::CameraMode, Camera},
         prince::{Prince, PushDir},
@@ -82,9 +85,9 @@ pub struct KatVelocity {
     /// offset: 0x90
     pub push_vel_on_floor_unit: Vec3,
 
-    /// Acceleration from gravity
+    /// (Downwards) velocity from gravity
     /// offset: 0xa0
-    pub accel_grav: Vec3,
+    pub vel_grav: Vec3,
 
     /// Acceleration from the contacted floor incline
     /// offset: 0xb0
@@ -97,12 +100,184 @@ pub struct KatVelocity {
 
 impl Katamari {
     /// offset: 0x20cd0
-    pub(super) fn update_incline_accel(&mut self, mission_state: &MissionState) {
-        // TODO: if gamemode is Ending, do nothing
+    pub(super) fn update_incline_accel_and_gravity(
+        &mut self,
+        prince: &mut Prince,
+        mission_state: &MissionState,
+    ) {
+        if mission_state.gamemode == GameMode::Ending {
+            // in the ending stage, there is no gravity
+            vec3::zero(&mut self.velocity.vel_grav);
+            return;
+        }
 
         self.airborne_prop_gravity = mission_state
             .stage_config
             .get_airborne_prop_gravity(self.diam_cm);
+
+        vec3::zero(&mut self.velocity.accel_incline);
+        if !self.physics_flags.climbing_wall {
+            if !self.physics_flags.airborne {
+                // if not climbing a wall and grounded (i.e. not airborne):
+                vec3::zero(&mut self.velocity.vel_grav);
+
+                if !self.hit_flags.force_flatground {
+                    // not wallclimbing, grounded, and not on forced flatground.
+                    // then we can check the currently contacted floor to see if it's
+                    // steep enough to automatically accelerate the katamari downwards.
+
+                    // consider the slope of the contacted floor, computed as the angle
+                    // of the floor normal's y component:
+                    let floor_slope = acos_f32(self.contact_floor_normal_unit[1]);
+
+                    if self.params.min_slope_grade_causing_accel < floor_slope / FRAC_PI_2 {
+                        // if the slope is steep enough to cause acceleration:
+
+                        // compute the unit rejection of gravity onto the floor:
+                        let mut floor_rej_down = [0.0; 3];
+                        let mut floor_proj_down = [0.0; 3];
+                        vec3_projection(
+                            &mut floor_proj_down,
+                            &mut floor_rej_down,
+                            &VEC3_Y_NEG,
+                            &self.contact_floor_normal_unit,
+                        );
+                        vec3_inplace_zero_small(&mut floor_rej_down, 1e-05);
+                        vec3_inplace_normalize(&mut floor_rej_down);
+
+                        // compute some kind of lateral unit velocity and the lateral speed
+                        // in its direction
+                        let mut vel_xz_unit = match self.physics_flags.no_input_push {
+                            true => self.velocity.velocity,
+                            false => self.velocity.push_vel_on_floor_unit,
+                        };
+                        set_y!(vel_xz_unit, 0.0);
+                        let speed_xz = vec3::length(&vel_xz_unit);
+                        vec3_inplace_normalize(&mut vel_xz_unit);
+
+                        // compute the current incline move type
+                        self.physics_flags.incline_move_type =
+                            if !self.physics_flags.immobile && speed_xz > 0.0 {
+                                // if the player is moving, the incline movetype is determined
+                                // by the similarity between the direction of their velocity and
+                                // the (??) direction the slope is facing.
+                                let similarity = vec3::dot(&vel_xz_unit, &floor_proj_down);
+                                let threshold = match self.physics_flags.no_input_push {
+                                    true => 0.0,
+                                    false => 0.258819,
+                                };
+
+                                // compute the incline move type:
+                                if self.physics_flags.contacts_wall {
+                                    // case 1: if the katamari contacts a wall, set the movetype to
+                                    // flatground regardless of the similarity.
+                                    KatInclineMoveType::MoveFlatground
+                                } else if similarity <= -threshold {
+                                    // case 2: `similarity <= -threshold`: moving against incline (i.e. uphill)
+                                    KatInclineMoveType::MoveUphill
+                                } else if similarity <= threshold {
+                                    // case 3: `-threshold < similarity <= threshold`: moving neutral
+                                    // with respect to incline (i.e. on flat ground)
+                                    KatInclineMoveType::MoveFlatground
+                                } else {
+                                    // case 4: `threshold < similarity`: moving with incline (i.e. downhill)
+                                    KatInclineMoveType::MoveDownhill
+                                }
+                            } else {
+                                // if the player isn't moving, start downhill acceleration
+                                // along the incline.
+                                self.physics_flags.immobile = false;
+                                self.move_downhill_ticks = 10;
+                                KatInclineMoveType::MoveDownhill
+                            };
+
+                        // update the katamari's incline acceleration based on its incline movetype
+                        match self.physics_flags.incline_move_type {
+                            KatInclineMoveType::MoveUphill => {
+                                // if moving uphill:
+                                // incline acceleration is a multiple of the unit rejection.
+                                // the multiple is determined by the prince's push strength and the number of
+                                // ticks that the katamari has been moving uphill.
+                                self.move_uphill_ticks += 1;
+                                self.move_downhill_ticks = 0;
+
+                                // TODO: wasn't this already computed
+                                let slope = acos_f32(self.contact_floor_normal_unit[1]);
+                                let accel_t = inv_lerp_clamp!(
+                                    slope,
+                                    self.params.min_slope_grade_causing_accel,
+                                    self.params.effective_max_slope_grade * FRAC_PI_2
+                                );
+                                prince.decrease_push_uphill_strength(accel_t);
+
+                                let incline_base_accel = if prince.input_avg_push_len <= 0.0 {
+                                    self.scaled_params.not_push_uphill_accel
+                                } else {
+                                    self.scaled_params.push_uphill_accel
+                                };
+
+                                let easein_accel = (self.move_uphill_ticks as f32
+                                    / self.params.uphill_accel_easein_duration)
+                                    .clamp(0.0, 1.0);
+                                let incline_mult =
+                                    easein_accel * (self.diam_cm / 50.0) * incline_base_accel;
+                                vec3::scale(
+                                    &mut self.velocity.accel_incline,
+                                    &floor_rej_down,
+                                    incline_mult,
+                                );
+                            }
+                            KatInclineMoveType::MoveDownhill => {
+                                // if moving downhill:
+                                self.move_downhill_ticks += 1;
+                                self.move_uphill_ticks = 0;
+
+                                let easein_accel = (self.move_downhill_ticks as f32
+                                    / self.params.downhill_accel_easein_duration)
+                                    .clamp(0.0, 1.0);
+                                let incline_mult = (self.scaled_params.not_push_uphill_accel
+                                    * self.diam_cm)
+                                    / 50.0
+                                    * easein_accel;
+                                vec3::scale(
+                                    &mut self.velocity.accel_incline,
+                                    &floor_rej_down,
+                                    incline_mult,
+                                );
+                            }
+                            KatInclineMoveType::MoveFlatground => {
+                                self.end_incline_movement(prince);
+                            }
+                        }
+                    } else {
+                        // if the contact floor isn't steep enough to accelerate the katamari
+                        // downwards automatically:
+                        self.end_incline_movement(prince);
+                    };
+                } else {
+                    // if contacting a surface that's forced flatground (i.e. regardless of its
+                    // slope, it won't accelerate the katamari downwards automatically)
+                    self.end_incline_movement(prince);
+                }
+            } else {
+                // if not wallclimbining and airborne:
+                // apply gravity acceleration
+                self.velocity.vel_grav[1] -= self.scaled_params.accel_grav;
+                self.end_incline_movement(prince);
+            }
+        } else {
+            // if climbing wall:
+            self.move_downhill_ticks = 0;
+            self.move_uphill_ticks = 0;
+            vec3::zero(&mut self.velocity.vel_grav);
+        }
+    }
+
+    fn end_incline_movement(&mut self, prince: &mut Prince) {
+        self.move_downhill_ticks = 0;
+        self.move_uphill_ticks = 0;
+        self.physics_flags.incline_move_type = KatInclineMoveType::MoveFlatground;
+        prince.reset_push_uphill_strength();
     }
 
     /// offset: 0x22130
@@ -605,13 +780,13 @@ impl Katamari {
         vec3::zero(&mut self.bonus_vel);
 
         // start with `velocity + accel_incline`
-        let mut next_vel = self.velocity.velocity.clone();
-        vec3_inplace_add_vec(&mut next_vel, &self.velocity.accel_incline);
+        let mut vel_accel = self.velocity.velocity.clone();
+        vec3_inplace_add_vec(&mut vel_accel, &self.velocity.accel_incline);
 
-        let speed0 = vec3::length(&next_vel);
+        let speed0 = vec3::length(&vel_accel);
         if speed0 > 0.0 && !self.physics_flags.climbing_wall {
             // if moving and not climbing a wall, apply ground friction
-            vec3_inplace_add_vec(&mut next_vel, &self.velocity.accel_ground_friction);
+            vec3_inplace_add_vec(&mut vel_accel, &self.velocity.accel_ground_friction);
         }
 
         if self.hit_flags.speed_check_off
@@ -620,12 +795,14 @@ impl Katamari {
             // TODO: `kat_apply_acceleration:44-61` (speedcheckoff acceleration)
         }
 
-        self.velocity.vel_accel = next_vel;
+        self.velocity.vel_accel = vel_accel;
         vec3::normalize(&mut self.velocity.vel_accel_unit, &self.velocity.vel_accel);
+
+        // compute velocity after gravity acceleration
         vec3::add(
             &mut self.velocity.vel_accel_grav,
             &self.velocity.vel_accel,
-            &self.velocity.accel_grav,
+            &self.velocity.vel_grav,
         );
         vec3::normalize(
             &mut self.velocity.vel_accel_grav_unit,
@@ -634,7 +811,9 @@ impl Katamari {
 
         let mut next_vel = self.velocity.vel_accel;
 
-        if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom) {
+        if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
+            || self.physics_flags.grounded_ray_type == None
+        {
             // if grounded via the "bottom" ray, meaning the katamari isn't vaulting:
             // TODO_VS: `kat_apply_acceleration:79-90`
             // TODO_ENDING: `kat_apply_acceleration:91-96`
@@ -643,6 +822,7 @@ impl Katamari {
                 // if not wall climbing:
                 // TODO: some SHUFPS crap going on here, not clear what it's doing
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
+                vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_grav);
             } else {
                 // if wall climbing:
                 if !self.physics_flags.at_max_climb_height {
@@ -653,7 +833,7 @@ impl Katamari {
             }
 
             if self.physics_flags.airborne {
-                next_vel = self.velocity.vel_accel_grav;
+                vec3_inplace_add_vec(&mut next_vel, &self.velocity.vel_accel_grav);
             }
 
             self.speed = vec3::length(&next_vel);

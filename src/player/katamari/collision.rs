@@ -712,7 +712,7 @@ impl Katamari {
     }
 
     fn is_falling(&self) -> bool {
-        self.velocity.accel_grav[1] + self.velocity.vel_accel[1] < 0.0
+        self.velocity.vel_grav[1] + self.velocity.vel_accel[1] < 0.0
     }
 
     /// (??) I think this is trying to clip the katamari away from walls when the game

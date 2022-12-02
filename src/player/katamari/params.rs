@@ -22,10 +22,6 @@ pub struct KatamariParams {
     /// offset: 0x7b220
     pub prop_attach_vol_ratio: f32,
 
-    /// (??)
-    /// offset: 0x7b254 (but this value is `cos(thatvalue * pi/2)` because reasons)
-    pub min_slope_grade: f32,
-
     /// (??) The minimum angle between input and katamari velocity needed to brake, or something
     /// offset: 0x7b238 (but this value is `cos(thatvalue * pi/2)` because reasons)
     pub min_brake_angle: f32,
@@ -197,6 +193,27 @@ pub struct KatamariParams {
     /// default: 1.2
     /// offset: 0x71624 (used at 0x1c8c4)
     pub increased_collision_radius_mult: f32,
+
+    /// If a floor surface's slope is larger than this value, it is considered steep enough
+    /// to automatically accelerate the katamari downwards along it.
+    /// default: 0.0453
+    /// offset: 0x7b254
+    pub min_slope_grade_causing_accel: f32,
+
+    /// The maximum floor slope grade for the purposes of accelerating the katamari.
+    /// All slopes with this grade or higher will have the same impact on the katamari's
+    /// acceleration.
+    /// default: 0.74
+    /// offset: 0x7b204
+    pub effective_max_slope_grade: f32,
+
+    /// The number of ticks during which the katamari's uphill acceleration eases in after
+    /// it starts moving uphill.
+    pub uphill_accel_easein_duration: f32,
+
+    /// The number of ticks during which the katamari's downhill acceleration eases in after
+    /// it starts moving downhill
+    pub downhill_accel_easein_duration: f32,
 }
 
 impl Default for KatamariParams {
@@ -207,7 +224,6 @@ impl Default for KatamariParams {
             prop_attached_alpha: 0.995,
             prop_attach_vol_ratio: f32::from_bits(0x3dcccccd), // 0.1
             prop_use_aabb_collision_vol_ratio: f32::from_bits(0x3f59999a), // 0.85
-            min_slope_grade: (f32::from_bits(0x3d398c7e) * FRAC_PI_2).cos(),
             min_brake_angle: (f32::from_bits(0x3eab020c) * FRAC_PI_2).cos(),
             max_wallclimb_angle: (f32::from_bits(0x3ecccccd) * FRAC_PI_2).cos(),
             clip_len_constant: f32::from_bits(0x3a03126f),
@@ -241,6 +257,10 @@ impl Default for KatamariParams {
             surface_normal_y_threshold: (f32::from_bits(0x3f3d70a4) * FRAC_PI_2).cos(),
             max_ray_len_ratio_to_radius: 2.5,
             increased_collision_radius_mult: 1.2,
+            min_slope_grade_causing_accel: f32::from_bits(0x3d398c7e), // 0.0453
+            effective_max_slope_grade: f32::from_bits(0x3f3d70a4),     // 0.074
+            uphill_accel_easein_duration: 20.0,
+            downhill_accel_easein_duration: 20.0,
         }
     }
 }
