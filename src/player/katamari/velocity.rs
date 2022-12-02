@@ -5,7 +5,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Z_POS},
-    macros::{inv_lerp, lerp, max, panic_log, set_y, vec3_from},
+    macros::{inv_lerp, lerp, max, panic_log, set_y, temp_debug_log, vec3_from},
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract_vec,
@@ -632,7 +632,13 @@ impl Katamari {
             if !self.physics_flags.climbing_wall {
                 // if not wall climbing:
                 // TODO: some SHUFPS crap going on here, not clear what it's doing
+                temp_debug_log!(
+                    "before add center={:?}, vel={:?}",
+                    self.center,
+                    self.velocity.vel_accel
+                );
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
+                temp_debug_log!("after add center={:?}", self.center);
             } else {
                 // if wall climbing:
                 if !self.physics_flags.at_max_climb_height {

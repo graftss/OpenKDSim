@@ -42,7 +42,7 @@ pub struct KatamariParams {
     /// flat floors (over this value) to sloped floors (under this value).
     /// (Note that a y component of 1 would be a completely flat floor)
     /// offset: 0x71608
-    pub sloped_floor_y_normal_threshold: f32,
+    pub sloped_floor_normal_y_threshold: f32,
 
     /// (??) If two surfaces have normal vectors which dot to above this value, they're not distinguished
     /// by the collision system while the katamari contacts both of them.
@@ -179,6 +179,24 @@ pub struct KatamariParams {
     /// default: 0.05
     /// offset: 0x71578 (used at 0x185ab)
     pub unstuck_bump_speed: f32,
+
+    /// The minimum y normal distinguishing a wall from a floor.
+    /// default: TODO
+    /// offset: TODO
+    pub surface_normal_y_threshold: f32,
+
+    /// The maximum length that a collision ray is allowed to have, expressed as a multiple of
+    /// the katamari's radius. (e.g. the default value of 2.5 means that no collision ray can be
+    /// longer than 2.5 times the katamari's radius)
+    /// default: 2.5
+    /// offset: 0x716ec (used at 0x1c5ba)
+    pub max_ray_len_ratio_to_radius: f32,
+
+    /// The multiple of the katamari's usual collision radius that's applied to
+    /// check for AABB collisions with props which have the "increased collision radius" property.
+    /// default: 1.2
+    /// offset: 0x71624 (used at 0x1c8c4)
+    pub increased_collision_radius_mult: f32,
 }
 
 impl Default for KatamariParams {
@@ -194,7 +212,7 @@ impl Default for KatamariParams {
             max_wallclimb_angle: (f32::from_bits(0x3ecccccd) * FRAC_PI_2).cos(),
             clip_len_constant: f32::from_bits(0x3a03126f),
             surface_similarity_threshold: f32::from_bits(0x3f7ffeb0),
-            sloped_floor_y_normal_threshold: f32::from_bits(0x3f7ff972),
+            sloped_floor_normal_y_threshold: f32::from_bits(0x3f7ff972),
             wall_to_floor_angle_stuck_threshold: f32::from_bits(0x40060a92), // 3pi/2
             wall_to_wall_angle_stuck_threshold: f32::from_bits(0x40278d36),  // 5pi/6
             detach_cooldown_when_stuck_btwn_walls: 15,
@@ -220,6 +238,9 @@ impl Default for KatamariParams {
             speed_check_off_friction_reduction: f32::from_bits(0x3f0ccccd), // 0.55
             move_into_wall_similarity: f32::from_bits(0x3c23d70a), // 0.01
             unstuck_bump_speed: f32::from_bits(0x3d4ccccd), // 0.05
+            surface_normal_y_threshold: (f32::from_bits(0x3f3d70a4) * FRAC_PI_2).cos(),
+            max_ray_len_ratio_to_radius: 2.5,
+            increased_collision_radius_mult: 1.2,
         }
     }
 }

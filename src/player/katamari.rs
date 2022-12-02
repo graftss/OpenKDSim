@@ -227,8 +227,9 @@ pub struct Katamari {
 
     /// The threshold for the unit normal y coordinate of surfaces that distinguishes
     /// floors and walls: higher is a floor, lower is a wall.
+    /// (NOTE: migrated to `KatamariParams`)
     /// offset: 0x1a4
-    surface_threshold_y_normal: f32,
+    // surface_threshold_y_normal: f32,
 
     /// Minimum angle between input and velocity to initiate a brake
     /// (NOTE: migrated to `KatamariParams`)
@@ -531,7 +532,7 @@ pub struct Katamari {
 
     /// (??) Some kind of transform for when the katamari is vaulting
     /// offset: 0x3914
-    vault_transform_unknown: Mat4,
+    vault_transform: Mat4,
 
     /// (??) The vector from the katamari center to the primary floor contact.
     /// offset: 0x3954
@@ -562,15 +563,19 @@ pub struct Katamari {
 
     /// (??) The maximum allowed length of any collision ray.
     /// offset: 0x39ac
-    max_allowed_ray_len: f32,
+    max_ray_len: f32,
 
-    /// The average length of all collision rays.
+    /// The average length of all mesh collision rays.
     /// offset: 0x39b0
-    average_ray_len: f32,
+    avg_mesh_ray_len: f32,
+
+    /// (??) An increased multiple of the `average_ray_len`
+    /// offset: 0x39b4
+    larger_avg_mesh_ray_len: f32,
 
     /// The number of ticks the katamari since the katamari started its current vault.
     /// offset: 0x39bc
-    vault_time_ticks: u32,
+    vault_ticks: u32,
 
     /// The collision ray index of the first prop ray.
     /// offset: 0x39c0
@@ -982,12 +987,12 @@ impl Katamari {
             // TODO: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
 
-        temp_debug_log!(
-            "center: {:?}, velocity:{:?}, vel_accel:{:?}",
-            self.center,
-            self.velocity.velocity,
-            self.velocity.vel_accel
-        );
+        // temp_debug_log!(
+        //     "center: {:?}, velocity:{:?}, vel_accel:{:?}",
+        //     self.center,
+        //     self.velocity.velocity,
+        //     self.velocity.vel_accel
+        // );
     }
 
     /// Update the katamari's scaled params by interpolating the mission's param control points.

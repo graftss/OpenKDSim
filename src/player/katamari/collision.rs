@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
     collision::raycast_state::RaycastCallType,
-    macros::{panic_log, set_translation, set_y, vec3_from, vec3_unit_xz},
+    macros::{panic_log, set_translation, set_y, temp_debug_log, vec3_from, vec3_unit_xz},
     math::{
         acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_normalize,
         vec3_inplace_scale, vec3_inplace_subtract, vec3_inplace_subtract_vec,
@@ -113,6 +113,8 @@ impl Katamari {
             .raycast_state
             .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
+        temp_debug_log!("center={center:?}, below={below:?}, found_hit={found_hit}");
+
         // update shadow position
         if !found_hit {
             // if there's no surface below, set the shadow position to the katamari top (idk why)
@@ -159,6 +161,9 @@ impl Katamari {
             for (_i, (point0, point1)) in
                 Iterator::zip(shell_initial_pts.iter(), shell_final_pts.iter()).enumerate()
             {
+                // TODO: replace this when shell points are working
+                continue;
+
                 // check collisions along each shell ray
                 self.raycast_state.load_ray(point0, point1);
                 self.raycast_state
@@ -170,6 +175,11 @@ impl Katamari {
             let center = self.center.clone();
             let mut hit_ray_idx = None;
             for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
+                temp_debug_log!(
+                    "$$$$$$$ ray endpt={:?}, kat_to_endpt={:?}",
+                    ray.endpoint,
+                    ray.kat_to_endpoint
+                );
                 self.raycast_state.load_ray(&center, &ray.endpoint);
                 if self
                     .raycast_state
@@ -190,6 +200,7 @@ impl Katamari {
         }
     }
 
+    /// offset: 0x133d0
     fn record_surface_contact(
         &mut self,
         ray_idx: i32,
@@ -205,7 +216,12 @@ impl Katamari {
         vec3_inplace_zero_small(&mut normal_unit, 1e-05);
 
         // use the y component of the hit surface's unit normal to decide if it's a wall or floor
-        let surface_type = if self.surface_threshold_y_normal < normal_unit[1] {
+        temp_debug_log!(
+            "---surface normal unit:{:?}, threshold={}",
+            normal_unit,
+            self.params.surface_normal_y_threshold
+        );
+        let surface_type = if self.params.surface_normal_y_threshold < normal_unit[1] {
             if ray_idx == -1 || ray_idx == -5 || ray_idx == -6 {
                 return None;
             }
@@ -328,6 +344,8 @@ impl Katamari {
                 .map(|ray| ray.contacts_surface = true);
         }
 
+        temp_debug_log!("??? found_old:{found_old}");
+
         if !found_old {
             self.inc_num_surface_contacts(surface_type);
         }
@@ -367,7 +385,7 @@ impl Katamari {
 
                 // record that we're contacting either a sloped or flat floor
                 // based on the floor's y normal
-                if floor.normal_unit[1] <= self.params.sloped_floor_y_normal_threshold {
+                if floor.normal_unit[1] <= self.params.sloped_floor_normal_y_threshold {
                     self.physics_flags.on_sloped_floor = true;
                 } else {
                     self.physics_flags.on_flat_floor = true;
@@ -461,21 +479,28 @@ impl Katamari {
         );
 
         // TODO: this control flow
-        let stuck_btwn_walls = if !self.hit_flags.small_ledge_climb {
+        let stuck_btwn_walls = if self.hit_flags.small_ledge_climb {
             true
-        } else if self.num_wall_contacts == 1 && self.num_floor_contacts > 0 {
-            // contacting exactly 1 wall and at least 1 floor:
+        } else if self.num_wall_contacts == 0 {
+            // if no wall contacts, not stuck
+            false
+        } else if self.num_wall_contacts == 1 {
+            if self.num_floor_contacts == 0 {
+                false
+            } else {
+                // contacting exactly 1 wall and at least 1 floor:
 
-            let wall_dot_floor = vec3::dot(
-                &self.contact_wall_normal_unit,
-                &self.contact_floor_normal_unit,
-            );
-            // TODO: technically this needs to be an `acos` of doubles
-            let angle = acos_f32(wall_dot_floor);
+                let wall_dot_floor = vec3::dot(
+                    &self.contact_wall_normal_unit,
+                    &self.contact_floor_normal_unit,
+                );
+                // TODO: technically this needs to be an `acos` of doubles
+                let angle = acos_f32(wall_dot_floor);
 
-            // stuck if the wall-to-floor angle is over the threshold parameter and the katamari moved.
-            angle > self.params.wall_to_floor_angle_stuck_threshold
-                && !vec3::exact_equals(&self.center, &self.last_center)
+                // stuck if the wall-to-floor angle is over the threshold parameter and the katamari moved.
+                angle > self.params.wall_to_floor_angle_stuck_threshold
+                    && !vec3::exact_equals(&self.center, &self.last_center)
+            }
         } else if self.num_wall_contacts == 2 {
             // contacting exactly 2 walls:
             let wall_dot_wall = vec3::dot(
@@ -497,6 +522,13 @@ impl Katamari {
             self.lose_props_when_stuck();
             true
         };
+
+        temp_debug_log!(
+            "&&& stuck btn walls: {}, walls={}, floors={}",
+            stuck_btwn_walls,
+            self.num_wall_contacts,
+            self.num_floor_contacts
+        );
 
         // TODO: `kat_update_stuckness:304-335` (a case that's too annoying right now)
 
@@ -586,6 +618,11 @@ impl Katamari {
             // if the katamari doesn't contact a wall, it's not moving into one either.
             false
         };
+        temp_debug_log!(
+            "=== intowall={:?}, stuck={}",
+            moving_into_wall,
+            self.physics_flags.stuck_between_walls
+        );
 
         if self.physics_flags.stuck_between_walls && !self.last_physics_flags.stuck_between_walls {
             // if the katamari has just gotten stuck between walls:
@@ -601,7 +638,6 @@ impl Katamari {
         // TODO: double check these shufps vector operations
         vec3::zero(&mut self.clip_translation);
         vec3_inplace_add_vec(&mut self.clip_translation, &self.contact_floor_clip);
-
         if moving_into_wall {
             vec3_inplace_add_vec(&mut self.clip_translation, &self.contact_wall_clip);
         }
