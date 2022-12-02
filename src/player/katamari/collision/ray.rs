@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, vec3_from},
+    macros::{inv_lerp_clamp, lerp, temp_debug_log, vec3_from},
     math::{vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::prop::WeakPropRef,
@@ -198,7 +198,7 @@ impl Katamari {
         }
     }
 
-    fn set_bottom_ray_contact(&mut self) {
+    pub fn set_bottom_ray_contact(&mut self) {
         self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
         self.vault_ray_idx = None;
         self.fc_ray_idx = None;
@@ -218,11 +218,12 @@ impl Katamari {
         let bottom_ray = &mut self.collision_rays[0];
         if !self.physics_flags.climbing_wall {
             // if the katamari isn't climbing a wall:
-            if !self.physics_flags.airborne {
+            /* !self.physics_flags.airborne */
+            if false {
                 // if the katamari is grounded, the bottom ray is in the direction of the
                 // contact floor surface's normal
                 vec3::copy(&mut tmp, &self.contact_floor_normal_unit);
-                vec3_inplace_scale(&mut tmp, -1.0 * radius);
+                vec3_inplace_scale(&mut tmp, radius);
                 vec3::subtract(&mut bottom_ray.endpoint, &self.center, &tmp);
             } else {
                 // otherwise if the katamari is airborne, the bottom ray is straight down
@@ -242,16 +243,17 @@ impl Katamari {
         );
         vec3::normalize(&mut bottom_ray.ray_local_unit, &bottom_ray.kat_to_endpoint);
 
+        temp_debug_log!("center: {:?}, bottom_ray: {:?}", self.center, bottom_ray);
+
         // TODO: `kat_orient_mesh_rays:164-174`
 
         // orient the mesh collision rays
         self.num_mesh_rays = 0;
-        let rotation_mat = &self.rotation_mat;
 
         // orient each mesh point using the katamari's rotation matrix
         for (i, mesh_point) in mesh_points.points.iter().enumerate() {
             let mesh_ray = &mut self.collision_rays[i];
-            vec3::transform_mat4(&mut mesh_ray.ray_local, mesh_point, &rotation_mat);
+            vec3::transform_mat4(&mut mesh_ray.ray_local, mesh_point, &self.rotation_mat);
             vec3::normalize(&mut mesh_ray.ray_local_unit, &mesh_ray.ray_local);
             mesh_ray.ray_len = radius;
             self.num_mesh_rays += 1;

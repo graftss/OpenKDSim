@@ -145,6 +145,14 @@ pub struct KatPhysicsFlags {
     /// (??)
     /// offset: 0x1f
     pub vs_mode_state: u8,
+
+    /// (??)
+    /// offset: 0x20
+    pub unknown_0x20: bool,
+
+    /// (??)
+    /// offset: 0x22
+    pub unknown_0x22: bool,
 }
 
 impl KatPhysicsFlags {

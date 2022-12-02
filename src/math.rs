@@ -87,6 +87,12 @@ pub fn vec3_inplace_normalize(vec: &mut Vec3) {
     vec[2] *= len;
 }
 
+/// Computes the vector projection and rejection of u onto v.
+pub fn vec3_projection(mut u_proj_v: &mut Vec3, mut u_rej_v: &mut Vec3, u: &Vec3, v: &Vec3) {
+    vec3::scale(&mut u_proj_v, &v, vec3::dot(u, v));
+    vec3::subtract(&mut u_rej_v, u, u_proj_v);
+}
+
 /// Writes the yaw rotation matrix of `mat` to `out`.
 pub fn mat4_compute_yaw_rot(mut out: &mut Mat4, mat: &Mat4) {
     let mut left_unit = vec3::create();

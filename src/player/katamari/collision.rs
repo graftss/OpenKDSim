@@ -6,9 +6,10 @@ use crate::{
     math::{
         acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_normalize,
         vec3_inplace_scale, vec3_inplace_subtract, vec3_inplace_subtract_vec,
-        vec3_inplace_zero_small,
+        vec3_inplace_zero_small, vec3_projection,
     },
     mission::{state::MissionState, GameMode},
+    player::prince::Prince,
     props::prop::WeakPropRef,
 };
 
@@ -32,7 +33,7 @@ pub enum SurfaceType {
 
 impl Katamari {
     /// The main function to update the katamari's collision state.
-    pub fn update_collision(&mut self, mission_state: &MissionState) {
+    pub fn update_collision(&mut self, prince: &Prince, mission_state: &MissionState) {
         self.last_num_floor_contacts = self.num_floor_contacts;
         self.last_num_wall_contacts = self.num_wall_contacts;
         self.num_floor_contacts = 0;
@@ -79,7 +80,7 @@ impl Katamari {
             self.update_surface_contacts();
             self.process_surface_contacts();
             self.resolve_being_stuck();
-            self.update_vault_and_climb();
+            self.update_vault_and_climb(prince);
 
             if self.physics_flags.airborne && self.raycast_state.closest_hit_idx.is_some() {
                 // TODO: `kat_update_collision:159-220` (update active hit before airborne?)
@@ -105,15 +106,13 @@ impl Katamari {
         let dist_down = self.radius_cm * 3.0;
         let center = self.center.clone();
         let mut below = center.clone();
-        vec3_inplace_subtract(&mut below, 0.0, -dist_down, 0.0);
+        vec3_inplace_subtract(&mut below, 0.0, dist_down, 0.0);
         self.raycast_state.load_ray(&center, &below);
 
         // check for unity hits straight down.
         let found_hit = self
             .raycast_state
             .find_nearest_unity_hit(RaycastCallType::Objects, false);
-
-        temp_debug_log!("center={center:?}, below={below:?}, found_hit={found_hit}");
 
         // update shadow position
         if !found_hit {
@@ -172,30 +171,29 @@ impl Katamari {
                 // TODO: `kat_update_surface_contacts:308-372` (resolve shell ray hits)
             }
 
-            let center = self.center.clone();
-            let mut hit_ray_idx = None;
+            // check collision rays for surface contacts
+            let center = self.center;
             for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
-                temp_debug_log!(
-                    "$$$$$$$ ray endpt={:?}, kat_to_endpt={:?}",
-                    ray.endpoint,
-                    ray.kat_to_endpoint
-                );
                 self.raycast_state.load_ray(&center, &ray.endpoint);
-                if self
+                let found_hit = self
                     .raycast_state
-                    .find_nearest_unity_hit(RaycastCallType::Objects, false)
-                {
+                    .find_nearest_unity_hit(RaycastCallType::Objects, false);
+                temp_debug_log!(
+                    "ray_idx={ray_idx}, endpt={:?}, len={:?}, found_hit={found_hit}",
+                    ray.endpoint,
+                    ray.ray_len
+                );
+
+                if found_hit {
                     // TODO: there's a flag being ignored here
                     if true && !self.last_physics_flags.airborne {
                         self.physics_flags.airborne = false;
                     }
-                    hit_ray_idx = Some(ray_idx);
-                    break;
+                    self.record_surface_contact(ray_idx as i32, None);
                 }
-            }
 
-            if let Some(ray_idx) = hit_ray_idx {
-                self.record_surface_contact(ray_idx as i32, None);
+                // TODO: break to only cast the bottom ray
+                break;
             }
         }
     }
@@ -343,8 +341,6 @@ impl Katamari {
                 .get_mut(ray_idx as usize)
                 .map(|ray| ray.contacts_surface = true);
         }
-
-        temp_debug_log!("??? found_old:{found_old}");
 
         if !found_old {
             self.inc_num_surface_contacts(surface_type);
@@ -577,7 +573,7 @@ impl Katamari {
 
     /// (??) Update the katamari's vault and climbing state.
     /// offset: 0x14c80
-    fn update_vault_and_climb(&mut self) {
+    fn update_vault_and_climb(&mut self, prince: &Prince) {
         if self.physics_flags.hit_shell_ray == Some(ray::ShellRay::TopCenter)
             && self.physics_flags.contacts_floor
             && !self.physics_flags.contacts_wall
@@ -589,6 +585,147 @@ impl Katamari {
 
         // TODO: `kat_apply_turntable_contact()`
         self.update_clip_translation();
+
+        if self.physics_flags.in_water
+            && !self.last_physics_flags.in_water
+            && self.physics_flags.airborne
+        {
+            // TODO: `kat_update_vault_and_climb:44` (play enter water sfx)
+        }
+
+        if self.physics_flags.grounded_ray_type != Some(KatCollisionRayType::Bottom) {
+            vec3_inplace_subtract_vec(&mut self.vault_contact_point, &self.contact_wall_clip);
+        }
+
+        self.physics_flags.unknown_0x22 = false;
+        'main: {
+            if self.num_wall_contacts + self.num_floor_contacts == 0 {
+                // if the katamari isn't contacting any surfaces
+                if !self.physics_flags.climbing_wall {
+                    // if not climbing a wall, reset wallclimb state
+                    self.end_wallclimb();
+                } else if self.is_climbing_0x898 < 1 {
+                    self.wallclimb_cooldown_timer = 10;
+                    self.wallclimb_ticks = 0;
+                    self.end_wallclimb();
+                } else {
+                    self.is_climbing_0x898 -= 1;
+                    if self.physics_flags.at_max_climb_height && prince.input_avg_push_len > 0.99 {
+                        break 'main;
+                    }
+                }
+
+                self.fc_ray_len = self.radius_cm;
+                self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
+                self.vault_ray_idx = None;
+
+                if !self.physics_flags.airborne {
+                    self.airborne_ticks = 0;
+                    self.falling_ticks = 0;
+                } else {
+                    self.airborne_ticks += 1;
+                    if self.is_falling() {
+                        self.falling_ticks += 1;
+                    }
+                }
+
+                self.physics_flags.airborne = true;
+                if self.physics_flags.climbing_wall {
+                    self.airborne_ticks += 1;
+                    if self.is_falling() {
+                        self.falling_ticks += 1;
+                    }
+                    self.physics_flags.airborne = false;
+                    panic_log!("??? why is this here");
+                }
+            } else {
+                // if contacting a surface:
+                self.physics_flags.unknown_0x20 = false;
+                // TODO: `self.update_bonks()`
+                if !self.physics_flags.contacts_floor
+                    && self.physics_flags.contacts_wall
+                    && !self.physics_flags.climbing_wall
+                {
+                    self.update_airborne_timers(true);
+                } else {
+                    self.update_airborne_timers(false);
+                }
+
+                // compute the projection and rejection of the katamari's velocity onto its contacted floor
+                vec3_projection(
+                    &mut self.velocity.vel_proj_floor,
+                    &mut self.velocity.vel_rej_floor,
+                    &self.velocity.velocity_unit,
+                    &self.contact_floor_normal_unit,
+                );
+
+                match self.try_init_vault_speed() {
+                    0 => return self.set_bottom_ray_contact(),
+                    // TODO: `kat_update_vault_and_climb:144-272
+                    _ => (),
+                }
+            }
+        }
+
+        if self.physics_flags.airborne {
+            if self.physics_flags.climbing_wall && self.is_climbing_0x898 > 0 {
+                self.is_climbing_0x898 -= 1;
+            } else {
+                if self.physics_flags.climbing_wall {
+                    self.wallclimb_cooldown_timer = 10;
+                    self.wallclimb_ticks = 0;
+                }
+
+                self.end_wallclimb();
+            }
+        }
+
+        if self.physics_flags.unknown_0x22 {
+            if !self.physics_flags.in_water {
+                let play_hit_ground_sfx = match self.physics_flags.grounded_ray_type {
+                    Some(KatCollisionRayType::Bottom) => true,
+                    Some(KatCollisionRayType::Prop) => false,
+                    Some(KatCollisionRayType::Mesh) => {
+                        self.collision_rays[self.vault_ray_idx.unwrap() as usize].ray_len
+                            / self.radius_cm
+                            > 1.05
+                    }
+                    None => false,
+                };
+
+                if play_hit_ground_sfx {
+                    // TODO: `kat_update_vault_and_climb:307` (play HIT_GROUND_FROM_FALL sfx)
+                }
+            }
+        }
+    }
+
+    fn try_init_vault_speed(&mut self) -> i32 {
+        return 0;
+    }
+
+    fn end_wallclimb(&mut self) {
+        self.physics_flags.climbing_wall = false;
+        self.physics_flags.at_max_climb_height = false;
+        self.wallclimb_init_y = 0.0;
+        self.wallclimb_max_height_ticks = 0;
+    }
+
+    fn update_airborne_timers(&mut self, new_airborne: bool) {
+        if !self.physics_flags.airborne {
+            self.airborne_ticks = 0;
+            self.falling_ticks = 0;
+        } else {
+            self.airborne_ticks += 1;
+            if self.is_falling() {
+                self.falling_ticks += 1;
+            }
+        }
+        self.physics_flags.airborne = new_airborne;
+    }
+
+    fn is_falling(&self) -> bool {
+        self.velocity.accel_grav[1] + self.velocity.vel_accel[1] < 0.0
     }
 
     /// (??) I think this is trying to clip the katamari away from walls when the game

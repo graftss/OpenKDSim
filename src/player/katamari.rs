@@ -214,7 +214,7 @@ pub struct Katamari {
     /// The number of ticks the katamari has been falling.
     /// Resets to 0 each time the katamari starts falling.
     /// offset: 0x116
-    ticks_falling: u16,
+    falling_ticks: u16,
 
     /// counts down from 10 after falling from a climb; if still nonzero, can't climb again    
     /// offset: 0x118
@@ -481,7 +481,7 @@ pub struct Katamari {
 
     /// (??) this might be the cooldown on the "struggle" VFX that plays when almost at max climb height
     /// offset: 0x898
-    is_climbing: u16,
+    is_climbing_0x898: u16,
 
     /// The cooldown period for the "ripple" VFX that plays continuously while the katamari is in water.
     /// offset: 0x89a
@@ -866,7 +866,7 @@ impl Katamari {
 
         // TODO: `kat_init:270-275` (prop combo initialization)
 
-        self.is_climbing = 0;
+        self.is_climbing_0x898 = 0;
         if self.physics_flags.climbing_wall {
             self.wallclimb_ticks = 0;
             self.wallclimb_cooldown_timer = self.params.init_wallclimb_cooldown_timer;
@@ -971,7 +971,7 @@ impl Katamari {
         // TODO: self.attract_props_to_center();
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
-        self.update_collision(&mission_state);
+        self.update_collision(prince, &mission_state);
 
         // compute distance to camera
         let mut dist_to_cam = vec3::create();
@@ -986,13 +986,6 @@ impl Katamari {
         if !camera.preclear.get_enabled() {
             // TODO: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
-
-        // temp_debug_log!(
-        //     "center: {:?}, velocity:{:?}, vel_accel:{:?}",
-        //     self.center,
-        //     self.velocity.velocity,
-        //     self.velocity.vel_accel
-        // );
     }
 
     /// Update the katamari's scaled params by interpolating the mission's param control points.

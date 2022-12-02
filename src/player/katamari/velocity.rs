@@ -52,11 +52,11 @@ pub struct KatVelocity {
 
     /// (??)
     /// offset: 0x20
-    pub speed_orth_on_floor: Vec3,
+    pub vel_rej_floor: Vec3,
 
     /// (??)
     /// offset: 0x30
-    pub speed_proj_on_floor: Vec3,
+    pub vel_proj_floor: Vec3,
 
     /// (??)
     /// offset: 0x40
@@ -628,17 +628,11 @@ impl Katamari {
             // if grounded via the "bottom" ray, meaning the katamari isn't vaulting:
             // TODO_VS: `kat_apply_acceleration:79-90`
             // TODO_ENDING: `kat_apply_acceleration:91-96`
-            // TODO: weird conditional here depending on vs mode, but it's always true in single player
+            // TODO_VS: weird conditional here depending on vs mode, but it's always true in single player
             if !self.physics_flags.climbing_wall {
                 // if not wall climbing:
                 // TODO: some SHUFPS crap going on here, not clear what it's doing
-                temp_debug_log!(
-                    "before add center={:?}, vel={:?}",
-                    self.center,
-                    self.velocity.vel_accel
-                );
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
-                temp_debug_log!("after add center={:?}", self.center);
             } else {
                 // if wall climbing:
                 if !self.physics_flags.at_max_climb_height {
