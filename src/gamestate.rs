@@ -65,12 +65,12 @@ impl GameState {
         _back_a: f32,
         _boost_a: f32,
         rot_s: f32,
-        dp_y: f32,
+        limit_y: f32,
         cam_x: f32,
         cam_y: f32,
         cam_z: f32,
     ) {
-        self.global.royal_warp_plane_y = dp_y;
+        self.global.royal_warp_plane_y = limit_y * 100.0;
         self.players[0]
             .katamari
             .set_speed(forw_s, side_s, backw_s, boost_s);

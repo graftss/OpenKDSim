@@ -177,11 +177,12 @@ impl Katamari {
                 let found_hit = self
                     .raycast_state
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
-                // temp_debug_log!(
-                //     "ray_idx={ray_idx}, endpt={:?}, len={:?}, found_hit={found_hit}",
-                //     ray.endpoint,
-                //     ray.ray_len
-                // );
+                temp_debug_log!(
+                    "ray_idx={ray_idx}, center={:?}, endpt={:?}, len={:?}, found_hit={found_hit}",
+                    center,
+                    ray.endpoint,
+                    ray.ray_len
+                );
 
                 if found_hit {
                     // TODO: there's a flag being ignored here
@@ -225,6 +226,8 @@ impl Katamari {
             self.physics_flags.contacts_wall = true;
             SurfaceType::Wall
         };
+
+        temp_debug_log!("recording surface contact on ray {ray_idx}: {surface_type:?}");
 
         let dot = vec3::dot(&normal_unit, &self.raycast_state.ray_unit);
         let ray_clip_len =
@@ -297,6 +300,8 @@ impl Katamari {
             }
         }
 
+        temp_debug_log!("`add_surface_contact`: found_old={found_old}");
+
         // depending on if we're using an old surface or a new one, get a reference
         // to the surface that we're going to write data to
         let mut added_surface = match old_surface {
@@ -341,6 +346,7 @@ impl Katamari {
         }
     }
 
+    /// offset: 0x13930
     fn process_surface_contacts(&mut self) {
         self.physics_flags.on_flat_floor = false;
         self.physics_flags.on_sloped_floor = false;
@@ -366,7 +372,7 @@ impl Katamari {
             // if contacting at least one floor:
 
             let mut max_ray_len = 0.0;
-            let mut sum_normal_unit = vec3::create();
+            let mut sum_floor_normals = vec3::create();
             let mut sum_clip_normal = vec3::create();
             let mut min_ratio = 2.0; // can be anything bigger than 1.0
 
@@ -382,7 +388,7 @@ impl Katamari {
                 }
 
                 // maintain running sum of all floor unit normals and clip normals
-                vec3_inplace_add_vec(&mut sum_normal_unit, &floor.normal_unit);
+                vec3_inplace_add_vec(&mut sum_floor_normals, &floor.normal_unit);
                 vec3_inplace_add_vec(&mut sum_clip_normal, &floor.clip_normal);
 
                 // maintain the max contact floor ray length
@@ -394,8 +400,8 @@ impl Katamari {
                 // impact distance ratio
                 if floor.impact_dist_ratio < min_ratio {
                     min_ratio = floor.impact_dist_ratio;
-                    fc_contact_point = Some(&floor.contact_point);
-                    fc_ray = Some(&floor.ray);
+                    fc_contact_point = Some(floor.contact_point);
+                    fc_ray = Some(floor.ray);
                     fc_ray_idx = Some(floor.ray_idx);
                 }
 
@@ -404,8 +410,10 @@ impl Katamari {
             }
 
             self.fc_ray_idx = fc_ray_idx;
-            // TODO: `kat_compute_minmax_floor_clip_normal()`
-            // TODO: `kat_apply_surface_contacts:119-125` (verify what this is doing with cheat engine)
+            self.compute_contact_floor_clip();
+
+            // TODO: the following line is possibly wrong
+            vec3::normalize(&mut self.contact_floor_normal_unit, &sum_floor_normals);
         }
 
         // process contact walls
@@ -418,6 +426,7 @@ impl Katamari {
             // else if contacting at least one wall:
 
             let mut max_ray_len = 0.0;
+            let mut sum_wall_normals = vec3::create();
 
             for wall in self.hit_walls.iter() {
                 // TODO: `kat_apply_surface_contacts:145-152` (verify in cheat engine)
@@ -425,11 +434,13 @@ impl Katamari {
                     max_ray_len = wall.ray_len;
                 }
 
+                vec3_inplace_add_vec(&mut sum_wall_normals, &wall.normal_unit);
                 self.hit_flags.apply_hit_attr(wall.hit_attr);
             }
 
             // TODO: `kat_apply_surface_contacts:163-169` (verify in cheat engine)
-            // TODO: `kat_compute_minmax_wall_clip_normal`
+            vec3::normalize(&mut self.contact_wall_normal_unit, &sum_wall_normals);
+            self.compute_contact_wall_clip();
             self.climb_radius_cm = max_ray_len;
         }
 
@@ -458,6 +469,62 @@ impl Katamari {
             );
             self.fc_contact_point = Some(contact_pt);
         }
+    }
+
+    /// offset: 0x169f0
+    fn compute_contact_floor_clip(&mut self) {
+        // compute the smallest and largest x, y, and z coordinates over all
+        // contacted floor surfaces
+        let mut min_clip_coords = [0.0; 3];
+        let mut max_clip_coords = [0.0; 3];
+        if self.num_floor_contacts > 0 {
+            // if the player contacts a floor:
+            for floor in self.hit_floors.iter() {
+                let clip = floor.clip_normal;
+                for i in [0, 1, 2] {
+                    if clip[i] > max_clip_coords[i] {
+                        max_clip_coords[i] = clip[i];
+                    } else if clip[i] < min_clip_coords[i] {
+                        min_clip_coords[i] = clip[i];
+                    }
+                }
+            }
+        }
+
+        vec3::add(
+            &mut self.contact_floor_clip,
+            &min_clip_coords,
+            &max_clip_coords,
+        );
+        vec3_inplace_zero_small(&mut self.contact_floor_clip, 0.0001);
+    }
+
+    /// offset: 0x16b80
+    fn compute_contact_wall_clip(&mut self) {
+        // compute the smallest and largest x, y, and z coordinates over all
+        // contacted floor surfaces
+        let mut min_clip_coords = [0.0; 3];
+        let mut max_clip_coords = [0.0; 3];
+        if self.num_wall_contacts > 0 {
+            // if the player contacts a floor:
+            for wall in self.hit_walls.iter() {
+                let clip = wall.clip_normal;
+                for i in [0, 1, 2] {
+                    if clip[i] > max_clip_coords[i] {
+                        max_clip_coords[i] = clip[i];
+                    } else if clip[i] < min_clip_coords[i] {
+                        min_clip_coords[i] = clip[i];
+                    }
+                }
+            }
+        }
+
+        vec3::add(
+            &mut self.contact_wall_clip,
+            &min_clip_coords,
+            &max_clip_coords,
+        );
+        vec3_inplace_zero_small(&mut self.contact_wall_clip, 0.0001);
     }
 
     fn resolve_being_stuck(&mut self) {

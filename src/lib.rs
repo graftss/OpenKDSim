@@ -150,15 +150,15 @@ pub unsafe extern "C" fn SetKatamariSpeed(
     back_a: f32,
     boost_a: f32,
     rot_s: f32,
-    dp_y: f32,
+    limit_y: f32,
     cam_x: f32,
     cam_y: f32,
     cam_z: f32,
 ) {
     STATE.with(|state| {
         state.borrow_mut().set_katamari_speed(
-            forw_s, side_s, back_s, boost_s, forw_a, side_a, back_a, boost_a, rot_s, dp_y, cam_x,
-            cam_y, cam_z,
+            forw_s, side_s, back_s, boost_s, forw_a, side_a, back_a, boost_a, rot_s, limit_y,
+            cam_x, cam_y, cam_z,
         );
     })
 }

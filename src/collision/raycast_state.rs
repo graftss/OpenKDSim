@@ -185,12 +185,12 @@ impl RaycastState {
         });
 
         let do_hit_result = do_hit(
-            self.point0[0] / UNITY_TO_SIM_SCALE,
-            self.point0[1] / UNITY_TO_SIM_SCALE,
-            self.point0[2] / UNITY_TO_SIM_SCALE,
-            self.point1[0] / UNITY_TO_SIM_SCALE,
-            self.point1[1] / UNITY_TO_SIM_SCALE,
-            self.point1[2] / UNITY_TO_SIM_SCALE,
+            self.point0[0] / scale,
+            self.point0[1] / scale,
+            self.point0[2] / scale,
+            self.point1[0] / scale,
+            self.point1[1] / scale,
+            self.point1[2] / scale,
             call_type.into(),
             888,
             include_objects.into(),

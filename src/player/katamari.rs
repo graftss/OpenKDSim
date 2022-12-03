@@ -897,19 +897,6 @@ impl Katamari {
         self.params.forwards_speed_mult = backw;
         self.params.forwards_speed_mult = boost;
     }
-
-    /// Forcibly end the katamari's movement, if it's moving.
-    /// offset: 0x1f390
-    pub fn set_immobile(&mut self, mission_state: &MissionState) {
-        self.physics_flags.immobile = true;
-        self.speed = 0.0;
-        self.wallclimb_cooldown_timer = 10;
-        self.last_speed = self.speed;
-        self.last_center = self.center;
-        self.bottom = self.center;
-        self.bottom[1] -= self.radius_cm;
-        self.apply_acceleration(mission_state);
-    }
 }
 
 impl Katamari {
@@ -917,16 +904,15 @@ impl Katamari {
     /// offset: 0x1db50
     pub fn update(&mut self, prince: &mut Prince, camera: &Camera, mission_state: &MissionState) {
         temp_debug_log!(
-            "num_surfaces={}, airborne={}",
+            "center={:?}, num_surfaces={}, airborne={}",
+            self.center,
             self.num_wall_contacts + self.num_floor_contacts,
             self.physics_flags.airborne
         );
-        temp_debug_log!(
-            "vel_accel={:?}, grav={:?}, grav_accel={}",
-            self.velocity.vel_accel,
-            self.velocity.vel_grav,
-            self.scaled_params.accel_grav
-        );
+        // temp_debug_log!(
+        //     "vel_accel={:?}",
+        //     self.velocity
+        // );
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 

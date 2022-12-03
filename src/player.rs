@@ -1,4 +1,7 @@
-use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
+use crate::{
+    delegates::DelegatesRef, gamestate::GameState, macros::temp_debug_log,
+    mission::state::MissionState,
+};
 
 use self::{
     camera::{mode::CameraMode, Camera},
@@ -31,7 +34,11 @@ impl Player {
         override_init_size: f32,
     ) {
         // first initialize the katamari
-        let init_pos = &mission_state.mission_config.init_kat_pos[player as usize];
+        let mut init_pos = &mut mission_state.mission_config.init_kat_pos[player as usize].clone();
+
+        // TEMP
+        init_pos[1] += 50.0;
+
         let init_diam = if override_init_size < 0.0 {
             mission_state.mission_config.init_diam_cm
         } else {
@@ -65,7 +72,7 @@ impl Player {
         } = self;
 
         // only run a royal warp if the katamari center is below the death plane.
-        if katamari.get_center()[1] <= warp_y {
+        if katamari.get_center()[1] >= warp_y {
             return;
         }
 

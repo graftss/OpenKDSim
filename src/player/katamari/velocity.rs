@@ -98,6 +98,25 @@ pub struct KatVelocity {
     pub accel_ground_friction: Vec3,
 }
 
+impl KatVelocity {
+    /// Reset all velocities and accelerations to 0
+    pub fn reset(&mut self) {
+        vec3::zero(&mut self.velocity);
+        vec3::zero(&mut self.velocity_unit);
+        vec3::zero(&mut self.vel_rej_floor);
+        vec3::zero(&mut self.vel_proj_floor);
+        vec3::zero(&mut self.last_vel_accel);
+        vec3::zero(&mut self.vel_accel);
+        vec3::zero(&mut self.vel_accel_unit);
+        vec3::zero(&mut self.vel_accel_grav);
+        vec3::zero(&mut self.vel_accel_grav_unit);
+        vec3::zero(&mut self.push_vel_on_floor_unit);
+        vec3::zero(&mut self.vel_grav);
+        vec3::zero(&mut self.accel_incline);
+        vec3::zero(&mut self.accel_ground_friction);
+    }
+}
+
 impl Katamari {
     /// offset: 0x20cd0
     pub(super) fn update_incline_accel_and_gravity(
@@ -833,7 +852,7 @@ impl Katamari {
             }
 
             if self.physics_flags.airborne {
-                vec3_inplace_add_vec(&mut next_vel, &self.velocity.vel_accel_grav);
+                vec3_inplace_add_vec(&mut next_vel, &self.velocity.vel_grav);
             }
 
             self.speed = vec3::length(&next_vel);
@@ -940,5 +959,21 @@ impl Katamari {
         self.velocity.vel_accel_unit = vel_unit;
         self.velocity.vel_accel_grav = *vel;
         self.velocity.vel_accel_grav_unit = vel_unit;
+    }
+
+    /// Forcibly end the katamari's movement, if it's moving.
+    /// offset: 0x1f390
+    pub fn set_immobile(&mut self, mission_state: &MissionState) {
+        self.physics_flags.immobile = true;
+        self.speed = 0.0;
+        self.wallclimb_cooldown_timer = 10;
+        self.last_speed = self.speed;
+        self.velocity.reset();
+        self.last_velocity.reset();
+        self.last_center = self.center;
+        self.last_velocity = self.velocity;
+        self.bottom = self.center;
+        self.bottom[1] -= self.radius_cm;
+        self.apply_acceleration(mission_state);
     }
 }
