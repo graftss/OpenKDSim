@@ -7,7 +7,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, temp_debug_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
@@ -1112,10 +1112,10 @@ impl Prince {
             0.0
         } else if push_angle <= back_cutoff {
             // case 4: angles in `[back_min, back_cutoff]` -> speed in `[0, -1]`
-            -inv_lerp!(push_angle, back_min, back_cutoff)
+            1.0 - inv_lerp!(push_angle, back_min, back_cutoff)
         } else {
             // case 5: angles in `[back_cutoff, pi]` -> speed in `[0, -1]`
-            -inv_lerp!(push_angle, back_cutoff, PI)
+            1.0 - inv_lerp!(push_angle, back_cutoff, PI)
         };
 
         // the sign of the push angle speed is determined by the x axis of the analog input

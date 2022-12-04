@@ -43,7 +43,7 @@ enum BrakeState {
 }
 
 /// Katamari velocity and acceleration values.
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Default, Copy, Clone)]
 pub struct KatVelocity {
     /// Current velocity
     /// offset: 0x0
@@ -96,6 +96,23 @@ pub struct KatVelocity {
     /// (??) Acceleration from the contacted floor friction (or some kind of similar force)
     /// offset: 0xc0
     pub accel_ground_friction: Vec3,
+}
+
+impl core::fmt::Debug for KatVelocity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KatVelocity")
+            .field("velocity", &self.velocity)
+            .field("vel_rej_floor", &self.vel_rej_floor)
+            .field("vel_proj_floor", &self.vel_proj_floor)
+            .field("last_vel_accel", &self.last_vel_accel)
+            .field("vel_accel", &self.vel_accel)
+            .field("vel_accel_grav", &self.vel_accel_grav)
+            .field("push_vel_on_floor_unit", &self.push_vel_on_floor_unit)
+            .field("vel_grav", &self.vel_grav)
+            .field("accel_incline", &self.accel_incline)
+            .field("accel_ground_friction", &self.accel_ground_friction)
+            .finish()
+    }
 }
 
 impl KatVelocity {

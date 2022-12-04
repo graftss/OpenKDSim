@@ -224,11 +224,6 @@ impl Katamari {
                 vec3::copy(&mut tmp, &self.contact_floor_normal_unit);
                 vec3_inplace_scale(&mut tmp, radius);
                 vec3::subtract(&mut bottom_ray.endpoint, &self.center, &tmp);
-                temp_debug_log!(
-                    "`orient_mesh_rays`: normal={:?}, bottom_endpt={:?}",
-                    self.contact_floor_normal_unit,
-                    bottom_ray.endpoint
-                );
             } else {
                 // otherwise if the katamari is airborne, the bottom ray is straight down
                 let down: Vec3 = [0.0, -radius, 0.0];

@@ -903,16 +903,6 @@ impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
     pub fn update(&mut self, prince: &mut Prince, camera: &Camera, mission_state: &MissionState) {
-        temp_debug_log!(
-            "center={:?}, num_surfaces={}, airborne={}",
-            self.center,
-            self.num_wall_contacts + self.num_floor_contacts,
-            self.physics_flags.airborne
-        );
-        // temp_debug_log!(
-        //     "vel_accel={:?}",
-        //     self.velocity
-        // );
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 

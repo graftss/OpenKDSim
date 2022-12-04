@@ -177,12 +177,6 @@ impl Katamari {
                 let found_hit = self
                     .raycast_state
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
-                temp_debug_log!(
-                    "ray_idx={ray_idx}, center={:?}, endpt={:?}, len={:?}, found_hit={found_hit}",
-                    center,
-                    ray.endpoint,
-                    ray.ray_len
-                );
 
                 if found_hit {
                     // TODO: there's a flag being ignored here
@@ -226,8 +220,6 @@ impl Katamari {
             self.physics_flags.contacts_wall = true;
             SurfaceType::Wall
         };
-
-        temp_debug_log!("recording surface contact on ray {ray_idx}: {surface_type:?}");
 
         let dot = vec3::dot(&normal_unit, &self.raycast_state.ray_unit);
         let ray_clip_len =
@@ -299,8 +291,6 @@ impl Katamari {
                 }
             }
         }
-
-        temp_debug_log!("`add_surface_contact`: found_old={found_old}");
 
         // depending on if we're using an old surface or a new one, get a reference
         // to the surface that we're going to write data to

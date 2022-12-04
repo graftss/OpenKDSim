@@ -34,7 +34,7 @@ impl Player {
         override_init_size: f32,
     ) {
         // first initialize the katamari
-        let mut init_pos = &mut mission_state.mission_config.init_kat_pos[player as usize].clone();
+        let init_pos = &mut mission_state.mission_config.init_kat_pos[player as usize].clone();
 
         // TEMP
         init_pos[1] += 50.0;
@@ -135,9 +135,5 @@ impl GameState {
                 &mission_state,
             );
         }
-    }
-
-    pub fn update_camera(&mut self, player_idx: usize) {
-        let _player = &mut self.players[player_idx];
     }
 }
