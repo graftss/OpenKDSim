@@ -743,7 +743,7 @@ impl Katamari {
 
     /// Compute the katamari's acceleration due to friction.
     /// offset: 0x21590
-    pub(super) fn apply_friction(&mut self, prince: &Prince, mission_state: &MissionState) {
+    pub(super) fn compute_friction_accel(&mut self, prince: &Prince, mission_state: &MissionState) {
         if !self.physics_flags.airborne {
             // if not airborne:
             // next velocity is `velocity + accel_incline + bonus_vel`
@@ -754,28 +754,33 @@ impl Katamari {
             if next_speed > self.params.min_speed_to_move || next_speed - self.last_speed > 0.0 {
                 // if the katamari is moving fast enough to apply friction:
                 self.physics_flags.immobile = false;
-                let bottom_friction = self.params.bottom_ray_friction * self.speed;
+                let mut t = 1.0;
 
-                let mut t = match self.physics_flags.grounded_ray_type {
+                match self.physics_flags.grounded_ray_type {
                     Some(KatCollisionRayType::Bottom) => {
                         // TODO_VS: `kat_update_friction:41-45`
-                        bottom_friction
+                        t = self.params.bottom_ray_friction * self.speed;
                     }
                     Some(_) => {
                         let t = match prince.oujistate.dash {
                             true => {
-                                inv_lerp!(self.speed, self.max_forwards_speed, self.max_boost_speed)
-                                    .clamp(0.0, 1.0)
+                                // TODO: could be wrong
+                                1.0 - inv_lerp!(
+                                    self.speed,
+                                    self.max_forwards_speed,
+                                    self.max_boost_speed
+                                )
+                                .clamp(0.0, 1.0)
                             }
                             false => 1.0,
                         };
 
                         // TODO: remove this when `kat_try_init_vault_speed` is implemented
-                        let max_length_ratio = 1.0;
-                        let angle_btwn_rejs = 1.0;
-                        let k =
-                            max_length_ratio * angle_btwn_rejs * self.params.nonbottom_ray_friction;
-                        lerp!(t, bottom_friction, bottom_friction * k)
+                        // let max_length_ratio = 1.0;
+                        // let angle_btwn_rejs = 1.0;
+                        // let k =
+                        //     max_length_ratio * angle_btwn_rejs * self.params.nonbottom_ray_friction;
+                        // lerp!(t, bottom_friction, bottom_friction * k)
                     }
                     None => {
                         panic_log!("this should not happen");
@@ -786,6 +791,8 @@ impl Katamari {
                 if prince.get_flags() & 0x40000 != 0 {
                     t *= 0.1234
                 }
+
+                temp_debug_log!("t={t}, flag={}", prince.get_flags() & 0x40000 != 0);
 
                 vec3::scale(
                     &mut self.velocity.accel_ground_friction,
@@ -816,8 +823,7 @@ impl Katamari {
         vec3::zero(&mut self.bonus_vel);
 
         // start with `velocity + accel_incline`
-        let mut vel_accel = self.velocity.velocity.clone();
-        vec3_inplace_add_vec(&mut vel_accel, &self.velocity.accel_incline);
+        let mut vel_accel = vec3_from!(+, self.velocity.velocity, self.velocity.accel_incline);
 
         let speed0 = vec3::length(&vel_accel);
         if speed0 > 0.0 && !self.physics_flags.climbing_wall {
@@ -927,8 +933,9 @@ impl Katamari {
             if !self.physics_flags.immobile {
                 // if the katamari is not airborne and moving:
                 vec3::normalize(&mut vel_unit, &vel);
+                self.last_rot_vel_unit = vel_unit;
             } else {
-                set_y!(vel_unit, -1.0);
+                vel_unit = self.last_rot_vel_unit;
             }
 
             if vec3::dot(&vel_unit, &net_normal_unit) >= ALMOST_1 {
@@ -950,7 +957,7 @@ impl Katamari {
                 return self.spin_rotation_speed = 0.0;
             }
 
-            self.spin_rotation_speed = normalize_bounded_angle(vel_len / pivot_circumf);
+            self.spin_rotation_speed = normalize_bounded_angle((vel_len / pivot_circumf) * TAU);
         } else {
             // if katamari is airborne:
             // TODO: `kat_update_rotation_speed:171-221`

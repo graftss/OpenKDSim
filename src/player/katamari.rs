@@ -102,6 +102,11 @@ pub struct Katamari {
     /// offset: 0x15313c
     can_detach_props: bool,
 
+    /// Used in `Katamari::update_rotation_speed`. In the original simulation, this
+    /// vector was a global for some reason.
+    /// offset: 0xd54be0
+    last_rot_vel_unit: Vec3,
+
     // END new fields
     /// A reference to the vector of katamari meshes.
     /// offset: 0x0
@@ -952,8 +957,10 @@ impl Katamari {
         );
 
         self.update_velocity(prince, camera, mission_state);
-        self.apply_friction(prince, mission_state);
+        self.compute_friction_accel(prince, mission_state);
         self.apply_acceleration(mission_state);
+
+        temp_debug_log!("speed={}", self.speed);
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;

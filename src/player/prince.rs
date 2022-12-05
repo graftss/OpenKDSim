@@ -246,7 +246,7 @@ pub struct Prince {
 
     /// The minimum angle between the two sticks necessary to cap turn speed.
     /// offset: 0x2b0
-    min_angle_btwn_sticks_for_fastest_turn: f32,
+    angle_btwn_sticks_for_fastest_turn: f32,
 
     /// (??)
     /// offset: 0x2bc
@@ -576,7 +576,7 @@ impl Prince {
         self.gachas_for_spin = 3;
         self.boost_recharge = 18;
         self.boost_recharge_frequency = 100;
-        self.min_angle_btwn_sticks_for_fastest_turn = 0.75;
+        self.angle_btwn_sticks_for_fastest_turn = 0.75;
         self.push_sideways_angle_threshold = 0.363474;
 
         self.update_transform(kat);
@@ -1078,10 +1078,10 @@ impl Prince {
         }
 
         let base_turn_speed = ls_y_sign
-            * inv_lerp!(
+            * inv_lerp_clamp!(
                 self.input_angle_btwn_sticks,
                 FRAC_PI_2,
-                self.min_angle_btwn_sticks_for_fastest_turn * PI
+                self.angle_btwn_sticks_for_fastest_turn * PI
             );
 
         self.quick_shifting = true;
@@ -1313,7 +1313,7 @@ impl Prince {
 }
 
 impl Player {
-    /// The main function to update a prince each tick.
+    /// The main function to update the prince each tick.
     pub fn update_prince(&mut self, mission_state: &mut MissionState) {
         let prince = &mut self.prince;
         let katamari = &mut self.katamari;

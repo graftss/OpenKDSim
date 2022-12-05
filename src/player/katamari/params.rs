@@ -249,7 +249,7 @@ impl Default for KatamariParams {
             brakeable_max_speed_ratio: f32::from_bits(0x3ee66666),
             brake_vfx_cooldown: 10,
             min_speed_to_move: f32::from_bits(0x3c23d70a), // 0.01
-            bottom_ray_friction: f32::from_bits(0x3d10d2e0), // 0.0352
+            bottom_ray_friction: f32::from_bits(0x3d102de0), // 0.0352
             nonbottom_ray_friction: f32::from_bits(0x3ba3d70a), // 0.005
             speed_check_off_friction_reduction: f32::from_bits(0x3f0ccccd), // 0.55
             move_into_wall_similarity: f32::from_bits(0x3c23d70a), // 0.01
