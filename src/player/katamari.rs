@@ -961,25 +961,9 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
-        temp_debug_log!("=====start tick=====");
-        temp_debug_log!("speed before={}", self.speed);
-
-        temp_debug_log!(
-            "({}), velocity before: {:?}",
-            vec3::length(&self.velocity.velocity),
-            self.velocity.velocity
-        );
         self.update_velocity(prince, camera, mission_state);
-        temp_debug_log!(
-            "({}), velocity after: {:?}",
-            vec3::length(&self.velocity.velocity),
-            self.velocity.velocity
-        );
         self.update_friction_accel(prince, mission_state);
         self.apply_acceleration(mission_state);
-
-        temp_debug_log!("speed after={}", self.speed);
-        temp_debug_log!("=====end tick=====");
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;

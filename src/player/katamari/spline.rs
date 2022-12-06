@@ -50,8 +50,6 @@ lazy_static! {
 /// (because reasons)
 /// offset: 0x232d0
 pub fn compute_spline_accel_mult(max_speed_ratio: f32) -> f32 {
-    return 1.0;
-
     // TODO: go back over this more carefully
 
     // find the index of the first control point whose `max_speed_ratio` field is
@@ -71,7 +69,6 @@ pub fn compute_spline_accel_mult(max_speed_ratio: f32) -> f32 {
     if first_idx == 0 {
         panic_log!("`compute_spline_accel_mut` error: `max_speed_ratio`={max_speed_ratio}.");
     }
-    temp_debug_log!("      max_speed_ratio={max_speed_ratio}, first_idx={first_idx}");
 
     let mut mat = [0.0; 16];
     mat[3] = 1.0;
