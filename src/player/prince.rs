@@ -857,9 +857,7 @@ impl Prince {
             // TODO_VS: check `should_reset_gachas_in_vs_mode()`
         }
 
-        // TODO_VS: vsmode specific code
         // TODO_VS: `prince_update_gachas:154-170`
-        // TODO_VS: `prince_update_gachas:177-211`
 
         if self.gacha_window_timer > 0 {
             // if there are gachas in progress and the gacha timer hasn't expired:
@@ -867,6 +865,8 @@ impl Prince {
 
             let gachas_for_spin = self.params.prince_gachas_for_spin;
             let gachas_for_boost = self.params.gachas_for_boost(katamari.get_diam_cm());
+
+            // TODO_VS: `prince_update_gachas:177-211`
 
             if just_did_gacha && self.gacha_count == gachas_for_boost {
                 // if initiating a boost:
@@ -884,7 +884,7 @@ impl Prince {
                 // TODO: `prince_update_gachas:249-253` (play spin sfx)
                 self.oujistate.dash = true;
                 self.oujistate.wheel_spin = true;
-            } else {
+            } else if self.gacha_count > gachas_for_boost {
                 // if enough gachas for a boost:
                 self.oujistate.dash = true;
                 self.oujistate.wheel_spin = false;
