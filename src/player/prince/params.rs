@@ -37,6 +37,21 @@ pub struct PrinceParams {
     /// default: pi/6
     /// offset: 0x715c4
     pub max_angle_btwn_sticks_for_push: f32,
+
+    /// The maximum speed multiplier applied from push magnitude.
+    /// default: 0x4
+    /// offset: 0x7b240
+    pub run_speed_mult: f32,
+
+    /// The minimum push magnitude needed to jog. Below this magnitude, the prince walks.
+    /// default: 0.29
+    /// offset: 0x7b244
+    pub jog_min_push_mag: f32,
+
+    /// The minimum push magnitude needed to jog. Below this magnitude, the prince jogs or walks.
+    /// default: 0.99
+    /// offset: 0x7b248
+    pub run_min_push_mag: f32,
 }
 
 impl Default for PrinceParams {
@@ -68,6 +83,9 @@ impl Default for PrinceParams {
             prince_roll_forwards_angle_threshold: f32::from_bits(0x3f060a92), // 0.5235988
             global_turn_speed_mult: 1.0,
             max_angle_btwn_sticks_for_push: f32::from_bits(0x3f060a92), // pi/6
+            jog_min_push_mag: f32::from_bits(0x3e947ae1),               // 0.24
+            run_min_push_mag: f32::from_bits(0x3f7d70a4),               // 0.99
+            run_speed_mult: f32::from_bits(0x3ecccccd),                 // 0.4
         }
     }
 }
@@ -93,5 +111,26 @@ impl PrinceParams {
         }
 
         panic_log!("{}", GACHAS_FOR_BOOST_PANIC_STR);
+    }
+
+    /// Compute a multiplier on speed applied when pushing the katamari based on the
+    /// magnitude of the push. Used in `Katamari::update_velocity`.
+    /// offset: 0x22644 (in `kat_update_velocity`)
+    pub fn push_mag_speed_mult(&self, push_mag: f32, pre_speed: f32) -> f32 {
+        if push_mag < self.jog_min_push_mag {
+            // case 1: prince is walking (`push_mag` in `[0, self.jog_min_push_mag]`)
+            push_mag / self.jog_min_push_mag * self.run_speed_mult * pre_speed
+        } else if push_mag < self.run_min_push_mag {
+            // case 2: prince is jogging (`push_mag` in `[self.jog_min_push_mag, self.run_min_push_mag]`)
+            pre_speed * self.run_speed_mult
+        } else {
+            // case 3: prince is running (`push_mag` in `[self.run_min_push_mag, 1]`)
+            // TODO: translate using an inv lerp macro
+            let lerped = (1.0
+                - ((push_mag - self.run_min_push_mag) / (1.0 - self.run_min_push_mag))
+                    * self.run_speed_mult)
+                + self.run_speed_mult;
+            pre_speed * lerped
+        }
     }
 }

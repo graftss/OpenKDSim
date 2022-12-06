@@ -2,6 +2,7 @@ mod collision;
 mod flags;
 mod params;
 pub mod scaled_params;
+mod spline;
 mod velocity;
 
 use std::{cell::RefCell, rc::Rc};
@@ -168,6 +169,10 @@ pub struct Katamari {
     /// (??)
     /// offset: 0x80
     base_speed: f32,
+
+    /// (??) The ratio of the katamari's current speed to its max speed.
+    /// offset: 0x84
+    max_speed_ratio: f32,
 
     /// (??) The ratio of the katamari's current speed to its base speed.
     /// offset: 0x88
@@ -956,11 +961,25 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
+        temp_debug_log!("=====start tick=====");
+        temp_debug_log!("speed before={}", self.speed);
+
+        temp_debug_log!(
+            "({}), velocity before: {:?}",
+            vec3::length(&self.velocity.velocity),
+            self.velocity.velocity
+        );
         self.update_velocity(prince, camera, mission_state);
-        self.compute_friction_accel(prince, mission_state);
+        temp_debug_log!(
+            "({}), velocity after: {:?}",
+            vec3::length(&self.velocity.velocity),
+            self.velocity.velocity
+        );
+        self.update_friction_accel(prince, mission_state);
         self.apply_acceleration(mission_state);
 
-        temp_debug_log!("speed={}", self.speed);
+        temp_debug_log!("speed after={}", self.speed);
+        temp_debug_log!("=====end tick=====");
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;

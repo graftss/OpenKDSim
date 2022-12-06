@@ -17,6 +17,7 @@ use crate::{
     mission::{self, stage::Stage, state::MissionState, GameMode},
     player::{
         camera::{mode::CameraMode, Camera},
+        katamari::spline::compute_spline_accel_mult,
         prince::{Prince, PushDir},
     },
 };
@@ -424,11 +425,12 @@ impl Katamari {
             (accel, 1.0)
         };
 
+        temp_debug_log!("   push_accel={push_accel}, push_mag={push_mag}");
+
         self.physics_flags.no_input_push = push_mag <= 0.0;
 
         if prince.get_flags() & 0x40000 != 0 {
-            // if quick shifting:
-            // TODO: (or pinching?)
+            // if quick shifting or pinching:
             // rotate the `vel_accel` velocity by the angle the prince is turning
             let mut yaw_rot = [0.0; 16];
             mat4::from_y_rotation(&mut yaw_rot, prince.get_angle_speed());
@@ -450,8 +452,8 @@ impl Katamari {
             };
 
             let pre_speed = lerp!(prince.get_push_strength(), sideways_speed, push_speed);
-            // TODO: `kat_update_velocity:240-256` (annoying lerp crap)
-            pre_speed
+
+            prince.get_params().push_mag_speed_mult(push_mag, pre_speed)
         } else {
             self.scaled_params.max_boost_speed * self.params.boost_speed_mult
         };
@@ -471,6 +473,8 @@ impl Katamari {
         };
 
         let max_speed = self.scaled_params.base_max_speed * base_speed_mult * climb_mult;
+
+        temp_debug_log!("   base_speed_mult={base_speed_mult}, max_speed={max_speed}");
 
         // TODO_VS: `kat_update_velocity:304-324`
 
@@ -524,6 +528,8 @@ impl Katamari {
             }
         };
 
+        temp_debug_log!("   accel={accel:?}");
+
         self.brake_accel *= prince.get_uphill_accel_penalty();
         vec3_inplace_normalize(&mut accel);
 
@@ -538,14 +544,21 @@ impl Katamari {
             _ => 1.0,
         };
 
+        temp_debug_log!("   incline_accel_mult={incline_accel_mult:?}");
+
         // compute spine-derived acceleration multiplier (used to smooth the acceleration
         // out i guess)
+        self.update_max_speed_ratio(prince);
         let spline_mult = match self.physics_flags.braking {
             true => 1.0,
-            false => self.compute_spline_accel_mult(prince),
+            false => compute_spline_accel_mult(self.max_speed_ratio),
         };
 
+        temp_debug_log!("   spline_mult={spline_mult}");
+
         let accel_magnitude = push_accel * push_mag * incline_accel_mult * spline_mult;
+
+        temp_debug_log!("   accel_magnitude={accel_magnitude}");
 
         if self.physics_flags.contacts_floor {
             // if the katamari contacts a floor, adjust the acceleration direction to be the
@@ -734,16 +747,23 @@ impl Katamari {
         }
     }
 
-    /// Computes a multiplier on the katamari's acceleration derived from a spline.
-    /// offset: 0x232d0
-    fn compute_spline_accel_mult(&self, _prince: &Prince) -> f32 {
-        // TODO
-        1.0
+    fn update_max_speed_ratio(&mut self, prince: &Prince) {
+        let max_speed = if prince.oujistate.dash {
+            self.max_boost_speed
+        } else {
+            match prince.get_push_dir() {
+                Some(PushDir::Backwards) => self.max_backwards_speed,
+                Some(PushDir::Sideways) => self.max_sideways_speed,
+                _ => self.max_forwards_speed,
+            }
+        };
+
+        self.max_speed_ratio = (self.speed / max_speed).clamp(0.0, 1.0);
     }
 
     /// Compute the katamari's acceleration due to friction.
     /// offset: 0x21590
-    pub(super) fn compute_friction_accel(&mut self, prince: &Prince, mission_state: &MissionState) {
+    pub(super) fn update_friction_accel(&mut self, prince: &Prince, mission_state: &MissionState) {
         if !self.physics_flags.airborne {
             // if not airborne:
             // next velocity is `velocity + accel_incline + bonus_vel`
@@ -830,6 +850,13 @@ impl Katamari {
             // if moving and not climbing a wall, apply ground friction
             vec3_inplace_add_vec(&mut vel_accel, &self.velocity.accel_ground_friction);
         }
+
+        temp_debug_log!(
+            "vel: {:?}, accel_inc:{:?}, accel_fric:{:?}",
+            self.velocity.velocity,
+            self.velocity.accel_incline,
+            self.velocity.accel_ground_friction
+        );
 
         if self.hit_flags.speed_check_off
             && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill
@@ -969,6 +996,7 @@ impl Katamari {
     /// Forcibly set the katamari's velocity to `vel`.
     /// offset: 0x1fd70
     pub fn set_velocity(&mut self, vel: &Vec3) {
+        temp_debug_log!("setting velocity to {:?}", vel);
         self.physics_flags.immobile = false;
 
         // compute speed
