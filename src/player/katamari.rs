@@ -19,7 +19,7 @@ use crate::{
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     delegates::Delegates,
-    macros::{min, set_translation, temp_debug_log},
+    macros::{min, set_translation, temp_debug_log, vec3_from},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
     props::prop::PropRef,
@@ -31,7 +31,7 @@ use self::{
     flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,
     scaled_params::KatScaledParams,
-    velocity::KatVelocity,
+    velocity::{CamRelativeDir, KatVelocity},
 };
 
 use super::{
@@ -215,6 +215,10 @@ pub struct Katamari {
     /// (??)
     /// offset: 0x10e
     input_push_dir: Option<PushDir>,
+
+    /// (??) The katamari's direction of movement relative to the camera.
+    /// offset: 0x110
+    cam_relative_dir: Option<CamRelativeDir>,
 
     /// The number of ticks the katamari has been airborne.
     /// Resets to 0 each time the katamari starts being airborne.
@@ -988,11 +992,9 @@ impl Katamari {
         self.update_collision(prince, &mission_state);
 
         // compute distance to camera
-        let mut dist_to_cam = vec3::create();
-        vec3::subtract(&mut dist_to_cam, &self.center, &cam_transform.pos);
-        self.dist_to_cam = vec3::len(&dist_to_cam);
-
-        // TODO: self.update_vel_relative_to_cam()
+        let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);
+        self.dist_to_cam = vec3::len(&kat_to_cam);
+        self.update_cam_relative_dir(camera);
 
         // TODO: `kat_update:390-415` (self.update_dust_cloud_vfx())
         // TODO: `kat_update:416-447` (self.update_prop_combo())

@@ -1,6 +1,8 @@
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4, vec3,
+    mat4,
+    vec2::dot,
+    vec3,
 };
 
 use crate::{
@@ -29,6 +31,7 @@ use super::{
 /// 0.9998
 const ALMOST_1: f32 = f32::from_bits(0x3f7ff2e5);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BrakeState {
     /// Not pushing hard enough to elicit katamari movement
     NoPush,
@@ -41,6 +44,15 @@ enum BrakeState {
 
     /// TODO_VS: i have no clue
     Shoot,
+}
+
+/// (??) Encodes the katamari's velocity relative to the camera's forward direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CamRelativeDir {
+    Forwards,
+    Backwards,
+    Left,
+    Right,
 }
 
 /// Katamari velocity and acceleration values.
@@ -1010,5 +1022,55 @@ impl Katamari {
         self.bottom = self.center;
         self.bottom[1] -= self.radius_cm;
         self.apply_acceleration(mission_state);
+    }
+
+    /// Compute and store the katamari's velocity relative to the camera
+    /// offset: 0x23520
+    pub fn update_cam_relative_dir(&mut self, camera: &Camera) {
+        self.cam_relative_dir = if self.physics_flags.immobile {
+            // case 1: katamari is immobile
+            None
+        } else {
+            // compute the camera-forward direction
+            let mut cam_forward = [0.0; 3];
+            vec3::transform_mat4(
+                &mut cam_forward,
+                &VEC3_Z_POS,
+                &camera.transform.lookat_yaw_rot_inv,
+            );
+
+            // compute unit lateral katamari velocity
+            let mut kat_lateral_vel = self.velocity.vel_accel_grav;
+            set_y!(kat_lateral_vel, 0.0);
+            vec3_inplace_normalize(&mut kat_lateral_vel);
+
+            let similarity = vec3::dot(&cam_forward, &kat_lateral_vel);
+            let threshold = self.params.cam_relative_vel_sideways_threshold;
+            if similarity < -threshold {
+                // case 1: velocity is moving backwards relative to camera
+                Some(CamRelativeDir::Backwards)
+            } else if similarity > threshold {
+                // case 2: velocity is moving forwards relative to camera
+                Some(CamRelativeDir::Forwards)
+            } else {
+                // case 3: velocity is within the interval `[-threshold, threshold]`, meaning that
+                // the katamari is moving sideways relative to camera forward.
+
+                // (??) Re-transform the lateral velocity relative relative to the camera's yaw rot
+                // so that sideways left and right movement are distinguished via the x component.
+                let mut relative_vel = [0.0; 3];
+                vec3::transform_mat4(
+                    &mut relative_vel,
+                    &kat_lateral_vel,
+                    &camera.transform.lookat_yaw_rot,
+                );
+
+                if relative_vel[0] >= 0.0 {
+                    Some(CamRelativeDir::Right)
+                } else {
+                    Some(CamRelativeDir::Left)
+                }
+            }
+        }
     }
 }

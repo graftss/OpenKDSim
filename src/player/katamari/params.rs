@@ -214,6 +214,12 @@ pub struct KatamariParams {
     /// The number of ticks during which the katamari's downhill acceleration eases in after
     /// it starts moving downhill
     pub downhill_accel_easein_duration: f32,
+
+    /// The threshold value for the dot product of camera-forward and katamari-velocity directions
+    /// which separates forwards, backwards, and sideways movement.
+    /// default: 0.70710677 (i.e. 1/sqrt(2))
+    /// offset: 0x715d8
+    pub cam_relative_vel_sideways_threshold: f32,
 }
 
 impl Default for KatamariParams {
@@ -261,6 +267,7 @@ impl Default for KatamariParams {
             effective_max_slope_grade: f32::from_bits(0x3f3d70a4),     // 0.074
             uphill_accel_easein_duration: 20.0,
             downhill_accel_easein_duration: 20.0,
+            cam_relative_vel_sideways_threshold: f32::from_bits(0x3f3504f3), // 0.70710677, or 1/sqrt(2)
         }
     }
 }
