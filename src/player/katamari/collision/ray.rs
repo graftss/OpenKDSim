@@ -264,4 +264,18 @@ impl Katamari {
             prop_ray.reset(radius);
         }
     }
+
+    /// Returns the type of the collision ray at index `ray_idx` if it exists.
+    /// If there is no ray at that index, returns `None`.
+    pub fn ray_type_by_idx(&self, ray_idx: u16) -> Option<KatCollisionRayType> {
+        if ray_idx == 0 {
+            Some(KatCollisionRayType::Bottom)
+        } else if ray_idx < self.first_prop_ray_index {
+            Some(KatCollisionRayType::Mesh)
+        } else {
+            self.collision_rays
+                .get(ray_idx as usize)
+                .map(|_| KatCollisionRayType::Prop)
+        }
+    }
 }

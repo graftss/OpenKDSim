@@ -1,4 +1,4 @@
-use gl_matrix::{common::Vec3, vec3};
+use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     collision::raycast_state::RaycastCallType,
@@ -719,9 +719,68 @@ impl Katamari {
                 );
 
                 match self.try_init_vault() {
+                    // case 1: the katamari isn't vaulting
                     TryInitVaultResult::NoVault => return self.set_bottom_ray_contact(),
-                    // TODO: `kat_update_vault_and_climb:144-272
-                    _ => (),
+
+                    // case 2: the katamari is starting a new vault
+                    TryInitVaultResult::InitVault => {
+                        let ray_idx = self.vault_ray_idx.unwrap();
+                        let ray_type = self.ray_type_by_idx(ray_idx);
+                        self.physics_flags.grounded_ray_type = ray_type;
+
+                        if ray_type == Some(KatCollisionRayType::Prop) {
+                            // if the vault ray is from a prop:
+                            // update `prop_vault_ray`
+                            let ray = &self.collision_rays[ray_idx as usize];
+                            vec3::scale(&mut self.prop_vault_ray, &ray.ray_local_unit, ray.ray_len);
+                        }
+
+                        // reset the `vault_transform` to the identity
+                        mat4::identity(&mut self.vault_transform);
+
+                        // save a copy of the katamari's transform when the vault started
+                        mat4::copy(&mut self.vault_init_transform, &self.transform);
+
+                        // set the vault floor normal to the contact floor normal
+                        vec3::copy(
+                            &mut self.vault_floor_normal_unit,
+                            &self.contact_floor_normal_unit,
+                        );
+
+                        // (??) stretch the floor contact ray that's being vaulted on
+                        let mut fc_ray = self.fc_ray.unwrap();
+                        vec3_inplace_scale(&mut fc_ray, self.params.vault_ray_stretch);
+                        self.fc_ray = Some(fc_ray);
+
+                        // Readjust the vault contact point to where the stretched ray ends
+                        vec3::add(&mut self.vault_contact_point, &self.center, &fc_ray);
+                        vec3_inplace_zero_small(&mut self.vault_contact_point, 0.0001);
+
+                        self.vault_ticks = 0;
+
+                        let ray = self
+                            .collision_rays
+                            .get(self.vault_ray_idx.unwrap() as usize)
+                            .unwrap();
+                        let ray_len_t = inv_lerp!(ray.ray_len, self.radius_cm, self.max_ray_len);
+                        if 0.3 <= ray_len_t {
+                            // TODO: play VAULTING sfx with volume `ray_len_t`
+                        }
+                    }
+
+                    // case 3: continuing a vault that was initialized on a previous tick
+                    TryInitVaultResult::OldVault => {
+                        if let Some(ray_idx) = self.vault_ray_idx {
+                            // update the grounded ray type based on the vaulted ray's index
+                            self.physics_flags.grounded_ray_type = self.ray_type_by_idx(ray_idx);
+
+                            // (??) i guess this is pushing the katamari up out of the ground
+                            // if the vault ray is clipped too far into the ground?
+                            if self.clip_translation[1] <= -1.0 {
+                                self.vault_contact_point[1] -= self.clip_translation[1];
+                            }
+                        }
+                    }
                 }
             }
         }

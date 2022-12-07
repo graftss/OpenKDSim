@@ -222,9 +222,14 @@ pub struct KatamariParams {
     pub cam_relative_vel_sideways_threshold: f32,
 
     /// (??)
-    /// default: 0x3
+    /// default: 0.3
     /// offset: 0x7b208
     pub vault_tuning_0x7b208: f32,
+
+    /// (??) When a vault is initiated, the vaulted collision ray's length is scaled by this value.
+    /// default: 1.05
+    /// offset:
+    pub vault_ray_stretch: f32,
 }
 
 impl Default for KatamariParams {
@@ -274,6 +279,7 @@ impl Default for KatamariParams {
             downhill_accel_easein_duration: 20.0,
             cam_relative_vel_sideways_threshold: f32::from_bits(0x3f3504f3), // 0.70710677, or 1/sqrt(2)
             vault_tuning_0x7b208: f32::from_bits(0x3e99999a),                // 0.3
+            vault_ray_stretch: f32::from_bits(0x3f866666),                   // 1.05
         }
     }
 }

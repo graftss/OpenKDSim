@@ -625,8 +625,9 @@ pub struct Katamari {
     /// offset: 0x38c2
     enable_prop_rays: bool,
 
-    /// The collision ray vector
-    vault_ray_vec: Vec3,
+    /// (??) The unit local unit vector of the vaulted prop collision ray, if one exists.
+    /// offset: 0x39c4
+    prop_vault_ray: Vec3,
 
     /// The first prop that was attached to the katamari.
     /// offset: 0x39d8
