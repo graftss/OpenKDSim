@@ -875,7 +875,7 @@ impl Katamari {
 
         // self.min_slope_grade_0x1b0 = self.params.min_slope_grade; (migrated to `KatamariParams`)
         // self.min_brake_angle = self.params.min_brake_angle; (migrated to `KatamariParams`)
-        self.max_wallclimb_angle = self.params.max_wallclimb_angle;
+        self.max_wallclimb_angle = self.params.min_wallclimb_similarity;
 
         self.physics_flags = KatPhysicsFlags::default();
         self.hit_flags = KatHitFlags::default();

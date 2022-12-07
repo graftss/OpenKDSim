@@ -52,6 +52,17 @@ pub struct PrinceParams {
     /// default: 0.99
     /// offset: 0x7b248
     pub run_min_push_mag: f32,
+
+    /// The minimum `input_avg_push_len` value to admit a wallclimb.
+    /// default: 0.95
+    /// offset: 0x715f8
+    pub wallclimb_min_avg_push_len: f32,
+
+    /// The angle threshold which admits wallclimbs. The angle 0 is straight up, and the
+    /// *absolute value* of the input sum's angle must be below this value to admit a wallclimb.
+    /// default: pi/18 ~~ 0.1745329
+    /// offset: 0x71590 (used at 0x167ce)
+    pub wallclimb_input_sum_angle_threshold: f32,
 }
 
 impl Default for PrinceParams {
@@ -86,6 +97,8 @@ impl Default for PrinceParams {
             jog_min_push_mag: f32::from_bits(0x3e947ae1),               // 0.24
             run_min_push_mag: f32::from_bits(0x3f7d70a4),               // 0.99
             run_speed_mult: f32::from_bits(0x3ecccccd),                 // 0.4
+            wallclimb_min_avg_push_len: f32::from_bits(0x3f733333),     // 0.95
+            wallclimb_input_sum_angle_threshold: f32::from_bits(0x3e32b8c2), // 0.1745329 (or pi/18)
         }
     }
 }

@@ -19,7 +19,7 @@ use crate::{
 
 use self::{hit::SurfaceHit, ray::KatCollisionRayType};
 
-use super::Katamari;
+use super::{flags::KatInclineMoveType, Katamari};
 
 pub mod history;
 pub mod hit;
@@ -817,6 +817,118 @@ impl Katamari {
                 }
             }
         }
+    }
+
+    /// offset: 0x15950
+    fn update_wall_contacts(&mut self) {
+        if self.physics_flags.climbing_wall {
+            // TODO: `kat_update_wall_contacts:47-58`
+            return;
+        }
+    }
+
+    fn can_climb_wall_contact(&mut self, prince: &Prince) -> bool {
+        'early_returns: {
+            if self.contact_prop.is_none()
+                || self.num_wall_contacts != 1
+                || self.num_floor_contacts == 0
+            {
+                // if one of the following hold:
+                //   - the katamari isn't colliding with a prop
+                //   - the katamari's isn't colliding with exactly 1 wall
+                //   - the katamari isn't colliding with a floor
+
+                // do some early checks to rule out the possibility of being able to wallclimb
+                if self.hit_flags.wall_climb_disabled {
+                    return false;
+                }
+                if self.physics_flags.hit_shell_ray.is_some() {
+                    return false;
+                }
+                if self.hit_flags.small_ledge_climb {
+                    break 'early_returns;
+                } else if !self.hit_flags.wall_climb_free {
+                    if self.wallclimb_cooldown_timer > 0 {
+                        return false;
+                    }
+                    if self.last_physics_flags.airborne {
+                        return false;
+                    }
+                    if self.physics_flags.airborne {
+                        return false;
+                    }
+                    if self.physics_flags.incline_move_type != KatInclineMoveType::MoveFlatground {
+                        return false;
+                    }
+                }
+            } else {
+                // if all of the following hold:
+                //   - the katamari contacts a prop
+                //   - the katamari is colliding with exactly 1 wall
+                //   - the katamari is colliding with a floor
+
+                // TODO_PROPS: `kat_can_climb_wall_contact:69-82` (init prop wallclimb)
+            }
+
+            if self.num_wall_contacts > 1 {
+                return false;
+            }
+        }
+
+        // don't start a new wall climb if the katamari doesn't currently contact a wall
+        if !self.physics_flags.contacts_wall && !self.physics_flags.climbing_wall {
+            return false;
+        }
+
+        // check that the angle between the katamari's push velocity and the wall normal are close
+        // enough to admit a wallclimb. since the wall normal is actually pointing *out* of the wall,
+        // we need to throw in a negative somewhere in there.
+        let similarity = vec3::dot(
+            &self.velocity.push_vel_on_floor_unit,
+            &self.hit_walls[0].normal_unit,
+        );
+        let angle = acos_f32(-similarity);
+        if angle > self.params.max_wallclimb_angle {
+            return false;
+        }
+
+        // check that the input is strong enough (and forward enough) to admit a wallclimb
+        if !prince.has_wallclimb_input() {
+            return false;
+        }
+
+        if !self.physics_flags.climbing_wall {
+            // if the katamari isn't already wallclimbing:
+            // start a new wallclimb
+            self.wallclimb_normal_unit = self.contact_wall_normal_unit;
+            self.wallclimb_speed = 0.0;
+            self.physics_flags.at_max_climb_height = false;
+
+            // (??) not sure what this is doing
+            // TODO_LOW: factor out magic number as param
+            if !self.hit_flags.wall_climb_free && self.base_speed * 0.95 < self.speed {
+                return false;
+            }
+        }
+
+        // finally, check the similarity between the katamari's push velocity and the wall
+        // normal. if the two vectors are similar enough, we can start a wallclimb.
+        let mut lateral_push_vel = self.velocity.push_vel_on_floor_unit;
+        set_y!(lateral_push_vel, 0.0);
+        vec3_inplace_normalize(&mut lateral_push_vel);
+
+        let mut lateral_wallclimb_normal = self.wallclimb_normal_unit;
+        set_y!(lateral_wallclimb_normal, 0.0);
+        vec3_inplace_normalize(&mut lateral_wallclimb_normal);
+
+        let push_to_wall_similarity = -vec3::dot(&lateral_push_vel, &lateral_wallclimb_normal);
+        return push_to_wall_similarity >= self.params.min_wallclimb_similarity;
+    }
+
+    /// (??)
+    /// offset: 0x12750
+    fn play_bonk_fx(&mut self, prop_moving: bool) {
+        // TODO
     }
 
     /// Check the current primary floor contact ray to see if a vault on that ray should be

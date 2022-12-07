@@ -518,6 +518,18 @@ impl Prince {
         self.is_quick_shifting
     }
 
+    pub fn get_input_sum_unit(&self) -> &StickInput {
+        &self.input_sum_unit
+    }
+
+    /// Returns `true` if the current input state admits a wallclimb.
+    /// (independently of all other things that could influence whether a wallclimb is allowed,
+    /// up to and including whether the katamari even contacts a wall in the first place)
+    pub fn has_wallclimb_input(&self) -> bool {
+        self.input_avg_push_len >= self.params.wallclimb_min_avg_push_len
+            && self.input_sum_unit.angle().abs() < self.params.wallclimb_input_sum_angle_threshold
+    }
+
     /// Returns the max speed reduction while huffing. This penalty eases off
     /// as the huff progresses, smoothly leading to into no penalty when the huff ends.
     /// offset: 0x226be (in `kat_update_velocity`)

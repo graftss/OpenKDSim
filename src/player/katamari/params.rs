@@ -28,7 +28,7 @@ pub struct KatamariParams {
 
     /// (??)
     /// offset: 0x10eb1c (but this value is `cos(thatvalue * pi/2)` because reasons)
-    pub max_wallclimb_angle: f32,
+    pub min_wallclimb_similarity: f32,
 
     /// (??) something about how the katamari collision rays can clip into surfaces
     /// offset: 0x7153c
@@ -230,6 +230,12 @@ pub struct KatamariParams {
     /// default: 1.05
     /// offset:
     pub vault_ray_stretch: f32,
+
+    /// The maximum angle between the katamari's velocity and a contacted wall normal which admits
+    /// a wallclimb.
+    /// default: 1.047198 (pi/3)
+    /// offset: 0x71614
+    pub max_wallclimb_angle: f32,
 }
 
 impl Default for KatamariParams {
@@ -241,7 +247,7 @@ impl Default for KatamariParams {
             prop_attach_vol_ratio: f32::from_bits(0x3dcccccd), // 0.1
             prop_use_aabb_collision_vol_ratio: f32::from_bits(0x3f59999a), // 0.85
             min_brake_angle: (f32::from_bits(0x3eab020c) * FRAC_PI_2).cos(),
-            max_wallclimb_angle: (f32::from_bits(0x3ecccccd) * FRAC_PI_2).cos(),
+            min_wallclimb_similarity: (f32::from_bits(0x3ecccccd) * FRAC_PI_2).cos(),
             clip_len_constant: f32::from_bits(0x3a03126f),
             surface_similarity_threshold: f32::from_bits(0x3f7ffeb0),
             sloped_floor_normal_y_threshold: f32::from_bits(0x3f7ff972),
@@ -280,6 +286,7 @@ impl Default for KatamariParams {
             cam_relative_vel_sideways_threshold: f32::from_bits(0x3f3504f3), // 0.70710677, or 1/sqrt(2)
             vault_tuning_0x7b208: f32::from_bits(0x3e99999a),                // 0.3
             vault_ray_stretch: f32::from_bits(0x3f866666),                   // 1.05
+            max_wallclimb_angle: f32::from_bits(0x3f860a92),                 // pi/3
         }
     }
 }
