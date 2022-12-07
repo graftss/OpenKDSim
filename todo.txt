@@ -4,3 +4,10 @@ random things that shouldn't be forgotten:
   use in `Prop::init_aabb_and_volume`
 - is it possible to drop the static `include_bytes!` data after 
   reading it into tables? (e.g. for stage config table)
+
+- gachas are bugged somehow: holding one stick up and repeating up-down on the other stick
+  will yield gachas
+  - (probably just not correctly checking what the previous gacha dir was)
+
+- when entering a pinch input from consistent non-pinch push inputs, the katamari
+  will orbit around in a circle for some reason

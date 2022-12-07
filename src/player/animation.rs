@@ -9,7 +9,10 @@ use crate::{
     },
 };
 
-use super::prince::{Prince, PrinceSidewaysDir, PrinceTurnType, PrinceViewMode, PushDir};
+use super::{
+    katamari::CamRelativeDir,
+    prince::{Prince, PrinceSidewaysDir, PrinceTurnType, PrinceViewMode, PushDir},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnimationId {
@@ -100,12 +103,18 @@ pub struct AnimationParams {
     /// default: 0.05
     /// offset: 0x71578 (used at 0x57c74)
     pub max_speed_ratio_to_idle: f32,
+
+    /// The lowest the katamari's max speed ratio must be to enter the `JogUp` animation.
+    /// default: 0.3
+    /// offset: 0x715a8 (used at 0x5797d and 0x57a94)
+    pub max_speed_ratio_to_jog: f32,
 }
 
 impl Default for AnimationParams {
     fn default() -> Self {
         Self {
             max_speed_ratio_to_idle: f32::from_bits(0x3d4ccccd), // 0.05
+            max_speed_ratio_to_jog: f32::from_bits(0x3e99999a),  // 0.3
         }
     }
 }
@@ -179,13 +188,24 @@ impl Animation {
                 // case 2: not airborne, L1 look
                 (AnimationId::L1Look, 1.0, false, None)
             } else {
+                let max_speed_ratio = katamari.get_max_speed_ratio();
+
                 // case 3: not airborne, not L1 look
                 let (id, speed, tut_move) = match prince.get_turn_type() {
                     PrinceTurnType::None => {
                         // case 3.1: not turning (no input)
-                        self.try_start_idle_animation(prince, katamari, rng);
-                        return;
-                        // TODO: `prince_update_animation:170-186` (needs prince vel relative to camera)
+                        if self.try_play_idle_animation(prince, katamari, rng) {
+                            return;
+                        }
+
+                        let id = match katamari.get_cam_relative_dir() {
+                            Some(CamRelativeDir::Forwards) | None => AnimationId::WalkUpNoPush,
+                            Some(CamRelativeDir::Backwards) => AnimationId::WalkDownNoPush,
+                            Some(CamRelativeDir::Left) => AnimationId::WalkLeftNoPush,
+                            Some(CamRelativeDir::Right) => AnimationId::WalkRightNoPush,
+                        };
+
+                        (id, 1.0, None)
                     }
 
                     // case 3.2: left stick up turn
@@ -230,11 +250,10 @@ impl Animation {
                         } else if prince.get_is_quick_shifting() {
                             // case 3.7.3: quick shifting (and not spinning or boosting)
                             let id = if !katamari.physics_flags.immobile
-                                && katamari.get_max_speed_ratio() >= 0.3
+                                && max_speed_ratio >= self.params.max_speed_ratio_to_jog
                             {
-                                // TODO: `prince_update_animation:222-228` (needs prince vel relative to camera)
-                                if true
-                                /* katamari.vel_relative_to_cam == BACKWARD */
+                                if katamari.get_cam_relative_dir()
+                                    == Some(CamRelativeDir::Backwards)
                                 {
                                     AnimationId::WalkDown
                                 } else {
@@ -247,7 +266,7 @@ impl Animation {
                             };
 
                             (id, 1.7, None)
-                        } else if self.try_start_idle_animation(prince, katamari, rng) {
+                        } else if self.try_play_idle_animation(prince, katamari, rng) {
                             // case 3.7.4: moving slow enough to play the idle animation
                             return;
                         } else if katamari.physics_flags.climbing_wall {
@@ -255,8 +274,31 @@ impl Animation {
                             (AnimationId::Climb, 1.0, None)
                         } else if !katamari.physics_flags.braking {
                             // case 3.7.6: not braking
-                            // TODO: `prince_update_animation:240-276` (needs prince vel relative to camera)
-                            (AnimationId::WalkUp, 1.0, None)
+                            let id = match katamari.get_cam_relative_dir() {
+                                Some(CamRelativeDir::Forwards) => {
+                                    if self.try_play_pinch_animation(prince, rng) {
+                                        return;
+                                    } else if max_speed_ratio < self.params.max_speed_ratio_to_jog {
+                                        AnimationId::WalkUp
+                                    } else if prince.get_is_huffing() {
+                                        AnimationId::WalkUpHuff
+                                    } else {
+                                        AnimationId::JogUp
+                                    }
+                                }
+                                Some(CamRelativeDir::Backwards) => AnimationId::WalkDown,
+                                Some(CamRelativeDir::Left) => AnimationId::WalkLeft,
+                                Some(CamRelativeDir::Right) => AnimationId::WalkRight,
+                                None => {
+                                    if self.try_play_pinch_animation(prince, rng) {
+                                        return;
+                                    } else {
+                                        AnimationId::JogUp
+                                    }
+                                }
+                            };
+
+                            (id, 1.0, None)
                         } else {
                             // case 3.7.7: braking
                             let side_dir = prince.get_push_sideways_dir();
@@ -297,7 +339,7 @@ impl Animation {
     }
 
     /// offset: 0x57cde
-    fn try_start_idle_animation(
+    fn try_play_idle_animation(
         &mut self,
         prince: &Prince,
         katamari: &Katamari,
@@ -325,6 +367,18 @@ impl Animation {
         }
 
         true
+    }
+
+    /// Checks the conditions for playing the `Pinch` animation, and if they are met, plays it.
+    /// Returns `true` if the `Pinch` animation was successfully played.
+    /// offset: 0x57d10
+    fn try_play_pinch_animation(&mut self, prince: &Prince, rng: &mut RngState) -> bool {
+        if prince.get_input_avg_len() > 0.0 && prince.input_avg_push_len == 0.0 {
+            self.play(AnimationId::Pinch, 1.0, false, rng);
+            true
+        } else {
+            false
+        }
     }
 
     /// Tells Unity to play the animation with id `id` at the speed `speed`.

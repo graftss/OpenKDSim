@@ -19,7 +19,7 @@ use crate::{
     mission::{self, stage::Stage, state::MissionState, GameMode},
     player::{
         camera::{mode::CameraMode, Camera},
-        katamari::spline::compute_spline_accel_mult,
+        katamari::{spline::compute_spline_accel_mult, CamRelativeDir},
         prince::{Prince, PushDir},
     },
 };
@@ -44,15 +44,6 @@ enum BrakeState {
 
     /// TODO_VS: i have no clue
     Shoot,
-}
-
-/// (??) Encodes the katamari's velocity relative to the camera's forward direction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CamRelativeDir {
-    Forwards,
-    Backwards,
-    Left,
-    Right,
 }
 
 /// Katamari velocity and acceleration values.

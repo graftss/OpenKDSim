@@ -31,7 +31,7 @@ use self::{
     flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,
     scaled_params::KatScaledParams,
-    velocity::{CamRelativeDir, KatVelocity},
+    velocity::KatVelocity,
 };
 
 use super::{
@@ -54,6 +54,15 @@ pub enum KatBoostEffectState {
     StopBuilding,
     Release,
     End,
+}
+
+/// (??) Encodes the katamari's velocity relative to the camera's forward direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CamRelativeDir {
+    Forwards,
+    Backwards,
+    Left,
+    Right,
 }
 
 #[derive(Debug, Default)]
@@ -733,6 +742,10 @@ impl Katamari {
 
     pub fn get_brake_push_dir(&self) -> Option<PushDir> {
         self.brake_push_dir
+    }
+
+    pub fn get_cam_relative_dir(&self) -> Option<CamRelativeDir> {
+        self.cam_relative_dir
     }
 
     /// Computes the ratio of the katamari's current speed to its "max" speed,
