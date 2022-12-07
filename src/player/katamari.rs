@@ -298,6 +298,10 @@ pub struct Katamari {
     /// offset: 0x438
     spin_rotation_speed: f32,
 
+    /// The length of `delta_pos`, which is the distance between `center` and `last_center`.
+    /// offset: 0x43c
+    delta_pos_len: f32,
+
     /// (??) The axis about which the katamari will rotate as it's pushed
     /// offset: 0x440
     spin_rotation_axis: Vec3,
@@ -348,7 +352,7 @@ pub struct Katamari {
 
     /// The `TopCenter` shell point.
     /// offset: 0x6a0
-    shell_top_center: Vec3,
+    shell_top: Vec3,
 
     /// The `Bottom` shell point.
     /// offset: 0x6b0
@@ -369,6 +373,10 @@ pub struct Katamari {
     /// The `TopRight` shell point.
     /// offset: 0x6f0
     shell_top_right: Vec3,
+
+    /// The difference between the start and endpoint of each shell ray.
+    /// offset: 0x700
+    shell_vec: Vec3,
 
     /// The katamari's transform matrix.
     /// offset: 0x710
@@ -842,6 +850,7 @@ impl Katamari {
         self.reset_collision_rays();
         self.set_immobile(mission_state);
         self.airborne_ticks = 0;
+        self.falling_ticks = 0;
     }
 }
 
@@ -997,9 +1006,13 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
+        temp_debug_log!("tick");
+
         self.update_velocity(prince, camera, mission_state);
         self.update_friction_accel(prince, mission_state);
         self.apply_acceleration(mission_state);
+
+        temp_debug_log!("   stuck:{}", self.physics_flags.stuck_between_walls);
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;
@@ -1040,7 +1053,7 @@ impl Katamari {
 
     /// Using the katamari volume, cache radius- and diameter-based katamari fields.
     /// offset: 0x1ee70
-    pub fn cache_sizes(&mut self) {
+    pub fn update_size_features(&mut self) {
         // compute radius and diameter from volume
         let radius_m = vol_to_rad(self.vol_m3);
         self.radius_cm = radius_m * 100.0 + self.params.radius_boost_cm;

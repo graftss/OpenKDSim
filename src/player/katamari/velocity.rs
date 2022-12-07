@@ -6,7 +6,7 @@ use gl_matrix::{
 };
 
 use crate::{
-    constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Z_POS},
+    constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     macros::{
         inv_lerp, inv_lerp_clamp, lerp, max, panic_log, set_y, temp_debug_log, vec3_from,
         vec3_unit_xz,
@@ -848,7 +848,7 @@ impl Katamari {
         if self.hit_flags.speed_check_off
             && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill
         {
-            // TODO: `kat_apply_acceleration:44-61` (speedcheckoff acceleration)
+            // TODO_LOW: `kat_apply_acceleration:44-61` (speedcheckoff acceleration)
         }
 
         self.velocity.vel_accel = vel_accel;
@@ -894,11 +894,11 @@ impl Katamari {
 
             self.speed = vec3::length(&next_vel);
 
-            self.cache_sizes();
+            self.update_size_features();
             self.update_rotation_speed(&next_vel);
             self.update_transform_unvaulted();
         } else {
-            self.cache_sizes();
+            self.update_size_features();
             // TODO: `kat_update_transform_vaulted()`
         }
 
@@ -907,12 +907,76 @@ impl Katamari {
         self.vault_prop_decay_mult =
             1.0 - self.base_speed_ratio * self.params.vault_prop_pull_to_center_mult;
 
-        // TODO: `kat_cache_shell_points()`
+        self.update_shell_points();
+
         // TODO_VS: `kat_apply_acceleration:166-196`
 
         if mission_state.stage == Stage::World {
             self.physics_flags.can_emit_smoke = self.diam_cm > 1200.0;
         }
+    }
+
+    /// Compute the shell collision points around the katamari's boundary. The shell points are
+    /// positioned based on how the katamari's center moved since the previous tick.
+    /// Specifically, the shell is oriented to be orthogonal to the katamari's velocity.
+    /// offset: 0x23b70
+    fn update_shell_points(&mut self) {
+        // compute shell top and bottom
+        vec3::scale(&mut self.shell_top, &VEC3_Y_POS, self.radius_cm);
+        vec3::scale(&mut self.shell_bottom, &VEC3_Y_POS, -self.radius_cm);
+
+        // compute `delta_pos` and its length
+        vec3::subtract(&mut self.delta_pos, &self.center, &self.last_center);
+        self.delta_pos_len = vec3::length(&self.delta_pos);
+        vec3::normalize(&mut self.delta_pos_unit, &self.delta_pos);
+
+        if self.physics_flags.immobile {
+            // if the katamari isn't moving:
+            // set `shell_vec` to the zero vector
+            vec3::zero(&mut self.shell_vec);
+        } else {
+            // if the katamari is moving:
+            // set `shell_vec` to `delta_pos_unit`.
+            // the original simulation recomputes it here, so i guess we will too
+            vec3::subtract(&mut self.shell_vec, &self.center, &self.last_center);
+            vec3_inplace_normalize(&mut self.shell_vec)
+        }
+
+        // scale `shell_vec` to have the same length as the katamari's radius (unless it's 0)
+        vec3_inplace_scale(&mut self.shell_vec, self.radius_cm);
+
+        // compute the `left_lateral_unit` vector
+        let mut left_lateral_unit = [0.0; 3];
+        if self.physics_flags.immobile {
+            // if the katamari isn't moving:
+            // TODO: `kat_update_shell_points:193-233`
+        } else {
+            // if the katamari is moving:
+            let mut move_lateral_unit = self.delta_pos;
+            set_y!(move_lateral_unit, 0.0);
+            vec3_inplace_normalize(&mut move_lateral_unit);
+
+            // compute the rotation matrix to rotate a point 90 degrees to the left
+            let mut left_rot_mat = [0.0; 16];
+            mat4::from_y_rotation(&mut left_rot_mat, -FRAC_PI_2);
+
+            vec3::transform_mat4(&mut left_lateral_unit, &move_lateral_unit, &left_rot_mat);
+        }
+
+        // compute left and right points as multiples of `left_lateral_unit`
+        vec3::scale(&mut self.shell_left, &left_lateral_unit, self.radius_cm);
+        vec3::scale(&mut self.shell_right, &left_lateral_unit, -self.radius_cm);
+
+        // compute top-left/right points by normalizing the sum of the top and the left/right points
+        vec3::add(&mut self.shell_top_left, &self.shell_top, &self.shell_left);
+        vec3_inplace_normalize(&mut self.shell_top_left);
+
+        vec3::add(
+            &mut self.shell_top_right,
+            &self.shell_top,
+            &self.shell_right,
+        );
+        vec3_inplace_normalize(&mut self.shell_top_right);
     }
 
     fn update_rotation_speed(&mut self, vel: &Vec3) {
@@ -1004,7 +1068,7 @@ impl Katamari {
     pub fn set_immobile(&mut self, mission_state: &MissionState) {
         self.physics_flags.immobile = true;
         self.speed = 0.0;
-        self.wallclimb_cooldown_timer = 10;
+        self.wallclimb_cooldown_timer = 0;
         self.last_speed = self.speed;
         self.velocity.reset();
         self.last_velocity.reset();

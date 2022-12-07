@@ -159,7 +159,7 @@ impl Katamari {
             let mut shell_initial_pts: [Vec3; 1] = Default::default();
             let mut shell_final_pts: [Vec3; 1] = Default::default();
 
-            vec3::copy(&mut shell_initial_pts[0], &self.shell_top_center);
+            vec3::copy(&mut shell_initial_pts[0], &self.shell_top);
             vec3_inplace_add(
                 &mut shell_initial_pts[0],
                 last_center[0],
@@ -167,7 +167,7 @@ impl Katamari {
                 last_center[2],
             );
 
-            vec3::copy(&mut shell_final_pts[0], &self.shell_top_center);
+            vec3::copy(&mut shell_final_pts[0], &self.shell_top);
             vec3_inplace_add_vec(&mut shell_final_pts[0], &shell_ray_vec);
 
             // TODO: `kat_update_surface_contacts:267-294` (support all shell points)
@@ -222,6 +222,7 @@ impl Katamari {
         vec3_inplace_zero_small(&mut normal_unit, 1e-05);
 
         // use the y component of the hit surface's unit normal to decide if it's a wall or floor
+        temp_debug_log!("  normal_unit={:?}", normal_unit);
         let surface_type = if self.params.surface_normal_y_threshold < normal_unit[1] {
             if ray_idx == -1 || ray_idx == -5 || ray_idx == -6 {
                 return None;
@@ -649,7 +650,7 @@ impl Katamari {
             && !self.last_physics_flags.in_water
             && self.physics_flags.airborne
         {
-            // TODO: `kat_update_vault_and_climb:44` (play enter water sfx)
+            // TODO_FX: `kat_update_vault_and_climb:44` (play enter water sfx)
         }
 
         if self.physics_flags.grounded_ray_type != Some(KatCollisionRayType::Bottom) {
@@ -764,7 +765,7 @@ impl Katamari {
                             .unwrap();
                         let ray_len_t = inv_lerp!(ray.ray_len, self.radius_cm, self.max_ray_len);
                         if 0.3 <= ray_len_t {
-                            // TODO: play VAULTING sfx with volume `ray_len_t`
+                            // TODO_FX: play VAULTING sfx with volume `ray_len_t`
                         }
                     }
 
@@ -812,7 +813,7 @@ impl Katamari {
                 };
 
                 if play_hit_ground_sfx {
-                    // TODO: `kat_update_vault_and_climb:307` (play HIT_GROUND_FROM_FALL sfx)
+                    // TODO_FX: `kat_update_vault_and_climb:307` (play HIT_GROUND_FROM_FALL sfx)
                 }
             }
         }
@@ -993,7 +994,11 @@ impl Katamari {
 
         // update center, bottom, and top points
         set_translation!(self.transform, self.center);
+
         self.bottom = self.center;
         self.bottom[1] -= self.radius_cm;
+
+        self.top = self.center;
+        self.top[1] += self.radius_cm;
     }
 }

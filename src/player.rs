@@ -95,7 +95,7 @@ impl Player {
         prince.update_royal_warp(katamari, dest.unwrap().prince_angle);
         camera.reset_state(katamari, prince);
 
-        // TODO: call `vs_volume_diff_callback` delegate
+        // TODO_VS: call `vs_volume_diff_callback` delegate
     }
 
     /// Mimicks the `SetShootingMode` API function.
