@@ -20,7 +20,6 @@ use crate::{
 
 use self::params::PrinceParams;
 
-mod animation;
 mod params;
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -193,7 +192,7 @@ pub struct Prince {
     /// If true, the prince is rotating quickly around the katamari
     /// (e.g. left stick up AND right stick down)
     /// offset: 0xa1
-    quick_shifting: bool,
+    is_quick_shifting: bool,
 
     /// Various 1-byte fields that are shared with the Unity code.
     /// offset: 0xa2
@@ -487,6 +486,10 @@ impl Prince {
         self.push_strength
     }
 
+    pub fn get_input_avg_len(&self) -> f32 {
+        self.input_avg_len
+    }
+
     pub fn get_is_huffing(&self) -> bool {
         self.is_huffing
     }
@@ -501,6 +504,18 @@ impl Prince {
 
     pub fn get_params(&self) -> &PrinceParams {
         &self.params
+    }
+
+    pub fn get_turn_type(&self) -> PrinceTurnType {
+        self.turn_type
+    }
+
+    pub fn get_push_sideways_dir(&self) -> Option<PrinceSidewaysDir> {
+        self.push_sideways_dir
+    }
+
+    pub fn get_is_quick_shifting(&self) -> bool {
+        self.is_quick_shifting
     }
 
     /// Returns the max speed reduction while huffing. This penalty eases off
@@ -953,7 +968,7 @@ impl Prince {
         if self.input_avg_len <= 0.0 || katamari.physics_flags.vs_mode_state == 2 {
             // if no analog input:
             self.angle_speed = 0.0;
-            self.quick_shifting = false;
+            self.is_quick_shifting = false;
             self.turn_type = PrinceTurnType::None;
             self.input_avg_push_len = 0.0;
             return None;
@@ -1085,7 +1100,7 @@ impl Prince {
                 self.angle_btwn_sticks_for_fastest_turn * PI
             );
 
-        self.quick_shifting = true;
+        self.is_quick_shifting = true;
         self.angle_speed = base_turn_speed * self.quick_shift_turn_speed;
         change_bounded_angle(&mut self.angle, global_speed_mult * self.angle_speed);
     }

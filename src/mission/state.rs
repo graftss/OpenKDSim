@@ -2,7 +2,7 @@ use super::{
     config::MissionConfig,
     ending::EndingState,
     stage::{Stage, StageConfig},
-    tutorial::TutorialState,
+    tutorial::{TutorialMove, TutorialState},
     vsmode::VsModeState,
     GameMode, Mission,
 };
@@ -72,5 +72,14 @@ impl MissionState {
         // initialize the mission and stage configs
         MissionConfig::get(&mut self.mission_config, mission);
         StageConfig::get(&mut self.stage_config, stage);
+    }
+
+    /// Set the tutorial move `tut_move` as being held.
+    pub fn set_tutorial_move_held(&mut self, tut_move: TutorialMove) {
+        if self.is_tutorial() {
+            if let Some(tutorial) = &mut self.tutorial {
+                tutorial.set_move_held(tut_move);
+            }
+        }
     }
 }

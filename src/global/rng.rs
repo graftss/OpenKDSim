@@ -48,7 +48,7 @@ impl RngState {
     pub fn get_rng2(&mut self) -> u8 {
         // save original rng2 state to return
         let current = self.rng2;
-        let result = RNG2_VALUES[(current & 256) as usize];
+        let result = RNG2_VALUES[(current & 255) as usize];
 
         // update rng2 state
         self.rng2 += 1;

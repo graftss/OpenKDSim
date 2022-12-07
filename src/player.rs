@@ -4,6 +4,7 @@ use crate::{
 };
 
 use self::{
+    animation::Animation,
     camera::{mode::CameraMode, Camera},
     constants::MAX_PLAYERS,
     input::Input,
@@ -11,6 +12,7 @@ use self::{
     prince::{Prince, PrinceViewMode},
 };
 
+pub mod animation;
 pub mod camera;
 pub mod constants;
 pub mod input;
@@ -19,10 +21,11 @@ pub mod prince;
 
 #[derive(Debug, Default)]
 pub struct Player {
-    pub katamari: Katamari,
-    pub prince: Prince,
+    pub animation: Animation,
     pub camera: Camera,
     pub input: Input,
+    pub katamari: Katamari,
+    pub prince: Prince,
 }
 
 impl Player {
@@ -55,6 +58,9 @@ impl Player {
         // then initialize the camera
         self.camera
             .init(&self.katamari, &self.prince, &mission_state.mission_config);
+
+        // then initialize the animation state
+        self.animation.set_delegates(delegates);
     }
 
     pub fn update_camera(&mut self, mission_state: &MissionState) {
@@ -127,7 +133,13 @@ impl GameState {
 
             // update the prince's transform now that the katamari is updated
             player.prince.update_transform(&player.katamari);
-            // TODO: self.princes[player].update_animation(); (although animations might want to be their own struct)
+            player.animation.update(
+                &player.prince,
+                &player.katamari,
+                &player.camera,
+                mission_state,
+                &mut global.rng,
+            );
 
             player.update_royal_warp(
                 self.global.royal_warp_plane_y,
