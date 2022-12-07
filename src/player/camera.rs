@@ -573,6 +573,10 @@ impl Camera {
         self.state.r1_jump_state
     }
 
+    pub fn get_r1_jump_height_ratio(&self) -> f32 {
+        self.state.r1_jump_height_ratio
+    }
+
     pub fn set_delay(&mut self, x: f32, y: f32, z: f32) {
         self.params.delay_x = x;
         self.params.delay_y = y;

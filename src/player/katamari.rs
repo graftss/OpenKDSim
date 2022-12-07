@@ -723,6 +723,10 @@ impl Katamari {
         self.speed
     }
 
+    pub fn get_max_speed_ratio(&self) -> f32 {
+        self.max_speed_ratio
+    }
+
     /// Computes the ratio of the katamari's current speed to its "max" speed,
     /// which varies with the prince's push direction.
     pub fn get_speed_ratio(&self, push_dir: PushDir) -> f32 {

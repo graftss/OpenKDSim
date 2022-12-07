@@ -20,6 +20,7 @@ use crate::{
 
 use self::params::PrinceParams;
 
+mod animation;
 mod params;
 
 #[derive(Debug, Default, Clone, Copy)]
