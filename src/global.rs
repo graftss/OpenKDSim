@@ -1,10 +1,17 @@
+pub mod rng;
+
 use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 
+use self::rng::RngState;
+
 /// Miscellaneous global game state.
 #[derive(Debug, Default)]
 pub struct GlobalState {
+    /// RNG state, which contains two RNG values.
+    pub rng: RngState,
+
     /// Set to true after `MonoInitStart` is called.
     /// offset: 0xff0f0
     pub did_init_start: bool,
