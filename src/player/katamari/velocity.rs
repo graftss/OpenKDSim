@@ -934,7 +934,7 @@ impl Katamari {
                     &self.contact_wall_normal_unit,
                 );
                 vec3_inplace_normalize(&mut net_normal_unit);
-                // TODO: `kat_update_rotation_speed:76-87` (this seems like it's just a no-op)
+                // TODO_LOW: `kat_update_rotation_speed:76-87` (this seems like it's just a no-op)
             } else {
                 // if not airborne and climbing a wall, set net normal to `<0,1,0>`
                 set_y!(net_normal_unit, 1.0);

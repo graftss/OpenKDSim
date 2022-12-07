@@ -103,7 +103,7 @@ macro_rules! lerp {
 /// Linear map on `$value` induced by `[$min, $max] -> [0, 1]`.
 macro_rules! inv_lerp {
     ($value: expr, $min: expr, $max: expr) => {
-        (($value) - ($min)) / (($max) - ($min))
+        ((($value) - ($min)) / (($max) - ($min)))
     };
 }
 

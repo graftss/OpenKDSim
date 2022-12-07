@@ -186,7 +186,7 @@ pub struct KatamariParams {
     /// longer than 2.5 times the katamari's radius)
     /// default: 2.5
     /// offset: 0x716ec (used at 0x1c5ba)
-    pub max_ray_len_ratio_to_radius: f32,
+    pub max_ray_len_radii: f32,
 
     /// The multiple of the katamari's usual collision radius that's applied to
     /// check for AABB collisions with props which have the "increased collision radius" property.
@@ -220,6 +220,11 @@ pub struct KatamariParams {
     /// default: 0.70710677 (i.e. 1/sqrt(2))
     /// offset: 0x715d8
     pub cam_relative_vel_sideways_threshold: f32,
+
+    /// (??)
+    /// default: 0x3
+    /// offset: 0x7b208
+    pub vault_tuning_0x7b208: f32,
 }
 
 impl Default for KatamariParams {
@@ -261,13 +266,14 @@ impl Default for KatamariParams {
             move_into_wall_similarity: f32::from_bits(0x3c23d70a), // 0.01
             unstuck_bump_speed: f32::from_bits(0x3d4ccccd), // 0.05
             surface_normal_y_threshold: (f32::from_bits(0x3f3d70a4) * FRAC_PI_2).cos(),
-            max_ray_len_ratio_to_radius: 2.5,
+            max_ray_len_radii: 2.5,
             increased_collision_radius_mult: 1.2,
             min_slope_grade_causing_accel: f32::from_bits(0x3d398c7e), // 0.0453
             effective_max_slope_grade: f32::from_bits(0x3f3d70a4),     // 0.074
             uphill_accel_easein_duration: 20.0,
             downhill_accel_easein_duration: 20.0,
             cam_relative_vel_sideways_threshold: f32::from_bits(0x3f3504f3), // 0.70710677, or 1/sqrt(2)
+            vault_tuning_0x7b208: f32::from_bits(0x3e99999a),                // 0.3
         }
     }
 }

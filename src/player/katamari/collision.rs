@@ -2,11 +2,15 @@ use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
     collision::raycast_state::RaycastCallType,
-    macros::{panic_log, set_translation, set_y, temp_debug_log, vec3_from, vec3_unit_xz},
+    constants::{FRAC_PI_2, FRAC_PI_90},
+    macros::{
+        inv_lerp, inv_lerp_clamp, lerp, min, panic_log, set_translation, set_y, temp_debug_log,
+        vec3_from, vec3_unit_xz,
+    },
     math::{
         acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_normalize,
         vec3_inplace_scale, vec3_inplace_subtract, vec3_inplace_subtract_vec,
-        vec3_inplace_zero_small, vec3_projection,
+        vec3_inplace_zero_small, vec3_projection, vec3_reflection,
     },
     mission::{state::MissionState, GameMode},
     player::prince::Prince,
@@ -29,6 +33,18 @@ pub mod ray;
 pub enum SurfaceType {
     Floor,
     Wall,
+}
+
+/// The three possible results returned by `Katamari::try_init_vault`
+pub enum TryInitVaultResult {
+    /// The katamari is not vaulting.
+    NoVault,
+
+    /// The katamari just started a new vault.
+    InitVault,
+
+    /// The katamari is vontinuing a vault from a previous tick.
+    OldVault,
 }
 
 impl Katamari {
@@ -160,7 +176,7 @@ impl Katamari {
                 Iterator::zip(shell_initial_pts.iter(), shell_final_pts.iter()).enumerate()
             {
                 // TODO: replace this when shell points are working
-                continue;
+                break;
 
                 // check collisions along each shell ray
                 self.raycast_state.load_ray(point0, point1);
@@ -172,7 +188,8 @@ impl Katamari {
 
             // check collision rays for surface contacts
             let center = self.center;
-            for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
+            let rays = &self.collision_rays.clone();
+            for (ray_idx, ray) in rays.iter().enumerate() {
                 self.raycast_state.load_ray(&center, &ray.endpoint);
                 let found_hit = self
                     .raycast_state
@@ -185,9 +202,6 @@ impl Katamari {
                     }
                     self.record_surface_contact(ray_idx as i32, None);
                 }
-
-                // TODO: break to only cast the bottom ray
-                break;
             }
         }
     }
@@ -332,6 +346,7 @@ impl Katamari {
         }
 
         if !found_old {
+            temp_debug_log!("new surface contact: type={surface_type:?}, ray_idx={ray_idx}");
             self.inc_num_surface_contacts(surface_type);
         }
     }
@@ -541,7 +556,7 @@ impl Katamari {
                     &self.contact_wall_normal_unit,
                     &self.contact_floor_normal_unit,
                 );
-                // TODO: technically this needs to be an `acos` of doubles
+                // TODO_LOW: technically this needs to be an `acos` of doubles
                 let angle = acos_f32(wall_dot_floor);
 
                 // stuck if the wall-to-floor angle is over the threshold parameter and the katamari moved.
@@ -703,8 +718,8 @@ impl Katamari {
                     &self.contact_floor_normal_unit,
                 );
 
-                match self.try_init_vault_speed() {
-                    0 => return self.set_bottom_ray_contact(),
+                match self.try_init_vault() {
+                    TryInitVaultResult::NoVault => return self.set_bottom_ray_contact(),
                     // TODO: `kat_update_vault_and_climb:144-272
                     _ => (),
                 }
@@ -744,8 +759,83 @@ impl Katamari {
         }
     }
 
-    fn try_init_vault_speed(&mut self) -> i32 {
-        return 0;
+    /// Check the current primary floor contact ray to see if a vault on that ray should be
+    /// initialized.
+    /// offset: 0x153c0
+    fn try_init_vault(&mut self) -> TryInitVaultResult {
+        // early returns when a vault isn't starting
+        if self.fc_ray_idx == Some(0) || self.fc_ray_idx.is_none() {
+            return TryInitVaultResult::NoVault;
+        }
+        if self.fc_ray_idx == self.vault_ray_idx {
+            return TryInitVaultResult::OldVault;
+        }
+
+        // early return when the collision ray isn't strictly longer than the katamari radius
+        let vault_ray_len_radii = self.fc_ray_len / self.radius_cm;
+        if vault_ray_len_radii <= 1.0 {
+            return TryInitVaultResult::NoVault;
+        }
+
+        // compute features of the vault ray length
+        self.vault_ray_idx = self.fc_ray_idx;
+        self.vault_ray_len_radii = vault_ray_len_radii;
+        self.vault_ray_max_len_ratio =
+            min!(vault_ray_len_radii / self.params.max_ray_len_radii, 1.0);
+
+        // compute unit rejection of katamari velocity onto floor normal
+        let mut vel_proj_floor = [0.0; 3];
+        let mut vel_rej_floor = [0.0; 3];
+        vec3_projection(
+            &mut vel_proj_floor,
+            &mut vel_rej_floor,
+            &self.velocity.velocity_unit,
+            &self.contact_floor_normal_unit,
+        );
+        vec3_inplace_normalize(&mut vel_rej_floor);
+
+        // compute the unit `fc_ray`
+        let mut fc_ray_unit = self.fc_ray.unwrap();
+        vec3_inplace_normalize(&mut fc_ray_unit);
+        vec3_inplace_zero_small(&mut fc_ray_unit, 1e-05);
+
+        let mut ray_proj_floor = [0.0; 3];
+        let mut ray_rej_floor = [0.0; 3];
+        vec3_projection(
+            &mut ray_proj_floor,
+            &mut ray_rej_floor,
+            &fc_ray_unit,
+            &self.contact_floor_normal_unit,
+        );
+        vec3_inplace_zero_small(&mut ray_rej_floor, 1e-05);
+
+        // transform the angle between the rejections:
+        //   [0, PI/2] -> [1, 0]
+        //   [PI/2, PI] -> 0
+        let rej_similarity = vec3::dot(&vel_rej_floor, &ray_rej_floor);
+        let rej_angle = acos_f32(rej_similarity);
+        self.vault_rej_angle_t = inv_lerp_clamp!(rej_angle, 0.0, FRAC_PI_2);
+
+        // (??) set the initial vault speed
+        if FRAC_PI_90 < rej_similarity {
+            let speed_t =
+                inv_lerp_clamp!(self.speed, self.max_forwards_speed, self.max_boost_speed);
+            let ray_len_t = inv_lerp_clamp!(self.fc_ray_len, self.radius_cm, self.max_ray_len);
+            let ray_len_k = lerp!(ray_len_t, 1.0, self.params.vault_tuning_0x7b208);
+            let speed_k = lerp!(speed_t, ray_len_k, 1.0);
+
+            // TODO: if this is buggy, this part is probably why
+            let mut vel_reflect_floor = [0.0; 3];
+            vec3_reflection(&mut vel_reflect_floor, &ray_rej_floor, &vel_rej_floor);
+            vec3_inplace_scale(&mut vel_reflect_floor, -1.0);
+
+            let mut vel_accel = [0.0; 3];
+            vec3::lerp(&mut vel_accel, &vel_rej_floor, &vel_reflect_floor, speed_k);
+
+            vec3::scale(&mut self.velocity.vel_accel, &vel_accel, self.speed);
+        }
+
+        return TryInitVaultResult::InitVault;
     }
 
     fn end_wallclimb(&mut self) {

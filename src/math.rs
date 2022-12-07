@@ -88,20 +88,24 @@ pub fn vec3_inplace_normalize(vec: &mut Vec3) {
 }
 
 /// Computes the vector projection and rejection of u onto v.
-pub fn vec3_projection(mut u_proj_v: &mut Vec3, mut u_rej_v: &mut Vec3, u: &Vec3, v: &Vec3) {
-    vec3::scale(&mut u_proj_v, &v, vec3::dot(u, v));
-    vec3::subtract(&mut u_rej_v, u, u_proj_v);
+pub fn vec3_projection(u_proj_v: &mut Vec3, u_rej_v: &mut Vec3, u: &Vec3, v: &Vec3) {
+    vec3::scale(u_proj_v, &v, vec3::dot(u, v));
+    vec3::subtract(u_rej_v, u, u_proj_v);
+}
+
+/// Computes the refection of `u` across `v`
+/// (see https://math.stackexchange.com/questions/13261/how-to-get-a-reflection-vector)
+pub fn vec3_reflection(u_reflect_v: &mut Vec3, u: &Vec3, v: &Vec3) {
+    let dot = vec3::dot(u, v);
+    vec3::scale_and_add(u_reflect_v, u, v, -2.0 * dot);
 }
 
 /// Writes the yaw rotation matrix of `mat` to `out`.
-pub fn mat4_compute_yaw_rot(mut out: &mut Mat4, mat: &Mat4) {
+pub fn mat4_compute_yaw_rot(out: &mut Mat4, mat: &Mat4) {
     let mut left_unit = vec3::create();
     let mut mat_rot = mat.clone();
     set_translation!(mat_rot, [0.0, 0.0, 0.0]);
     vec3::transform_mat4(&mut left_unit, &[1.0, 0.0, 0.0], &mat_rot);
-
-    println!("mat_rot: {mat_rot:#?}");
-    println!("left_unit: {left_unit:#?}");
 
     if left_unit[0] == 0.0 && left_unit[2] == 0.0 {
         // if the left vector is somehow the y+ or y- axis, just set it to x+, apparently
@@ -112,7 +116,7 @@ pub fn mat4_compute_yaw_rot(mut out: &mut Mat4, mat: &Mat4) {
     }
 
     // using the left vector, compute the yaw rotation component of the lookat matrix.
-    mat4::identity(&mut out);
+    mat4::identity(out);
     out[0] = left_unit[0];
     out[2] = left_unit[2];
     out[8] = -left_unit[2];
@@ -189,6 +193,7 @@ pub fn change_bounded_angle(angle: &mut f32, delta: f32) {
     *angle = normalize_bounded_angle(*angle + delta);
 }
 
+/// Maps [-1.0, 1.0] to [PI, 0] using `acos`
 #[inline]
 pub fn acos_f32(value: f32) -> f32 {
     match value {

@@ -140,7 +140,7 @@ impl Katamari {
             // from the katamari radius (when boosting) to the rays' true lengths (when moving slowly)
             let ray_rescale_t = inv_lerp_clamp!(speed, max_boost_spd, max_fwd_spd);
 
-            self.max_ray_len = self.radius_cm * self.params.max_ray_len_ratio_to_radius;
+            self.max_ray_len = self.radius_cm * self.params.max_ray_len_radii;
 
             // keep a running sum of the total ray length as we iterate over all rays, which
             // will be used to find the average length of mesh rays.

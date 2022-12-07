@@ -579,6 +579,11 @@ pub struct Katamari {
     /// offset: 0x3984
     vault_floor_normal_unit: Vec3,
 
+    /// The ratio of the vault ray length to the katamari's radius (at the time that
+    /// the vault started).
+    /// offset: 0x3994
+    vault_ray_len_radii: f32,
+
     /// (??) The index of the collision ray being used to vault, if one exists.
     /// offset: 0x3998
     vault_ray_idx: Option<u16>,
@@ -587,8 +592,13 @@ pub struct Katamari {
     /// offset: 0x399c
     fc_ray_idx: Option<u16>,
 
+    /// (??)
+    /// offset: 0x39a0
+    vault_rej_angle_t: f32,
+
     /// (??) The ratio of the current vaulted ray's length to the maximum vaulted ray length
     /// (the maximum such length is 2.5 times the katamari's radius)
+    /// offset: 0x39a4
     vault_ray_max_len_ratio: f32,
 
     /// (??) The maximum allowed length of any collision ray.
@@ -1009,11 +1019,11 @@ impl Katamari {
         self.dist_to_cam = vec3::len(&kat_to_cam);
         self.update_cam_relative_dir(camera);
 
-        // TODO: `kat_update:390-415` (self.update_dust_cloud_vfx())
-        // TODO: `kat_update:416-447` (self.update_prop_combo())
+        // TODO_LOW: `kat_update:390-415` (self.update_dust_cloud_vfx())
+        // TODO_LOW: `kat_update:416-447` (self.update_prop_combo())
 
         if !camera.preclear.get_enabled() {
-            // TODO: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
+            // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
     }
 
@@ -1042,7 +1052,7 @@ impl Katamari {
             self.vol_m3 = f32::from_bits(0x4df9abdf);
         }
 
-        // TODO: `kat_cache_sizes:26-28` (something about `GameShow` mission)
+        // TODO_LOW: `kat_cache_sizes:26-28` (something about `GameShow` mission)
 
         self.diam_m = self.diam_cm / 100.0;
         self.display_radius_cm = self.radius_cm * self.params.display_radius_ratio;
@@ -1071,6 +1081,6 @@ impl Katamari {
         mat4::copy(&mut self.transform, &self.rotation_mat);
         set_translation!(self.transform, self.center);
 
-        // TODO: `kat_apply_pitch_when_spinning()`
+        // TODO_LOW: `kat_apply_pitch_when_spinning()` (this seems to be unused)
     }
 }
