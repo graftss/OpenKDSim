@@ -19,6 +19,7 @@ use crate::{
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     delegates::Delegates,
+    global::GlobalState,
     macros::{min, set_translation, temp_debug_log, vec3_from},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
@@ -116,6 +117,10 @@ pub struct Katamari {
     /// vector was a global for some reason.
     /// offset: 0xd54be0
     last_rot_vel_unit: Vec3,
+
+    /// The number of props lost during a bonk. The value is updated
+    /// offset: 0xd34c4c
+    props_lost_from_bonks: u32,
 
     // END new fields
     /// A reference to the vector of katamari meshes.
@@ -246,7 +251,7 @@ pub struct Katamari {
     /// "Bounciness" or elasticity multiplier, which is a linear function of
     /// the katamari's diameter. The linear can be different depending on the stage.
     /// offset: 0x19c
-    elasticity: f32,
+    y_elasticity: f32,
 
     /// The threshold for the unit normal y coordinate of surfaces that distinguishes
     /// floors and walls: higher is a floor, lower is a wall.
@@ -404,7 +409,7 @@ pub struct Katamari {
 
     /// The katamari's radius when it started climbing.
     /// offset: 0x768
-    wallclimb_init_rad: f32,
+    wallclimb_init_radius: f32,
 
     /// The distance moved upward each tick during a wall climb.
     /// offset: 0x76c
@@ -957,7 +962,13 @@ impl Katamari {
 impl Katamari {
     /// Main katamari update function.
     /// offset: 0x1db50
-    pub fn update(&mut self, prince: &mut Prince, camera: &Camera, mission_state: &MissionState) {
+    pub fn update(
+        &mut self,
+        prince: &mut Prince,
+        camera: &Camera,
+        global: &GlobalState,
+        mission_state: &MissionState,
+    ) {
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -983,7 +994,7 @@ impl Katamari {
 
         self.update_incline_accel_and_gravity(prince, mission_state);
 
-        self.elasticity = stage_config.get_kat_elasticity(self.diam_cm);
+        self.y_elasticity = stage_config.get_kat_elasticity(self.diam_cm);
 
         if !oujistate.wheel_spin && !oujistate.dash_start {
             // if the katamari is not spinning:
@@ -1026,7 +1037,7 @@ impl Katamari {
         // TODO: self.attract_props_to_center();
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
-        self.update_collision(prince, &mission_state);
+        self.update_collision(prince, camera, global, &mission_state);
 
         // compute distance to camera
         let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);

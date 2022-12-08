@@ -51,11 +51,11 @@ enum BrakeState {
 pub struct KatVelocity {
     /// Current velocity
     /// offset: 0x0
-    pub velocity: Vec3,
+    pub vel: Vec3,
 
     /// Current unit velocity
     /// offset: 0x10
-    pub velocity_unit: Vec3,
+    pub vel_unit: Vec3,
 
     /// (??)
     /// offset: 0x20
@@ -105,7 +105,7 @@ pub struct KatVelocity {
 impl core::fmt::Debug for KatVelocity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("KatVelocity")
-            .field("velocity", &self.velocity)
+            .field("velocity", &self.vel)
             .field("vel_rej_floor", &self.vel_rej_floor)
             .field("vel_proj_floor", &self.vel_proj_floor)
             .field("last_vel_accel", &self.last_vel_accel)
@@ -122,8 +122,8 @@ impl core::fmt::Debug for KatVelocity {
 impl KatVelocity {
     /// Reset all velocities and accelerations to 0
     pub fn reset(&mut self) {
-        vec3::zero(&mut self.velocity);
-        vec3::zero(&mut self.velocity_unit);
+        vec3::zero(&mut self.vel);
+        vec3::zero(&mut self.vel_unit);
         vec3::zero(&mut self.vel_rej_floor);
         vec3::zero(&mut self.vel_proj_floor);
         vec3::zero(&mut self.last_vel_accel);
@@ -188,7 +188,7 @@ impl Katamari {
                         // compute some kind of lateral unit velocity and the lateral speed
                         // in its direction
                         let mut vel_xz_unit = match self.physics_flags.no_input_push {
-                            true => self.velocity.velocity,
+                            true => self.velocity.vel,
                             false => self.velocity.push_vel_on_floor_unit,
                         };
                         set_y!(vel_xz_unit, 0.0);
@@ -607,16 +607,16 @@ impl Katamari {
                 vec3_inplace_scale(&mut next_velocity, capped_next_speed);
             }
 
-            self.velocity.velocity = next_velocity;
+            self.velocity.vel = next_velocity;
         }
 
         // if the katamari just bonked, set velocity equal to the initial bonk velocity
         if self.physics_flags.bonked {
-            self.velocity.velocity = self.init_bonk_velocity;
+            self.velocity.vel = self.init_bonk_velocity;
             self.physics_flags.bonked = false;
         }
 
-        vec3::normalize(&mut self.velocity.velocity_unit, &self.velocity.velocity);
+        vec3::normalize(&mut self.velocity.vel_unit, &self.velocity.vel);
     }
 
     fn compute_brake_state(&mut self, prince: &mut Prince, camera: &Camera) -> BrakeState {
@@ -763,7 +763,7 @@ impl Katamari {
         if !self.physics_flags.airborne {
             // if not airborne:
             // next velocity is `velocity + accel_incline + bonus_vel`
-            let mut next_vel = vec3_from!(+, self.velocity.velocity, self.velocity.accel_incline);
+            let mut next_vel = vec3_from!(+, self.velocity.vel, self.velocity.accel_incline);
             vec3_inplace_add_vec(&mut next_vel, &self.bonus_vel);
             let next_speed = vec3::length(&next_vel);
 
@@ -837,7 +837,7 @@ impl Katamari {
         vec3::zero(&mut self.bonus_vel);
 
         // start with `velocity + accel_incline`
-        let mut vel_accel = vec3_from!(+, self.velocity.velocity, self.velocity.accel_incline);
+        let mut vel_accel = vec3_from!(+, self.velocity.vel, self.velocity.accel_incline);
 
         let speed0 = vec3::length(&vel_accel);
         if speed0 > 0.0 && !self.physics_flags.climbing_wall {

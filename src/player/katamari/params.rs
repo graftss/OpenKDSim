@@ -236,6 +236,16 @@ pub struct KatamariParams {
     /// default: 1.047198 (pi/3)
     /// offset: 0x71614
     pub max_wallclimb_angle: f32,
+
+    /// (??)
+    /// default: 9
+    /// offset: 0x7b260
+    pub min_impact_falling_frames: u32,
+
+    /// (??)
+    /// default: 70
+    /// offset: 0x7b264
+    pub max_impact_falling_frames: u32,
 }
 
 impl Default for KatamariParams {
@@ -287,6 +297,8 @@ impl Default for KatamariParams {
             vault_tuning_0x7b208: f32::from_bits(0x3e99999a),                // 0.3
             vault_ray_stretch: f32::from_bits(0x3f866666),                   // 1.05
             max_wallclimb_angle: f32::from_bits(0x3f860a92),                 // pi/3
+            min_impact_falling_frames: 9,
+            max_impact_falling_frames: 70,
         }
     }
 }

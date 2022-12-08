@@ -103,7 +103,7 @@ pub struct KatPhysicsFlags {
 
     /// (??)
     /// offset: 0x14
-    pub moved_too_much_0x14: bool,
+    pub moved_more_than_rad_0x14: bool,
 
     /// (??)
     /// offset: 0x15
@@ -169,6 +169,11 @@ impl KatPhysicsFlags {
         self.detaching_props = false;
         self.contacts_wall = false;
         self.contacts_floor = false;
+    }
+
+    pub fn grounded_by_mesh_or_prop(&self) -> bool {
+        self.grounded_ray_type.is_some()
+            && self.grounded_ray_type != Some(KatCollisionRayType::Bottom)
     }
 }
 

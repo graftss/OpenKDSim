@@ -93,7 +93,7 @@ pub fn vec3_projection(u_proj_v: &mut Vec3, u_rej_v: &mut Vec3, u: &Vec3, v: &Ve
     vec3::subtract(u_rej_v, u, u_proj_v);
 }
 
-/// Computes the refection of `u` across `v`
+/// Computes the refection of `u` across `v`, which is `u - 2(u.v)v
 /// (see https://math.stackexchange.com/questions/13261/how-to-get-a-reflection-vector)
 pub fn vec3_reflection(u_reflect_v: &mut Vec3, u: &Vec3, v: &Vec3) {
     let dot = vec3::dot(u, v);

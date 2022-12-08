@@ -942,7 +942,7 @@ impl Prince {
 
     /// Exit spin/boost state and reset gachas.
     /// offset: 0x56600
-    fn end_spin_and_boost(&mut self, katamari: &mut Katamari) {
+    pub fn end_spin_and_boost(&mut self, katamari: &mut Katamari) {
         self.oujistate.end_boost();
         self.gacha_count = 0;
         katamari.physics_flags.wheel_spin = false;

@@ -147,7 +147,7 @@ macro_rules! vec3_from {
     }
 }
 
-/// Creates a new `Vec3` obtained
+/// Creates a new `Vec3` obtained by normalizing just the x and z components of `vec`.
 macro_rules! vec3_unit_xz {
     ($vec: expr) => {{
         let mut unit_xz = [$vec[0], 0.0, $vec[2]];
