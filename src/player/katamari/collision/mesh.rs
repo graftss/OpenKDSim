@@ -29,12 +29,9 @@ impl KatMesh {
             let point_w = read_f32!(point_bytes, 12);
 
             // make all the points negative to translate from simulation to unity coordinates
-            vec3_inplace_scale(&mut point, -1.0);
-
-            println!("point={:?}", point);
+            // vec3_inplace_scale(&mut point, -1.0);
 
             if point_w == -1.0 {
-                println!("found mesh with {} points", mesh_points.len());
                 result.push(KatMesh {
                     points: mesh_points,
                 });

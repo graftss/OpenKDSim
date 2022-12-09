@@ -1,8 +1,16 @@
-/// Log a formatted string. Used temporarily while debugging.
+/// Log a formatted string to the main debug log file. Used temporarily while debugging.
 #[allow(unused_macros)]
 macro_rules! temp_debug_log {
     ($($y: expr),+) => {
         crate::util::debug_log(&format!($($y),+));
+    }
+}
+
+/// Log a formatted string to an arbitrary file. Used temporarily while debugging.
+#[allow(unused_macros)]
+macro_rules! temp_debug_write {
+    ($path: expr, $($y: expr),+) => {
+        crate::util::debug_write($path, &format!($($y),+));
     }
 }
 
@@ -192,6 +200,7 @@ pub(crate) use {
     set_translation,
     set_y,
     temp_debug_log,
+    temp_debug_write,
     vec3_from,
     vec3_unit_xz,
 };

@@ -8,7 +8,7 @@ const RNG2_VALUES: &'static [u8; 256] = include_bytes!("bin/rng2_values.bin");
 
 #[derive(Debug)]
 pub struct RngState {
-    /// TODO: RNG1 value. Initial value is 0x10e1 (4321 in decimal).
+    /// RNG1 value. Initial value is 0x10e1 (4321 in decimal).
     /// offset: 0x7bc44
     pub rng1: u32,
 
@@ -16,7 +16,7 @@ pub struct RngState {
     /// offset: 0x153140
     rng1_calls: u32,
 
-    /// TODO: RNG2 value. Initial value is 0.
+    /// RNG2 value. Initial value is 0.
     /// offset: 0x10eb2c
     pub rng2: u32,
 }

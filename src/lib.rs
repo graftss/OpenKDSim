@@ -895,6 +895,14 @@ pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission:
     });
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackDebugDrawLine(cb: DebugDrawLineDelegate) {
+    temp_debug_log!("calling tcddl");
+    STATE.with(|state| {
+        state.borrow_mut().delegates.borrow_mut().debug_draw_line = Some(cb);
+    });
+}
+
 /// This seems to be what simulates a single object in the collection UI and the names UI.
 /// Not a priority.
 #[no_mangle]

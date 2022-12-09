@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, temp_debug_log, vec3_from},
+    macros::{inv_lerp_clamp, lerp, temp_debug_log, vec3_from, temp_debug_write},
     math::{vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::prop::WeakPropRef,
@@ -197,6 +197,28 @@ impl Katamari {
             }
             self.set_bottom_ray_contact();
         }
+
+        // after updating the collision rays, draw them if desired
+        if self.debug_config.draw_collision_rays {
+            if let Some(delegates) = &self.delegates {
+                if let Some(draw) = delegates.borrow().debug_draw_line {
+                    for ray in self.collision_rays.iter() {
+                        let p0 = vec3_from!(+, ray.kat_to_endpoint, ray.endpoint);
+                        draw(
+                            p0[0],
+                            p0[1],
+                            p0[2],
+                            ray.endpoint[0],
+                            ray.endpoint[1],
+                            ray.endpoint[2],
+                            1.0,
+                            0.0,
+                            0.0,
+                        );
+                    }
+                }
+            }
+        }
     }
 
     pub fn set_bottom_ray_contact(&mut self) {
@@ -223,8 +245,8 @@ impl Katamari {
                 // if the katamari is grounded, the bottom ray is in the direction of the
                 // contact floor surface's normal
                 vec3::copy(&mut tmp, &self.contact_floor_normal_unit);
-                vec3_inplace_scale(&mut tmp, radius);
-                vec3::subtract(&mut bottom_ray.endpoint, &self.center, &tmp);
+                vec3_inplace_scale(&mut tmp, -radius);
+                vec3::add(&mut bottom_ray.endpoint, &self.center, &tmp);
             } else {
                 // otherwise if the katamari is airborne, the bottom ray is straight down
                 let down: Vec3 = [0.0, -radius, 0.0];
@@ -232,7 +254,7 @@ impl Katamari {
             }
         } else {
             // else if the katamari is climbing a wall:
-            // TODO: `kat_orient_mesh_rays:125-147`
+            // TODO_CLIMB: `kat_orient_mesh_rays:125-147`
         }
 
         bottom_ray.ray_len = radius;
@@ -250,12 +272,14 @@ impl Katamari {
         self.num_mesh_rays = 0;
 
         // orient each mesh point using the katamari's rotation matrix
-        for (i, mesh_point) in mesh_points.points.iter().enumerate() {
-            let mesh_ray = &mut self.collision_rays[i + 1];
+        for (mesh_ray_idx, mesh_point) in mesh_points.points.iter().enumerate() {
+            let mesh_ray = &mut self.collision_rays[mesh_ray_idx + 1];
             vec3::transform_mat4(&mut mesh_ray.ray_local, mesh_point, &self.rotation_mat);
             vec3::normalize(&mut mesh_ray.ray_local_unit, &mesh_ray.ray_local);
             mesh_ray.ray_len = radius;
             self.num_mesh_rays += 1;
+
+            // temp_debug_write!("rays-open.log", "{}\t{:?}\t{:?}\t{:?}", mesh_ray_idx+1, mesh_ray.endpoint, mesh_ray.ray_local, mesh_ray.kat_to_endpoint);
         }
 
         self.first_prop_ray_index = self.num_mesh_rays + 1;

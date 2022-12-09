@@ -1,4 +1,4 @@
-mod collision;
+pub mod collision;
 mod flags;
 mod params;
 pub mod scaled_params;
@@ -18,9 +18,9 @@ use crate::{
         FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
-    delegates::Delegates,
+    delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{min, set_translation, temp_debug_log, vec3_from},
+    macros::{min, set_translation, temp_debug_log, vec3_from, temp_debug_write},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
     props::prop::PropRef,
@@ -66,9 +66,24 @@ pub enum CamRelativeDir {
     Right,
 }
 
+#[derive(Debug)]
+pub struct DebugConfig {
+    pub draw_collision_rays: bool
+}
+
+impl Default for DebugConfig {
+    fn default() -> Self {
+        Self { draw_collision_rays: true }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Katamari {
     // BEGIN new fields (that were not part of the original simulation's `Katamari` struct.)
+    delegates: Option<DelegatesRef>,
+
+    debug_config: DebugConfig,
+
     /// Parameters that affect katamari movement. In the original simulation these were
     /// mostly static constants.
     params: KatamariParams,
@@ -309,7 +324,7 @@ pub struct Katamari {
 
     /// (??) The axis about which the katamari will rotate as it's pushed
     /// offset: 0x440
-    spin_rotation_axis: Vec3,
+    rotation_axis: Vec3,
 
     /// (??)
     /// offset: 0x450
@@ -873,6 +888,7 @@ impl Katamari {
         // extra stuff not in the original simulation
         self.max_prop_rays = self.params.max_prop_collision_rays;
         self.raycast_state.set_delegates(delegates);
+        self.delegates = Some(delegates.clone());
         // end extra stuff
 
         self.player = player;
@@ -905,7 +921,7 @@ impl Katamari {
         let rad_m = self.radius_cm / 100.0;
         self.vol_m3 = rad_m * rad_m * rad_m * FRAC_4PI_3;
 
-        vec3::copy(&mut self.spin_rotation_axis, &VEC3_X_NEG);
+        vec3::copy(&mut self.rotation_axis, &VEC3_X_NEG);
         mat4::identity(&mut self.transform);
         mat4::identity(&mut self.turntable_rotation_mat);
         mat4::identity(&mut self.rotation_mat);
@@ -925,13 +941,13 @@ impl Katamari {
 
         self.set_immobile(mission_state);
         self.update_scaled_params(&mission_state.mission_config);
-        // TODO: `kat_init:254` (copy vector 0x71a50 to 0xb3240)
+        // TODO_LOW: `kat_init:254` (copy vector 0x71a50 to 0xb3240)
 
         self.prop_combo_count = 0;
         self.physics_flags.wheel_spin = false;
         self.last_collision_game_time_ms = 0;
 
-        // TODO: `kat_init:270-275` (prop combo initialization)
+        // TODO_PROPS: `kat_init:270-275` (prop combo initialization)
 
         self.is_climbing_0x898 = 0;
         if self.physics_flags.climbing_wall {
@@ -969,6 +985,11 @@ impl Katamari {
         global: &GlobalState,
         mission_state: &MissionState,
     ) {
+        temp_debug_write!("opensim.log", "{}\t{}\t{}\t{}\t{}\t{}\t{}", global.ticks, 
+            self.rotation_axis[0], self.rotation_axis[1], self.rotation_axis[2],
+            self.camera_side_vector[0], self.camera_side_vector[1], self.camera_side_vector[2]
+        );
+
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -1018,12 +1039,15 @@ impl Katamari {
         );
 
         temp_debug_log!("tick");
+        temp_debug_log!(
+            "   init center={:?}, radius={:?}",
+            self.center[1],
+            self.radius_cm
+        );
 
         self.update_velocity(prince, camera, mission_state);
         self.update_friction_accel(prince, mission_state);
         self.apply_acceleration(mission_state);
-
-        temp_debug_log!("   stuck:{}", self.physics_flags.stuck_between_walls);
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;
@@ -1033,11 +1057,21 @@ impl Katamari {
             &cam_transform.lookat_yaw_rot_inv,
         );
 
+        temp_debug_log!(
+            "   center after accel: {:?}",
+            self.center[1]
+        );
+
         self.update_collision_rays();
-        // TODO: self.attract_props_to_center();
+        // TODO_PROPS: self.attract_props_to_center();
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state);
+
+        temp_debug_log!(
+            "   center after collision: {:?}",
+            self.center[1]
+        );
 
         // compute distance to camera
         let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);
@@ -1050,6 +1084,8 @@ impl Katamari {
         if !camera.preclear.get_enabled() {
             // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
+
+        temp_debug_log!("   contact floor clip:{:?}, clip_translation:{:?}", self.contact_floor_clip, self.clip_translation);
     }
 
     /// Update the katamari's scaled params by interpolating the mission's param control points.
@@ -1090,11 +1126,11 @@ impl Katamari {
 
         // apply the spin rotation to the katamari's rotation matrix;
         let mut spin_rotation_mat = mat4::create();
-        if vec3::length(&self.spin_rotation_axis) > 0.0 {
+        if vec3::length(&self.rotation_axis) > 0.0 {
             mat4::from_rotation(
                 &mut spin_rotation_mat,
                 self.spin_rotation_speed,
-                &self.spin_rotation_axis,
+                &self.rotation_axis,
             );
         }
 

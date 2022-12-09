@@ -27,7 +27,6 @@ pub mod hit;
 pub mod mesh;
 pub mod ray;
 
-// TODO: probably a better place for this
 /// All surface triangles can be categorized as either a floor or a wall. They
 /// are distinguished via the y component of their unit normal vectors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,9 +93,9 @@ impl Katamari {
 
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
-        // TODO: `kat_initial_process_props()`
+        // TODO_PROPS: `kat_initial_process_props()`
         if mission_state.gamemode == GameMode::Ending {
-            // TODO: `kat_update_collision:105-132 (ending-specific reduced collision)
+            // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
             // TODO: `kat_update_water_contact()`
             self.update_surface_contacts();
@@ -203,6 +202,7 @@ impl Katamari {
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
                 if found_hit {
+                    temp_debug_log!("   -- found hit: ray {ray_idx}");
                     // TODO: there's a flag being ignored here
                     if true && !self.last_physics_flags.airborne {
                         self.physics_flags.airborne = false;
@@ -225,12 +225,11 @@ impl Katamari {
             );
         });
 
-        let mut normal_unit = hit.normal_unit.clone();
-        vec3_inplace_zero_small(&mut normal_unit, 1e-05);
+        let mut impact_unit = hit.normal_unit;
+        vec3_inplace_zero_small(&mut impact_unit, 1e-05);
 
         // use the y component of the hit surface's unit normal to decide if it's a wall or floor
-        temp_debug_log!("  normal_unit={:?}", normal_unit);
-        let surface_type = if self.params.surface_normal_y_threshold < normal_unit[1] {
+        let surface_type = if self.params.surface_normal_y_threshold < impact_unit[1] {
             if ray_idx == -1 || ray_idx == -5 || ray_idx == -6 {
                 return None;
             }
@@ -243,16 +242,28 @@ impl Katamari {
             SurfaceType::Wall
         };
 
-        let dot = vec3::dot(&normal_unit, &self.raycast_state.ray_unit);
+        let dot = vec3::dot(&impact_unit, &self.raycast_state.ray_unit);
         let ray_clip_len =
             (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant) * hit.impact_dist;
 
-        let mut proj = vec3::clone(&normal_unit);
-        vec3_inplace_scale(&mut proj, dot * ray_clip_len);
+        let mut clip_normal = vec3::clone(&impact_unit);
+        vec3_inplace_scale(&mut clip_normal, dot * ray_clip_len);
 
-        // TODO: `kat_record_surface_contact:84-104` (edge case)
+        // temp_debug_log!("   impact_point:{:?}, dist_ratio:{}", hit.impact_point, hit.impact_dist_ratio);
+        // temp_debug_log!("   ray={:?}, p0={:?}, p1={:?}", self.raycast_state.ray, self.raycast_state.point0, self.raycast_state.point1);
+        // temp_debug_log!("   dot:{dot}, ray_clip_len={ray_clip_len}, clip_normal: {clip_normal:?}");
 
-        self.add_surface_contact(surface_type, &normal_unit, &proj, ray_idx, prop);
+        if impact_unit[1] < -0.1 {
+            let angle = acos_f32(impact_unit[1]);
+            if angle < 1.047198 {
+                self.physics_flags.contacts_down_slanted_ceiling = true;
+                if self.physics_flags.contacts_prop_0xa {
+                    set_y!(clip_normal, 0.0);
+                }
+            }
+        }
+
+        self.add_surface_contact(surface_type, &impact_unit, &clip_normal, ray_idx, prop);
 
         Some(surface_type)
     }
@@ -354,7 +365,7 @@ impl Katamari {
         }
 
         if !found_old {
-            temp_debug_log!("new surface contact: type={surface_type:?}, ray_idx={ray_idx}");
+            // temp_debug_log!("   new surface contact: type={surface_type:?}, ray_idx={ray_idx}");
             self.inc_num_surface_contacts(surface_type);
         }
     }
@@ -656,7 +667,7 @@ impl Katamari {
         }
 
         // TODO: `kat_apply_turntable_contact()`
-        self.update_clip_translation();
+        self.apply_clip_translation();
 
         if self.physics_flags.in_water
             && !self.last_physics_flags.in_water
@@ -1360,11 +1371,8 @@ impl Katamari {
         self.velocity.vel_grav[1] + self.velocity.vel_accel[1] < 0.0
     }
 
-    /// (??) I think this is trying to clip the katamari away from walls when the game
-    /// thinks that it's stuck.
-    /// TODO: there are some SHUFPS instructions here that might not be decompiled correctly.
     /// offset: 0x183f0
-    fn update_clip_translation(&mut self) {
+    fn apply_clip_translation(&mut self) {
         let moving_into_wall = if self.physics_flags.contacts_wall {
             if self.physics_flags.immobile {
                 // if contacting a wall and immobile, i guess we're moving into a wall
@@ -1377,9 +1385,10 @@ impl Katamari {
                 // compute unit lateral wall normal
                 let wall_normal_xz_unit = vec3_unit_xz!(self.contact_wall_normal_unit);
 
-                // the katamari is moving towards the wall if its velocity dot the wall normal is
-                // below the similarity threshold (since the wall normal should be pointing away
-                // from katamari movement, any negative similarity should work)
+                // the katamari is moving towards the wall if:
+                // its velocity dot the wall normal is below the similarity threshold 
+                // (since the wall normal should be pointing away from katamari movement, any 
+                // negative similarity should also work)
                 vec3::dot(&move_xz_unit, &wall_normal_xz_unit)
                     <= self.params.move_into_wall_similarity
             }
@@ -1387,6 +1396,8 @@ impl Katamari {
             // if the katamari doesn't contact a wall, it's not moving into one either.
             false
         };
+
+        vec3::zero(&mut self.clip_translation);
 
         if self.physics_flags.stuck_between_walls && !self.last_physics_flags.stuck_between_walls {
             // if the katamari has just gotten stuck between walls:
@@ -1399,8 +1410,6 @@ impl Katamari {
             self.set_velocity(&push_velocity);
         }
 
-        // TODO: double check these shufps vector operations
-        vec3::zero(&mut self.clip_translation);
         vec3_inplace_add_vec(&mut self.clip_translation, &self.contact_floor_clip);
         if moving_into_wall {
             vec3_inplace_add_vec(&mut self.clip_translation, &self.contact_wall_clip);
@@ -1427,8 +1436,10 @@ impl Katamari {
             // if stuck between walls:
             self.clip_translation[0] += self.center[0] - self.last_center[0];
             self.clip_translation[2] += self.center[2] - self.last_center[2];
-            vec3_inplace_subtract_vec(&mut self.center, &self.clip_translation);
         }
+
+        // apply the clip translation to the katamari center
+        vec3_inplace_subtract_vec(&mut self.center, &self.clip_translation);
 
         // update center, bottom, and top points
         set_translation!(self.transform, self.center);

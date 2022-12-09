@@ -143,6 +143,9 @@ unsafe fn test() {
     // let mut params = mission::config::CamScaledCtrlPt::default()
 
     // println!("max size: {:#?}", s.scaled_params_max_size);
+
+    let mesh = &player::katamari::collision::mesh::KAT_MESHES[1];
+    println!("mesh points:\n {:?}", mesh.points);
 }
 
 fn test_cam_pos(

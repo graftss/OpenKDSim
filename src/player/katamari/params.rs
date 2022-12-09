@@ -31,6 +31,7 @@ pub struct KatamariParams {
     pub min_wallclimb_similarity: f32,
 
     /// (??) something about how the katamari collision rays can clip into surfaces
+    /// default: 0.0005
     /// offset: 0x7153c
     pub clip_len_constant: f32,
 
@@ -42,6 +43,7 @@ pub struct KatamariParams {
 
     /// (??) If two surfaces have normal vectors which dot to above this value, they're not distinguished
     /// by the collision system while the katamari contacts both of them.
+    /// default: 0.99998
     /// offset: 0x7160c
     pub surface_similarity_threshold: f32,
 
@@ -258,8 +260,8 @@ impl Default for KatamariParams {
             prop_use_aabb_collision_vol_ratio: f32::from_bits(0x3f59999a), // 0.85
             min_brake_angle: (f32::from_bits(0x3eab020c) * FRAC_PI_2).cos(),
             min_wallclimb_similarity: (f32::from_bits(0x3ecccccd) * FRAC_PI_2).cos(),
-            clip_len_constant: f32::from_bits(0x3a03126f),
-            surface_similarity_threshold: f32::from_bits(0x3f7ffeb0),
+            clip_len_constant: f32::from_bits(0x3a03126f), // 0.0005
+            surface_similarity_threshold: f32::from_bits(0x3f7ffeb0), // 0.99998
             sloped_floor_normal_y_threshold: f32::from_bits(0x3f7ff972),
             wall_to_floor_angle_stuck_threshold: f32::from_bits(0x40060a92), // 3pi/2
             wall_to_wall_angle_stuck_threshold: f32::from_bits(0x40278d36),  // 5pi/6

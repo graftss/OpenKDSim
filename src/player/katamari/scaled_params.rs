@@ -113,7 +113,12 @@ impl KatScaledParams {
         } else {
             let t = inv_lerp!(diam_cm, min_pt.diam_cm, max_pt.diam_cm);
             lerp_param!(self, min_pt, max_pt, t, base_max_speed);
+
+            // gravity is stored in the param tables as a positive value, while
+            // it needs to be negative
             lerp_param!(self, min_pt, max_pt, t, accel_grav);
+            self.accel_grav *= -1.0;
+
             lerp_param!(self, min_pt, max_pt, t, brake_forwards_force);
             lerp_param!(self, min_pt, max_pt, t, brake_backwards_force);
             lerp_param!(self, min_pt, max_pt, t, brake_sideways_force);

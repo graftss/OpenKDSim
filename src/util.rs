@@ -30,18 +30,26 @@ pub fn vec3_from_le_bytes(out: &mut Vec3, bytes: &[u8], offset: usize) {
     }
 }
 
-pub fn debug_log(str: &str) {
+/// Write the string `str` to the file `path`.
+pub fn debug_write(path: &str, str: &str) {
     use std::io::Write;
 
     let path = Path::new(
-        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log",
+        path
     );
 
     let mut file = OpenOptions::new()
+        .create(true)
         .read(true)
         .append(true)
         .open(path)
         .unwrap();
 
     if let Err(_e) = writeln!(file, "{}", str) {}
+}
+
+const DEBUG_LOG_PATH: &'static str = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log";
+
+pub fn debug_log(str: &str) {
+    debug_write(&DEBUG_LOG_PATH, str);
 }

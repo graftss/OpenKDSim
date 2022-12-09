@@ -300,9 +300,9 @@ impl Katamari {
                     self.end_incline_movement(prince);
                 }
             } else {
-                // if not wallclimbining and airborne:
+                // if not wallclimbing and airborne:
                 // apply gravity acceleration
-                self.velocity.vel_grav[1] -= self.scaled_params.accel_grav;
+                self.velocity.vel_grav[1] += self.scaled_params.accel_grav;
                 self.end_incline_movement(prince);
             }
         } else {
@@ -803,7 +803,8 @@ impl Katamari {
                     }
                 };
 
-                // TODO: ??
+                // apply significantly less friction when the prince is either quick shifting
+                // or pinching
                 if prince.get_flags() & 0x40000 != 0 {
                     t *= 0.1234
                 }
@@ -1021,14 +1022,14 @@ impl Katamari {
             }
 
             // compute spin rotation axis
-            vec3::transform_mat4(&mut self.spin_rotation_axis, &vel_unit, &net_normal_rot);
+            vec3::transform_mat4(&mut self.rotation_axis, &vel_unit, &net_normal_rot);
 
             // set y component to zero and renormalize
-            set_y!(self.spin_rotation_axis, 0.0);
-            let spin_rot_len = vec3::len(&self.spin_rotation_axis);
+            set_y!(self.rotation_axis, 0.0);
+            let spin_rot_len = vec3::len(&self.rotation_axis);
 
             if spin_rot_len < 0.5 {
-                vec3::copy(&mut self.spin_rotation_axis, &self.camera_side_vector);
+                vec3::copy(&mut self.rotation_axis, &self.camera_side_vector);
             }
 
             if self.speed <= 0.0 {
@@ -1038,7 +1039,32 @@ impl Katamari {
             self.spin_rotation_speed = normalize_bounded_angle((vel_len / pivot_circumf) * TAU);
         } else {
             // if katamari is airborne:
-            // TODO: `kat_update_rotation_speed:171-221`
+
+            let mut vel_unit = vel.clone();
+            vec3_inplace_normalize(&mut vel_unit);
+
+            // if falling almost entirely vertically, no rot speed
+            if vel_unit[1] >= ALMOST_1 {
+                return self.spin_rotation_speed = 0.0;
+            }
+
+            let lateral_vel_unit = (vel_unit[0] * vel_unit[0] + vel_unit[2] * vel_unit[2]).sqrt();
+            if lateral_vel_unit <= 0.0 {
+                vec3::copy(&mut self.rotation_axis, &self.camera_side_vector);
+            } else {
+                let mut rotation_mat = mat4::create();
+                mat4::from_rotation(&mut rotation_mat, FRAC_PI_2, &VEC3_Y_POS);
+
+                set_y!(vel_unit, 0.0);
+                vec3::transform_mat4(&mut self.rotation_axis, &vel_unit, &rotation_mat);
+                vec3_inplace_normalize(&mut self.rotation_axis);
+            }
+
+            self.spin_rotation_speed = if vel_len <= 0.0001 {
+                0.0
+            } else {
+                normalize_bounded_angle(vel_len / pivot_circumf * TAU)
+            };
         }
 
         self.spin_rotation_speed = self.spin_rotation_speed.clamp(-PI, PI);

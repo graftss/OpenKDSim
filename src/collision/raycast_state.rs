@@ -130,7 +130,7 @@ impl RaycastState {
     pub fn load_ray(&mut self, point0: &Vec3, point1: &Vec3) {
         self.point0 = point0.clone();
         self.point1 = point1.clone();
-        self.ray = vec3_from!(-, point0, point1);
+        self.ray = vec3_from!(-, point1, point0);
         vec3::normalize(&mut self.ray_unit, &self.ray);
         mat4::look_at(&mut self.ray_lookat, &point0, &self.ray, &VEC3_Y_POS);
 

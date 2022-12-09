@@ -94,7 +94,7 @@ impl GameState {
             .set_cam_eff_1P(cam_eff_1P);
     }
 
-    /// Mimicks the `GetPrice` API function.
+    /// Mimicks the `GetPrince` API function.
     pub fn get_prince(
         &self,
         player_idx: usize,
@@ -122,7 +122,7 @@ impl GameState {
         prince.get_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz, tx, ty, tz);
         *view_mode = prince.get_view_mode() as i32;
 
-        // TODO: update `face_mode`
+        // TODO_LOW: update `face_mode`
 
         let katamari = &player.katamari;
         katamari.get_alarm(alarm_mode, alarm_type);
@@ -195,10 +195,10 @@ impl GameState {
         // read the mission's `MonoData` data from the `mono_data` raw pointer.
         self.mono_data.init(mono_data);
 
-        // TODO: init subobjects
-        // TODO: init comment prop groups
-        // TODO: init random prop groups
-        // TODO: init generated props
+        // TODO_PROPS: init subobjects
+        // TODO_PROPS: init comment prop groups
+        // TODO_PROPS: init random prop groups
+        // TODO_PROPS: init generated props
     }
 
     /// Mimicks the `MonoInitAddProp` API function.
@@ -242,7 +242,7 @@ impl GameState {
 
     /// Mimicks the `MonoInitEnd` API function.
     pub fn mono_init_end(&mut self) {
-        // TODO: init_cache_gemini_twins();
+        // TODO_PROPS: init_cache_gemini_twins();
         self.props.global_paths.init();
         self.global.props_initialized = true;
     }
@@ -261,7 +261,7 @@ impl GameState {
         self.mission_state.stage_area += 1;
 
         if self.mission_state.is_vs_mode {
-            // TODO: vs mode crap
+            // TODO_VS: vs mode crap
         } else {
             self.props.change_next_area(self.mission_state.area)
         }

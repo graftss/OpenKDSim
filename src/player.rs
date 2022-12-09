@@ -39,9 +39,6 @@ impl Player {
         // first initialize the katamari
         let init_pos = &mut mission_state.mission_config.init_kat_pos[player as usize].clone();
 
-        // TEMP
-        init_pos[1] += 50.0;
-
         let init_diam = if override_init_size < 0.0 {
             mission_state.mission_config.init_diam_cm
         } else {
