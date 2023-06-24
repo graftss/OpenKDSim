@@ -980,15 +980,15 @@ impl Katamari {
         vec3_inplace_normalize(&mut self.shell_top_right);
     }
 
-    fn update_rotation_speed(&mut self, vel: &Vec3) {
+    fn update_rotation_speed(&mut self, velocity: &Vec3) {
         if self.physics_flags.braking {
             return self.rotation_speed = 0.0;
         }
 
-        let vel_len = vec3::len(vel);
+        let speed = vec3::len(velocity);
         let pivot_circumf = max!(self.fc_ray_len, 0.1) * TAU;
 
-        if !self.physics_flags.airborne {
+        if !self.physics_flags.airborne { // 0x200ba
             let mut net_normal_unit = [0.0, 0.0, 0.0];
 
             if !self.physics_flags.climbing_wall {
@@ -1011,10 +1011,9 @@ impl Katamari {
             let mut vel_unit = Vec3::default();
             if !self.physics_flags.immobile {
                 // if the katamari is not airborne and moving:
-                vec3::normalize(&mut vel_unit, &vel);
-                self.last_rot_vel_unit = vel_unit;
+                vec3::normalize(&mut vel_unit, &velocity);
             } else {
-                vel_unit = self.last_rot_vel_unit;
+                vel_unit = VEC3_Y_NEG;
             }
 
             if vec3::dot(&vel_unit, &net_normal_unit) >= ALMOST_1 {
@@ -1022,25 +1021,25 @@ impl Katamari {
             }
 
             // compute spin rotation axis
-            vec3::transform_mat4(&mut self.rotation_axis, &vel_unit, &net_normal_rot);
+            vec3::transform_mat4(&mut self.rotation_axis_unit, &vel_unit, &net_normal_rot);
 
             // set y component to zero and renormalize
-            set_y!(self.rotation_axis, 0.0);
-            let spin_rot_len = vec3::len(&self.rotation_axis);
+            set_y!(self.rotation_axis_unit, 0.0);
+            let spin_rot_len = vec3::len(&self.rotation_axis_unit);
 
             if spin_rot_len < 0.5 {
-                vec3::copy(&mut self.rotation_axis, &self.camera_side_vector);
+                vec3::copy(&mut self.rotation_axis_unit, &self.camera_side_vector);
             }
 
             if self.speed <= 0.0 {
                 return self.rotation_speed = 0.0;
             }
 
-            self.rotation_speed = normalize_bounded_angle((vel_len / pivot_circumf) * TAU);
+            self.rotation_speed = normalize_bounded_angle((speed / pivot_circumf) * TAU);
         } else {
             // if katamari is airborne:
 
-            let mut vel_unit = vel.clone();
+            let mut vel_unit = velocity.clone();
             vec3_inplace_normalize(&mut vel_unit);
 
             // if falling almost entirely vertically, no rot speed
@@ -1050,20 +1049,20 @@ impl Katamari {
 
             let lateral_vel_unit = (vel_unit[0] * vel_unit[0] + vel_unit[2] * vel_unit[2]).sqrt();
             if lateral_vel_unit <= 0.0 {
-                vec3::copy(&mut self.rotation_axis, &self.camera_side_vector);
+                vec3::copy(&mut self.rotation_axis_unit, &self.camera_side_vector);
             } else {
                 let mut rotation_mat = mat4::create();
                 mat4::from_rotation(&mut rotation_mat, FRAC_PI_2, &VEC3_Y_POS);
 
                 set_y!(vel_unit, 0.0);
-                vec3::transform_mat4(&mut self.rotation_axis, &vel_unit, &rotation_mat);
-                vec3_inplace_normalize(&mut self.rotation_axis);
+                vec3::transform_mat4(&mut self.rotation_axis_unit, &vel_unit, &rotation_mat);
+                vec3_inplace_normalize(&mut self.rotation_axis_unit);
             }
 
-            self.rotation_speed = if vel_len <= 0.0001 {
+            self.rotation_speed = if speed <= 0.0001 {
                 0.0
             } else {
-                normalize_bounded_angle(vel_len / pivot_circumf * TAU)
+                normalize_bounded_angle(speed / pivot_circumf * TAU)
             };
         }
 

@@ -117,7 +117,9 @@ impl Katamari {
     /// Update the katamari's collision rays
     pub fn update_collision_rays(&mut self) {
         self.last_collision_rays = self.collision_rays.clone();
+        // self.debug_log_clip_data("0x1af26");
         self.orient_mesh_rays();
+        // self.debug_log_clip_data("0x1af2e");
 
         // TODO: `kat_update_rays_with_attached_props()`
 
@@ -259,12 +261,13 @@ impl Katamari {
 
         bottom_ray.ray_len = radius;
         vec3_inplace_zero_small(&mut bottom_ray.endpoint, 0.0001);
+        vec3::subtract(&mut bottom_ray.ray_local, &bottom_ray.endpoint, &self.center);
+        vec3::normalize(&mut bottom_ray.ray_local_unit, &bottom_ray.ray_local);
         vec3::subtract(
             &mut bottom_ray.kat_to_endpoint,
             &bottom_ray.endpoint,
             &self.center,
         );
-        vec3::normalize(&mut bottom_ray.ray_local_unit, &bottom_ray.kat_to_endpoint);
 
         // TODO: `kat_orient_mesh_rays:164-174` (orient other shell rays)
 

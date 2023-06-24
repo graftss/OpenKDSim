@@ -98,11 +98,11 @@ impl Katamari {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
             // TODO: `kat_update_water_contact()`
-            self.debug_log_clip_data("0x1302a");
+            // self.debug_log_clip_data("0x1302a");
             self.update_surface_contacts();
-            self.debug_log_clip_data("0x1303d");
+            // self.debug_log_clip_data("0x1303d");
             self.process_surface_contacts();
-            self.debug_log_clip_data("0x13045");
+            // self.debug_log_clip_data("0x13045");
             self.resolve_being_stuck();
             self.update_vault_and_climb(prince, camera, global);
 

@@ -15,6 +15,15 @@ impl Katamari {
         temp_debug_log!("    clip_translation:{:?}", self.clip_translation);
         temp_debug_log!("    contact_floor_normal_unit:{:?}", self.contact_floor_normal_unit);
 
+        temp_debug_log!("    rotation_speed:{:?}", self.rotation_speed);
+        temp_debug_log!("    rotation_mat:{:?}", self.rotation_mat);
+        temp_debug_log!("    rotation_axis:{:?}", self.rotation_axis_unit);
+        temp_debug_log!("    camera_side_vector:{:?}", self.camera_side_vector);
+
+        for (idx, ray) in self.collision_rays.iter().enumerate() {
+            temp_debug_log!("    ray {}: {:?} (len={:?})", idx, ray.ray_local, ray.ray_len);
+        }
+
         // fc data
         temp_debug_log!("    fc_ray_idx: {:?}", self.fc_ray_idx);
         temp_debug_log!("    fc_ray: {:?}", self.fc_ray);
@@ -28,14 +37,6 @@ impl Katamari {
             temp_debug_log!("    bottom len: {}", ray.ray_len);
         } else {
             temp_debug_log!("  NO BOTTOM RAY");
-        }
-    }
-
-    pub fn debug_log_collision_rays(&self) {
-        for (idx, ray) in self.collision_rays.iter().enumerate() {
-            temp_debug_log!("    ray {}", idx);
-            temp_debug_log!("      local: {:?}", ray.ray_local);
-            temp_debug_log!("      length: {:?}", ray.ray_len);
         }
     }
 }

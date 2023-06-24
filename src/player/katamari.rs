@@ -315,7 +315,7 @@ pub struct Katamari {
     /// offset: 0x3e4
     scaled_params: KatScaledParams,
 
-    /// (??) The amount that the katamari will rotate about its spin rotation axis
+    /// The amount that the katamari will rotate about its spin rotation axis
     /// offset: 0x438
     rotation_speed: f32,
 
@@ -323,9 +323,9 @@ pub struct Katamari {
     /// offset: 0x43c
     delta_pos_len: f32,
 
-    /// (??) The axis about which the katamari will rotate as it's pushed
+    /// The axis about which the katamari rotates.
     /// offset: 0x440
-    rotation_axis: Vec3,
+    rotation_axis_unit: Vec3,
 
     /// (??)
     /// offset: 0x450
@@ -922,7 +922,7 @@ impl Katamari {
         let rad_m = self.radius_cm / 100.0;
         self.vol_m3 = rad_m * rad_m * rad_m * FRAC_4PI_3;
 
-        vec3::copy(&mut self.rotation_axis, &VEC3_X_NEG);
+        vec3::copy(&mut self.rotation_axis_unit, &VEC3_X_NEG);
         mat4::identity(&mut self.transform);
         mat4::identity(&mut self.turntable_rotation_mat);
         mat4::identity(&mut self.rotation_mat);
@@ -977,11 +977,6 @@ impl Katamari {
 }
 
 impl Katamari {
-    fn debug_log_state(&self, note: &str) {
-       temp_debug_log!("{}\n    center={:?}\n    rot_speed={:.12}\n    rot_mat={:?}", note, self.center, self.rotation_speed, self.rotation_mat); 
-    }
-
-
     /// Main katamari update function.
     /// offset: 0x1db50
     pub fn update(
@@ -991,6 +986,9 @@ impl Katamari {
         global: &GlobalState,
         mission_state: &MissionState,
     ) {
+        temp_debug_log!("tick");
+        self.debug_log_clip_data("0x1dba8");
+        temp_debug_log!("{:?}", camera.get_transform());
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -1039,12 +1037,16 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
-        temp_debug_log!("tick");
-        self.debug_log_clip_data("0x1df32");
+        // self.debug_log_clip_data("0x1df32");
 
         self.update_velocity(prince, camera, mission_state);
+
+        // self.debug_log_clip_data("0x1df3a");
+
         self.update_friction_accel(prince, mission_state);
         self.apply_acceleration(mission_state);
+
+        // self.debug_log_clip_data("0x1df7f");
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;
@@ -1054,13 +1056,18 @@ impl Katamari {
             &cam_transform.lookat_yaw_rot_inv,
         );
 
+        self.debug_log_clip_data("0x1e04d");
+        temp_debug_log!("{:?}", cam_transform);
+
+        // self.debug_log_clip_data("0x1e076");
         self.update_collision_rays();
         // TODO_PROPS: self.attract_props_to_center();
+        // self.debug_log_clip_data("0x1e07b");
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state);
 
-        self.debug_log_clip_data("0x1e13e");
+        // self.debug_log_clip_data("0x1e13e");
 
         // compute distance to camera
         let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);
@@ -1113,11 +1120,11 @@ impl Katamari {
 
         // apply the spin rotation to the katamari's rotation matrix;
         let mut spin_rotation_mat = mat4::create();
-        if vec3::length(&self.rotation_axis) > 0.0 {
+        if vec3::length(&self.rotation_axis_unit) > 0.0 {
             mat4::from_rotation(
                 &mut spin_rotation_mat,
                 self.rotation_speed,
-                &self.rotation_axis,
+                &self.rotation_axis_unit,
             );
         }
 

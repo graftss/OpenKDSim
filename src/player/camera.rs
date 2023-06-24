@@ -6,7 +6,7 @@ use gl_matrix::{
 use crate::{
     collision::raycast_state::RaycastState,
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    macros::{log, max, min, set_translation, set_y, vec3_from},
+    macros::{log, max, min, set_translation, set_y, vec3_from, temp_debug_log},
     math::{
         change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
         vec3_inplace_scale, vec3_inplace_subtract_vec,
@@ -527,7 +527,7 @@ impl CameraTransform {
     /// Update the camera transform using the current values of `pos` and `target`,
     /// which should have been already updated.
     /// offset: 0x57fd0
-    pub fn propagate_pos_and_target(&mut self) {
+    pub fn update(&mut self) {
         // compute the lookat matrix of the camera
         mat4_look_at(&mut self.lookat, &self.pos, &self.target, &VEC3_Y_POS);
 
@@ -634,10 +634,10 @@ impl Camera {
         mission_state: &MissionState,
     ) {
         // TODO_REFACTOR: is it really necessary to propagate the pos and target twice?
-        self.transform.propagate_pos_and_target();
+        self.transform.update();
         self.state
             .update(prince, katamari, mission_state, &mut self.transform);
-        self.transform.propagate_pos_and_target();
+        self.transform.update();
     }
 
     /// Update the camera state during an L1 look with the left stick input `(ls_x, ls_y)`.
@@ -741,6 +741,7 @@ impl Camera {
         self.transform.target = VEC3_Z_POS;
         self.transform.up = VEC3_Y_POS;
         self.transform.mas4_preclear_offset = 0.0;
+        self.transform.update();
     }
 
     pub fn set_mode(&mut self, mode: CameraMode) {
