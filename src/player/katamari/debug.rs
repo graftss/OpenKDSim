@@ -9,19 +9,27 @@ impl Katamari {
     /// That way, this data can be compared to the analogous data via a breakpoint in the 
     /// original simulation.
     pub fn debug_log_clip_data(&self, offset_note: &str) {
+        return;
+
         temp_debug_log!("  {}", offset_note);
         temp_debug_log!("    center:{:?}", self.center);
+
+        // temp_debug_log!("    rotation_speed:{:?}", self.rotation_speed);
+        // temp_debug_log!("    rotation_mat:{:?}", self.rotation_mat);
+        // temp_debug_log!("    rotation_axis:{:?}", self.rotation_axis_unit);
+        // temp_debug_log!("    camera_side_vector:{:?}", self.camera_side_vector);
+
         temp_debug_log!("    contact floor clip:{:?}", self.contact_floor_clip);
         temp_debug_log!("    clip_translation:{:?}", self.clip_translation);
         temp_debug_log!("    contact_floor_normal_unit:{:?}", self.contact_floor_normal_unit);
-
-        temp_debug_log!("    rotation_speed:{:?}", self.rotation_speed);
-        temp_debug_log!("    rotation_mat:{:?}", self.rotation_mat);
-        temp_debug_log!("    rotation_axis:{:?}", self.rotation_axis_unit);
-        temp_debug_log!("    camera_side_vector:{:?}", self.camera_side_vector);
+        for (idx, floor) in self.hit_floors.iter().enumerate() {
+            temp_debug_log!("    f{} clipNormal={:?}", idx, floor.clip_normal);
+            temp_debug_log!("    f{} normal={:?}", idx, floor.normal_unit);
+        }
 
         for (idx, ray) in self.collision_rays.iter().enumerate() {
             temp_debug_log!("    ray {}: {:?} (len={:?})", idx, ray.ray_local, ray.ray_len);
+            if idx == 18 { break; }
         }
 
         // fc data

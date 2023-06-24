@@ -230,11 +230,11 @@ impl RaycastState {
                 // compute impact distance
                 let ray_len = vec3::distance(&self.point0, &self.point1);
                 let hit_to_p1_len = vec3::distance(&self.point1, &impact_point);
-                let impact_dist = ray_len - hit_to_p1_len;
+                let impact_dist = ray_len;
 
                 // write hit to the raycast state at index 0 (it will be the only stored hit)
                 self.closest_hit_idx = Some(0);
-                self.hit_dist = impact_dist;
+                self.hit_dist = impact_dist - hit_to_p1_len;
                 self.hit_tris.push(RaycastTriHit {
                     impact_point: impact_point.clone(),
                     normal_unit: impact_normal.clone(),

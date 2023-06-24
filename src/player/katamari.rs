@@ -987,8 +987,8 @@ impl Katamari {
         mission_state: &MissionState,
     ) {
         temp_debug_log!("tick");
-        self.debug_log_clip_data("0x1dba8");
-        temp_debug_log!("{:?}", camera.get_transform());
+        // self.debug_log_clip_data("0x1dba8");
+
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -1056,9 +1056,6 @@ impl Katamari {
             &cam_transform.lookat_yaw_rot_inv,
         );
 
-        self.debug_log_clip_data("0x1e04d");
-        temp_debug_log!("{:?}", cam_transform);
-
         // self.debug_log_clip_data("0x1e076");
         self.update_collision_rays();
         // TODO_PROPS: self.attract_props_to_center();
@@ -1067,7 +1064,7 @@ impl Katamari {
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state);
 
-        // self.debug_log_clip_data("0x1e13e");
+        self.debug_log_clip_data("0x1e13e");
 
         // compute distance to camera
         let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);
