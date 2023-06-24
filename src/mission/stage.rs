@@ -35,16 +35,16 @@ impl Into<u8> for Stage {
 impl From<u8> for Stage {
     fn from(value: u8) -> Self {
         match value {
+            // Some entries in the `MissionConfig` table created by `read_mission_config_0x60_table`
+            // have their `stage` field set to 0. This only occurs for a table entry that's unused.
+            0 => Self::Unknown(0),
             1 => Self::House,
             2 => Self::Town,
             3 => Self::World,
             9 => Self::Ending,
             10 => Self::VsMode,
             12 => Self::Tutorial,
-            _ => {
-                log!("encountered unknown `Stage` value: {}", value);
-                Self::Unknown(value)
-            }
+            _ => { panic_log!("Encountered unknown stage: {}", value); }
         }
     }
 }

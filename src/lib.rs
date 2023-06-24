@@ -26,7 +26,8 @@ use props::{
     config::NamePropConfig,
     prop::{AddPropArgs, Prop},
 };
-use std::cell::RefCell;
+use std::{cell::RefCell};
+use backtrace::Backtrace;
 
 use crate::macros::{log, panic_log};
 
@@ -688,6 +689,10 @@ pub unsafe extern "C" fn MonoInitStart(
     clear_flag: i32,
     end_flag: i32,
 ) {
+    std::panic::set_hook(Box::new(|panic_info| {
+        log!("panic: {:?}", panic_info);
+        log!("trace: {:?}", Backtrace::new());
+    }));
     log!(
         "MonoInitStart({}, {}, {}, {}, {}, {})",
         mission,
@@ -885,9 +890,6 @@ pub unsafe extern "C" fn Tick(delta: f32) {
 #[no_mangle]
 pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission: i32) {
     log!("Init({}, {}, {})", player_idx, override_init_size, mission);
-    std::panic::set_hook(Box::new(|panic_info| {
-        log!("panic: {:?}", panic_info);
-    }));
     STATE.with(|state| {
         state
             .borrow_mut()

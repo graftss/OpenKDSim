@@ -9,7 +9,7 @@ impl Katamari {
     /// That way, this data can be compared to the analogous data via a breakpoint in the 
     /// original simulation.
     pub fn debug_log_clip_data(&self, offset_note: &str) {
-        temp_debug_log!("  ({})", offset_note);
+        temp_debug_log!("  {}", offset_note);
         temp_debug_log!("    center:{:?}", self.center);
         temp_debug_log!("    contact floor clip:{:?}", self.contact_floor_clip);
         temp_debug_log!("    clip_translation:{:?}", self.clip_translation);
@@ -28,6 +28,14 @@ impl Katamari {
             temp_debug_log!("    bottom len: {}", ray.ray_len);
         } else {
             temp_debug_log!("  NO BOTTOM RAY");
+        }
+    }
+
+    pub fn debug_log_collision_rays(&self) {
+        for (idx, ray) in self.collision_rays.iter().enumerate() {
+            temp_debug_log!("    ray {}", idx);
+            temp_debug_log!("      local: {:?}", ray.ray_local);
+            temp_debug_log!("      length: {:?}", ray.ray_len);
         }
     }
 }
