@@ -59,7 +59,9 @@ impl Katamari {
         self.last_num_floor_contacts = self.num_floor_contacts;
         self.last_num_wall_contacts = self.num_wall_contacts;
         self.num_floor_contacts = 0;
+        self.hit_floors.clear();
         self.num_wall_contacts = 0;
+        self.hit_walls.clear();
         self.fc_ray_idx = None;
 
         // TODO_VS: `kat_update_collision:41-61` (compute vol ratio for vs mode)
@@ -250,8 +252,8 @@ impl Katamari {
         let dot = vec3::dot(&impact_unit, &self.raycast_state.ray_unit);
         let ray_clip_len =
             (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant) * self.raycast_state.ray_len;
-        temp_debug_log!("ray_idx={}, dot={}, impact_unit={:?}, ray_unit={:?}", ray_idx, dot, impact_unit, self.raycast_state.ray_unit);
-        temp_debug_log!("ray_clip_len={:?}, impact_dist_ratio={:?}, clip_len_const={:?}, impact_dist={:?}", ray_clip_len, hit.impact_dist_ratio, self.params.clip_len_constant, self.raycast_state.ray_len);
+        // temp_debug_log!("ray_idx={}, dot={}, impact_unit={:?}, ray_unit={:?}", ray_idx, dot, impact_unit, self.raycast_state.ray_unit);
+        // temp_debug_log!("ray_clip_len={:?}, impact_dist_ratio={:?}, clip_len_const={:?}, impact_dist={:?}", ray_clip_len, hit.impact_dist_ratio, self.params.clip_len_constant, self.raycast_state.ray_len);
 
         let mut clip_normal = vec3::clone(&impact_unit);
         vec3_inplace_scale(&mut clip_normal, dot * ray_clip_len);

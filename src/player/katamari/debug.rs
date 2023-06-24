@@ -22,22 +22,22 @@ impl Katamari {
         temp_debug_log!("    contact floor clip:{:?}", self.contact_floor_clip);
         temp_debug_log!("    clip_translation:{:?}", self.clip_translation);
         temp_debug_log!("    contact_floor_normal_unit:{:?}", self.contact_floor_normal_unit);
+        temp_debug_log!("    num_floor_contacts:{:?}", self.num_floor_contacts);
         for (idx, floor) in self.hit_floors.iter().enumerate() {
-            temp_debug_log!("    f{} clipNormal={:?}", idx, floor.clip_normal);
-            temp_debug_log!("    f{} normal={:?}", idx, floor.normal_unit);
+            temp_debug_log!("    f{}: {:?}", idx, floor);
         }
 
-        for (idx, ray) in self.collision_rays.iter().enumerate() {
-            temp_debug_log!("    ray {}: {:?} (len={:?})", idx, ray.ray_local, ray.ray_len);
-            if idx == 18 { break; }
-        }
+        // for (idx, ray) in self.collision_rays.iter().enumerate() {
+        //     temp_debug_log!("    ray {}: {:?} (len={:?})", idx, ray.ray_local, ray.ray_len);
+        //     if idx == 18 { break; }
+        // }
 
         // fc data
-        temp_debug_log!("    fc_ray_idx: {:?}", self.fc_ray_idx);
-        temp_debug_log!("    fc_ray: {:?}", self.fc_ray);
-        temp_debug_log!("    fc_ray_len: {:?}", self.fc_ray);
-        temp_debug_log!("    fc_contact_point: {:?}", self.fc_contact_point);
-
+        // temp_debug_log!("    fc_ray_idx: {:?}", self.fc_ray_idx);
+        // temp_debug_log!("    fc_ray: {:?}", self.fc_ray);
+        // temp_debug_log!("    fc_ray_len: {:?}", self.fc_ray);
+        // temp_debug_log!("    fc_contact_point: {:?}", self.fc_contact_point);
+        
         // bottom collision ray
         if let Some(ray) = self.collision_rays.get(0) {
             temp_debug_log!("    bottom contact: {}", ray.contacts_surface);
