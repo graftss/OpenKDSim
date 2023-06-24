@@ -98,11 +98,11 @@ impl Katamari {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
             // TODO: `kat_update_water_contact()`
-            self.debug_log_clip_data("0x1302a");
+            // self.debug_log_clip_data("0x1302a");
             self.update_surface_contacts();
-            self.debug_log_clip_data("0x1303a");
+            // self.debug_log_clip_data("0x1303a");
             self.process_surface_contacts();
-            self.debug_log_clip_data("0x13042");
+            // self.debug_log_clip_data("0x13042");
             self.resolve_being_stuck();
             self.update_vault_and_climb(prince, camera, global);
 
@@ -249,7 +249,9 @@ impl Katamari {
 
         let dot = vec3::dot(&impact_unit, &self.raycast_state.ray_unit);
         let ray_clip_len =
-            (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant) * hit.impact_dist;
+            (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant) * self.raycast_state.ray_len;
+        temp_debug_log!("ray_idx={}, dot={}, impact_unit={:?}, ray_unit={:?}", ray_idx, dot, impact_unit, self.raycast_state.ray_unit);
+        temp_debug_log!("ray_clip_len={:?}, impact_dist_ratio={:?}, clip_len_const={:?}, impact_dist={:?}", ray_clip_len, hit.impact_dist_ratio, self.params.clip_len_constant, self.raycast_state.ray_len);
 
         let mut clip_normal = vec3::clone(&impact_unit);
         vec3_inplace_scale(&mut clip_normal, dot * ray_clip_len);
@@ -350,7 +352,7 @@ impl Katamari {
         added_surface.contact_point = closest_hit.impact_point.clone();
         added_surface.clip_normal_len = clip_normal_len;
         added_surface.impact_dist_ratio = closest_hit.impact_dist_ratio;
-        added_surface.ray_len = self.raycast_state.hit_dist;
+        added_surface.ray_len = self.raycast_state.ray_len;
         added_surface.ray_idx = ray_idx as u16;
         added_surface.hit_attr = closest_hit.metadata.into();
         added_surface.prop = prop;

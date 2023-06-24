@@ -1059,7 +1059,7 @@ impl Katamari {
         // self.debug_log_clip_data("0x1e076");
         self.update_collision_rays();
         // TODO_PROPS: self.attract_props_to_center();
-        // self.debug_log_clip_data("0x1e07b");
+        self.debug_log_clip_data("0x1e080");
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state);
