@@ -38,6 +38,7 @@ pub struct KatamariParams {
     /// The threshold on the y component of a floor normal that distinguishes
     /// flat floors (over this value) to sloped floors (under this value).
     /// (Note that a y component of 1 would be a completely flat floor)
+    /// default: 0.9999
     /// offset: 0x71608
     pub sloped_floor_normal_y_threshold: f32,
 
@@ -262,7 +263,7 @@ impl Default for KatamariParams {
             min_wallclimb_similarity: (f32::from_bits(0x3ecccccd) * FRAC_PI_2).cos(),
             clip_len_constant: f32::from_bits(0x3a03126f), // 0.0005
             surface_similarity_threshold: f32::from_bits(0x3f7ffeb0), // 0.99998
-            sloped_floor_normal_y_threshold: f32::from_bits(0x3f7ff972),
+            sloped_floor_normal_y_threshold: f32::from_bits(0x3f7ff972), // 0.9999
             wall_to_floor_angle_stuck_threshold: f32::from_bits(0x40060a92), // 3pi/2
             wall_to_wall_angle_stuck_threshold: f32::from_bits(0x40278d36),  // 5pi/6
             detach_cooldown_when_stuck_btwn_walls: 15,

@@ -15,7 +15,7 @@ use crate::{
     },
     mission::{state::MissionState, GameMode},
     player::{camera::Camera, prince::Prince},
-    props::prop::WeakPropRef,
+    props::prop::WeakPropRef, util::debug_log,
 };
 
 use self::{hit::SurfaceHit, ray::KatCollisionRayType};
@@ -98,8 +98,11 @@ impl Katamari {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
             // TODO: `kat_update_water_contact()`
+            self.debug_log_clip_data("0x1302a");
             self.update_surface_contacts();
+            self.debug_log_clip_data("0x1303d");
             self.process_surface_contacts();
+            self.debug_log_clip_data("0x13045");
             self.resolve_being_stuck();
             self.update_vault_and_climb(prince, camera, global);
 
@@ -202,7 +205,6 @@ impl Katamari {
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
                 if found_hit {
-                    temp_debug_log!("   -- found hit: ray {ray_idx}");
                     // TODO: there's a flag being ignored here
                     if true && !self.last_physics_flags.airborne {
                         self.physics_flags.airborne = false;
@@ -213,6 +215,9 @@ impl Katamari {
         }
     }
 
+    /// Returns `None` if the surface contact arose from a shell ray.
+    /// If not, then the surface contact arose from a collision ray and the returned value is
+    /// type of surface that is contacted (either wall or floor).
     /// offset: 0x133d0
     fn record_surface_contact(
         &mut self,
@@ -254,8 +259,8 @@ impl Katamari {
         // temp_debug_log!("   dot:{dot}, ray_clip_len={ray_clip_len}, clip_normal: {clip_normal:?}");
 
         if impact_unit[1] < -0.1 {
-            let angle = acos_f32(impact_unit[1]);
-            if angle < 1.047198 {
+            let normal_angle_y = acos_f32(impact_unit[1]);
+            if normal_angle_y < 1.047198 {
                 self.physics_flags.contacts_down_slanted_ceiling = true;
                 if self.physics_flags.contacts_prop_0xa {
                     set_y!(clip_normal, 0.0);
@@ -383,9 +388,9 @@ impl Katamari {
         }
 
         // data about the collision ray that's nearest to contacting a floor.
-        let mut fc_ray_idx = None;
-        let mut fc_ray = None;
-        let mut fc_contact_point = None;
+        let mut min_ratio_ray_idx = None;
+        let mut min_ratio_ray = None;
+        let mut min_ratio_contact_pt = None;
 
         // process contact floors
         if self.num_floor_contacts == 0 {
@@ -395,10 +400,10 @@ impl Katamari {
         } else {
             // if contacting at least one floor:
 
-            let mut max_ray_len = 0.0;
+            let mut max_contact_ray_len = 0.0;
+            let mut min_ratio = 2.0; // can be anything bigger than 1.0
             let mut sum_floor_normals = vec3::create();
             let mut sum_clip_normal = vec3::create();
-            let mut min_ratio = 2.0; // can be anything bigger than 1.0
 
             for floor in self.hit_floors.iter() {
                 // for each contacted floor:
@@ -416,24 +421,24 @@ impl Katamari {
                 vec3_inplace_add_vec(&mut sum_clip_normal, &floor.clip_normal);
 
                 // maintain the max contact floor ray length
-                if floor.ray_len > max_ray_len {
-                    max_ray_len = floor.ray_len;
+                if floor.ray_len > max_contact_ray_len {
+                    max_contact_ray_len = floor.ray_len;
                 }
 
                 // maintain a bunch of data about the contact floor with the minimum
                 // impact distance ratio
                 if floor.impact_dist_ratio < min_ratio {
                     min_ratio = floor.impact_dist_ratio;
-                    fc_contact_point = Some(floor.contact_point);
-                    fc_ray = Some(floor.ray);
-                    fc_ray_idx = Some(floor.ray_idx);
+                    min_ratio_contact_pt = Some(floor.contact_point);
+                    min_ratio_ray = Some(floor.ray);
+                    min_ratio_ray_idx = Some(floor.ray_idx);
                 }
 
                 // turn on hit flags based on the contact floor's hit attribute
                 self.hit_flags.apply_hit_attr(floor.hit_attr);
             }
 
-            self.fc_ray_idx = fc_ray_idx;
+            self.fc_ray_idx = min_ratio_ray_idx;
             self.compute_contact_floor_clip();
 
             // TODO: the following line is possibly wrong
@@ -468,27 +473,32 @@ impl Katamari {
             self.climb_radius_cm = max_ray_len;
         }
 
-        if fc_ray_idx.is_none()
-            || self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
+        if min_ratio_ray_idx.is_none() || self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
         {
-            // if the primary floor contact point is the bottom ray
-            self.fc_ray_idx = None;
-            self.fc_ray = None;
-            self.fc_contact_point = None;
-            // TODO: is this right
-            self.fc_ray_len = self.collision_rays[0].ray_len;
-        } else if fc_ray_idx == self.vault_ray_idx {
+            // if the primary floor contact point is from the bottom ray:
+            self.fc_ray_idx = min_ratio_ray_idx;
+            self.fc_ray = min_ratio_ray;
+            self.fc_contact_point = min_ratio_contact_pt;
+
+            self.fc_ray_len = if min_ratio_ray_idx.is_none() {
+                self.climb_radius_cm
+            } else {
+                self.collision_rays[0].ray_len
+            };
+        } else if min_ratio_ray_idx == self.vault_ray_idx {
+            // if the primary floor contact point is from the vault ray:    
             self.fc_ray_idx = self.vault_ray_idx;
         } else {
-            self.fc_ray_idx = fc_ray_idx;
-            self.fc_ray_len = self.collision_rays[fc_ray_idx.unwrap() as usize].ray_len;
-            self.fc_ray = fc_ray.map(|v| v.clone());
+            // if the primary floor contact point is from a non-bottom, non-vault ray:
+            self.fc_ray_idx = min_ratio_ray_idx;
+            self.fc_ray = min_ratio_ray;
+            self.fc_ray_len = self.collision_rays[min_ratio_ray_idx.unwrap() as usize].ray_len;
 
             let mut contact_pt = vec3::create();
             vec3::scale_and_add(
                 &mut contact_pt,
-                &fc_contact_point.unwrap(),
-                &fc_ray.unwrap(),
+                &min_ratio_contact_pt.unwrap(),
+                &min_ratio_ray.unwrap(),
                 0.005,
             );
             self.fc_contact_point = Some(contact_pt);
@@ -505,7 +515,7 @@ impl Katamari {
             // if the player contacts a floor:
             for floor in self.hit_floors.iter() {
                 let clip = floor.clip_normal;
-                for i in [0, 1, 2] {
+                for i in 0..2 {
                     if clip[i] > max_clip_coords[i] {
                         max_clip_coords[i] = clip[i];
                     } else if clip[i] < min_clip_coords[i] {
@@ -680,7 +690,7 @@ impl Katamari {
             vec3_inplace_subtract_vec(&mut self.vault_contact_point, &self.contact_wall_clip);
         }
 
-        self.physics_flags.unknown_0x22 = false;
+        self.physics_flags.just_hit_ground_hard = false;
         'main: {
             if self.num_wall_contacts + self.num_floor_contacts == 0 {
                 // if the katamari isn't contacting any surfaces
@@ -822,7 +832,7 @@ impl Katamari {
             }
         }
 
-        if self.physics_flags.unknown_0x22 {
+        if self.physics_flags.just_hit_ground_hard {
             if !self.physics_flags.in_water {
                 let play_hit_ground_sfx = match self.physics_flags.grounded_ray_type {
                     Some(KatCollisionRayType::Bottom) => true,
@@ -845,7 +855,7 @@ impl Katamari {
     /// offset: 0x15950
     fn update_wall_contacts(&mut self, prince: &mut Prince, camera: &Camera, global: &GlobalState) {
         if self.physics_flags.climbing_wall {
-            // TODO: `kat_update_wall_contacts:47-58`
+            // TODO_CLIMB: `kat_update_wall_contacts:47-58`
             if self.can_climb_wall_contact(prince) {
                 return self.update_wallclimb();
             }
@@ -961,7 +971,7 @@ impl Katamari {
                     if !self.physics_flags.in_water {
                         // TODO_FX: `kat_update_wall_contacts:224-246`
                     }
-                    self.physics_flags.unknown_0x22 = true;
+                    self.physics_flags.just_hit_ground_hard = true;
                 }
             }
 
@@ -1426,11 +1436,7 @@ impl Katamari {
                 if !self.last_physics_flags.contacts_down_slanted_ceiling {
                     vec3::normalize(&mut self.delta_pos_unit, &self.delta_pos);
                 }
-                let mut clip_translation = self.delta_pos_unit;
-                vec3_inplace_scale(&mut clip_translation, -self.speed);
-                self.set_velocity(&clip_translation);
-                vec3_inplace_add_vec(&mut self.center, &clip_translation);
-                self.clip_translation = clip_translation;
+                // TODO_LOW: `kat_apply_clip_translation:125-146` (weird edge case??)
             }
         } else {
             // if stuck between walls:

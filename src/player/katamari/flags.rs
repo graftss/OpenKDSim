@@ -150,9 +150,9 @@ pub struct KatPhysicsFlags {
     /// offset: 0x20
     pub unknown_0x20: bool,
 
-    /// (??)
+    /// Set to true on the frame when the katamari hits the ground after a long enough fall.
     /// offset: 0x22
-    pub unknown_0x22: bool,
+    pub just_hit_ground_hard: bool,
 }
 
 impl KatPhysicsFlags {

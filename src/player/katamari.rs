@@ -1,4 +1,5 @@
 pub mod collision;
+mod debug;
 mod flags;
 mod params;
 pub mod scaled_params;
@@ -316,7 +317,7 @@ pub struct Katamari {
 
     /// (??) The amount that the katamari will rotate about its spin rotation axis
     /// offset: 0x438
-    spin_rotation_speed: f32,
+    rotation_speed: f32,
 
     /// The length of `delta_pos`, which is the distance between `center` and `last_center`.
     /// offset: 0x43c
@@ -976,6 +977,11 @@ impl Katamari {
 }
 
 impl Katamari {
+    fn debug_log_state(&self, note: &str) {
+       temp_debug_log!("{}\n    center={:?}\n    rot_speed={:.12}\n    rot_mat={:?}", note, self.center, self.rotation_speed, self.rotation_mat); 
+    }
+
+
     /// Main katamari update function.
     /// offset: 0x1db50
     pub fn update(
@@ -985,11 +991,6 @@ impl Katamari {
         global: &GlobalState,
         mission_state: &MissionState,
     ) {
-        temp_debug_write!("opensim.log", "{}\t{}\t{}\t{}\t{}\t{}\t{}", global.ticks, 
-            self.rotation_axis[0], self.rotation_axis[1], self.rotation_axis[2],
-            self.camera_side_vector[0], self.camera_side_vector[1], self.camera_side_vector[2]
-        );
-
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
 
@@ -1039,11 +1040,7 @@ impl Katamari {
         );
 
         temp_debug_log!("tick");
-        temp_debug_log!(
-            "   init center={:?}, radius={:?}",
-            self.center[1],
-            self.radius_cm
-        );
+        self.debug_log_clip_data("0x1df32");
 
         self.update_velocity(prince, camera, mission_state);
         self.update_friction_accel(prince, mission_state);
@@ -1057,21 +1054,13 @@ impl Katamari {
             &cam_transform.lookat_yaw_rot_inv,
         );
 
-        temp_debug_log!(
-            "   center after accel: {:?}",
-            self.center[1]
-        );
-
         self.update_collision_rays();
         // TODO_PROPS: self.attract_props_to_center();
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state);
 
-        temp_debug_log!(
-            "   center after collision: {:?}",
-            self.center[1]
-        );
+        self.debug_log_clip_data("0x1e13e");
 
         // compute distance to camera
         let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);
@@ -1084,8 +1073,6 @@ impl Katamari {
         if !camera.preclear.get_enabled() {
             // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
-
-        temp_debug_log!("   contact floor clip:{:?}, clip_translation:{:?}", self.contact_floor_clip, self.clip_translation);
     }
 
     /// Update the katamari's scaled params by interpolating the mission's param control points.
@@ -1129,7 +1116,7 @@ impl Katamari {
         if vec3::length(&self.rotation_axis) > 0.0 {
             mat4::from_rotation(
                 &mut spin_rotation_mat,
-                self.spin_rotation_speed,
+                self.rotation_speed,
                 &self.rotation_axis,
             );
         }

@@ -982,7 +982,7 @@ impl Katamari {
 
     fn update_rotation_speed(&mut self, vel: &Vec3) {
         if self.physics_flags.braking {
-            return self.spin_rotation_speed = 0.0;
+            return self.rotation_speed = 0.0;
         }
 
         let vel_len = vec3::len(vel);
@@ -1018,7 +1018,7 @@ impl Katamari {
             }
 
             if vec3::dot(&vel_unit, &net_normal_unit) >= ALMOST_1 {
-                return self.spin_rotation_speed = 0.0;
+                return self.rotation_speed = 0.0;
             }
 
             // compute spin rotation axis
@@ -1033,10 +1033,10 @@ impl Katamari {
             }
 
             if self.speed <= 0.0 {
-                return self.spin_rotation_speed = 0.0;
+                return self.rotation_speed = 0.0;
             }
 
-            self.spin_rotation_speed = normalize_bounded_angle((vel_len / pivot_circumf) * TAU);
+            self.rotation_speed = normalize_bounded_angle((vel_len / pivot_circumf) * TAU);
         } else {
             // if katamari is airborne:
 
@@ -1045,7 +1045,7 @@ impl Katamari {
 
             // if falling almost entirely vertically, no rot speed
             if vel_unit[1] >= ALMOST_1 {
-                return self.spin_rotation_speed = 0.0;
+                return self.rotation_speed = 0.0;
             }
 
             let lateral_vel_unit = (vel_unit[0] * vel_unit[0] + vel_unit[2] * vel_unit[2]).sqrt();
@@ -1060,14 +1060,14 @@ impl Katamari {
                 vec3_inplace_normalize(&mut self.rotation_axis);
             }
 
-            self.spin_rotation_speed = if vel_len <= 0.0001 {
+            self.rotation_speed = if vel_len <= 0.0001 {
                 0.0
             } else {
                 normalize_bounded_angle(vel_len / pivot_circumf * TAU)
             };
         }
 
-        self.spin_rotation_speed = self.spin_rotation_speed.clamp(-PI, PI);
+        self.rotation_speed = self.rotation_speed.clamp(-PI, PI);
     }
 
     /// Forcibly set the katamari's velocity to `vel`.
