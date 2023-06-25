@@ -4,6 +4,7 @@
 
 use std::cell::RefCell;
 
+use collision::raycast_state::ray_hits_aabb;
 use gamestate::GameState;
 use gl_matrix::{common::Vec3, mat4, quat, vec3};
 use props::prop::AddPropArgs;
@@ -182,10 +183,33 @@ fn test_cam_pos(
 }
 
 fn test_triangle_hit() {
+    let mut raycast_state = RaycastState::default();
+
     // let triangle = [[-2.6363091468811,0.020901577547193,-4.1993327140808],[-2.6363091468811,-6.4182171821594,4.274188041687],[-2.6363091468811,-6.4182171821594,-4.199333190918]];
     // let ray = [[-26.963624954224,-24.175483703613,17.492353439331],[-25.76362991333,-25.552066802979,15.770400047302]];
     // let result=[[-26.267070770264,-24.974540710449,1.4569648504257],[0.70710015296936,2.0945599032984e-007,0.70711332559586]];
     // let t = 1.46;
+
+    // raycast_state.load_ray(&ray[0], &ray[1]);
+    // println!("init state {:?}", raycast_state);
+    // let t = raycast_state.ray_hits_triangle(&triangle, &None);
+    // println!("result: {:?}", raycast_state.ray_to_triangle_hit);
+    // println!("t={}", t);
+
+    let mut out = [0.0, 0.0, 0.0];
+    // let p0 = [-26.9048, -24.06036, 26.7104];
+    // let p1 = [-26.904846, -34.10034, 26.71042252];
+    // let aabb_min = [-175.171, -65.931, 87.703];
+    // let aabb_max = [-26.905, -34.100, 26.7104225];
+    let result = ray_hits_aabb(
+        &[30.0, 2.0, 1.0],
+        &[-30.0, 2.0, 1.0],
+        &[0.0, 0.0, 0.0],
+        &[10.0, 10.0, 10.0],
+        &mut out,
+    );
+    // let result = ray_hits_aabb(&p0, &p1, &aabb_min, &aabb_max, &mut out);
+    println!("result={}, out={:?}", result, out)
 }
 
 fn main() {

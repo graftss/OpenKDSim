@@ -3,7 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use gl_matrix::{
     common::{Mat4, Vec3},
     mat2::create,
-    mat4, vec3,
+    mat4,
+    vec2::scale_and_add,
+    vec3,
 };
 
 use crate::{
@@ -13,7 +15,7 @@ use crate::{
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
-use super::hit_attribute::HitAttribute;
+use super::{hit_attribute::HitAttribute, mesh::Mesh};
 
 const IMPACT_EPS: f32 = 0.0001;
 
@@ -275,8 +277,6 @@ impl RaycastState {
             vec3::transform_mat4(&mut p2, &triangle[2], mat);
         }
 
-        println!("trangle={:?}", triangle);
-
         // just naively copy this i guess
         let p0p1 = vec3_from!(-, p1, p0);
         let p0p2 = vec3_from!(-, p2, p0);
@@ -288,8 +288,6 @@ impl RaycastState {
         let d2 = p0p2[1] * ray[0] - p0p2[0] * ray[1];
         let d = d1 * p0p1[1] + d0 * p0p1[0] + d2 * p0p1[2];
 
-        println!("d={}", d);
-
         // if d is (almost) 0, the ray is parallel (enough) to the plane of the triangle (to admit defeat)
         if d > -EPS && d < EPS {
             return 0.0;
@@ -300,8 +298,6 @@ impl RaycastState {
         let p0r0 = vec3_from!(-, self.point0, p0);
         let dt = (p0r0[1] * d1 + p0r0[0] * d0 + p0r0[2] * d2) * d_inv;
 
-        println!("dt={}", dt);
-
         if dt < 0.0 || dt > 1.0 {
             return 0.0;
         }
@@ -311,15 +307,11 @@ impl RaycastState {
         let x2 = p0r0[0] * p0p1[1] - p0r0[1] * p0p1[0];
         let du = (x0 * ray[0] + x1 * ray[1] + x2 * ray[2]) * d_inv;
 
-        println!("du={}", du);
-
         if du < 0.0 || (du + dt) > 1.0 {
             return 0.0;
         }
 
         let dv = (x0 * p0p2[0] + x1 * p0p2[1] + x2 * p0p2[2]) * d_inv;
-
-        println!("dv={}, d0={}", dv, d0);
 
         if dv <= EPS || dv > ray_len
         /* something else here maybe */
@@ -335,8 +327,6 @@ impl RaycastState {
             &self.ray_unit,
             t,
         );
-
-        println!("t={}", t);
 
         if t < 0.0 || t > self.ray_len {
             return 0.0;
@@ -361,6 +351,115 @@ impl RaycastState {
 
         return t;
     }
+
+    pub fn ray_hits_mesh(&mut self, mesh: &Mesh, transform: &Option<Mat4>) -> i32 {
+        0
+    }
+}
+
+/// Returns `true` if the line segment from `p0` to `p1` meets the AABB with opposite corner points
+/// `aabb_min` and `aabb_max`.
+/// The `out` writes an intersection point if one exists - possibly the one furthest from `p0`.
+/// `out` doesn't seem to be used by the simulation.
+/// offset: 0x106b0
+pub fn ray_hits_aabb(
+    p0: &Vec3,
+    p1: &Vec3,
+    aabb_min: &Vec3,
+    aabb_max: &Vec3,
+    out: &mut Vec3,
+) -> bool {
+    let [min_x, min_y, min_z] = *aabb_min;
+    let [max_x, max_y, max_z] = *aabb_max;
+    let [p0x, p0y, p0z] = *p0;
+    let [p1x, p1y, p1z] = *p1;
+
+    // if the entire range of some coordinate plane along the ray p0->p1 doesn't coincide
+    // with the box's corresponding coordinate range, we already know there's no intersection
+    if (p1x < min_x && p0x < min_x) || (p1x > max_x && p0x > max_x) {
+        return false;
+    }
+    if (p1y < min_y && p0y < min_y) || (p1y > max_y && p0y > max_y) {
+        return false;
+    }
+    if (p1z < min_z && p0z < min_z) || (p1z > max_z && p0z > max_z) {
+        return false;
+    }
+
+    // if `p0` is inside the box, then that's the intersection point
+    if p0x > min_x && p0y > min_y && p0z > min_x && p0x < max_x && p0y < max_y && p0z < max_z {
+        vec3::copy(out, &p0);
+        return true;
+    }
+
+    let min_p0 = vec3_from!(-, p0, aabb_min);
+    let min_p1 = vec3_from!(-, p1, aabb_min);
+    let p0_p1 = vec3_from!(-, p1, p0);
+
+    if min_p0[0] * min_p1[0] < 0.0 && min_p0[0] != min_p1[0] {
+        let t = min_p0[0] / (min_p0[0] - min_p1[0]);
+        vec3::scale_and_add(out, p0, &p0_p1, t);
+        println!("case 1, {}", t);
+
+        if min_z < out[2] && out[2] < max_z && min_y < out[1] && out[1] < max_y {
+            return true;
+        }
+    }
+
+    if min_p1[1] * min_p0[1] < 0.0 && min_p0[1] != min_p1[1] {
+        println!("case 2");
+        let t = min_p0[1] / (min_p0[1] - min_p1[1]);
+        vec3::scale_and_add(out, p0, &p0_p1, t);
+
+        if min_z < out[2] && out[2] < max_z && min_x < out[0] && out[0] < max_x {
+            return true;
+        }
+    }
+
+    if min_p0[2] * min_p1[2] < 0.0 && min_p0[2] != min_p1[2] {
+        println!("case 3");
+        let t = min_p0[2] / (min_p0[2] - min_p1[2]);
+        vec3::scale_and_add(out, p0, &p0_p1, t);
+
+        if min_x < out[0] && out[0] < max_x && min_y < out[1] && out[1] < max_y {
+            return true;
+        }
+    }
+
+    let max_p0 = vec3_from!(-, p0, aabb_max);
+    let max_p1 = vec3_from!(-, p1, aabb_max);
+
+    if max_p0[0] * max_p1[0] < 0.0 && max_p0[0] != max_p1[0] {
+        println!("case 4");
+        let t = max_p0[0] / (max_p0[0] - max_p1[0]);
+        vec3::scale_and_add(out, p0, &p0_p1, t);
+
+        if min_z < out[2] && out[2] < max_z && min_y < out[1] && out[1] < max_y {
+            return true;
+        }
+    }
+
+    if max_p0[1] * max_p1[1] < 0.0 && max_p0[1] != max_p1[1] {
+        println!("case 5");
+        let t = max_p0[1] / (max_p0[1] - max_p1[1]);
+        vec3::scale_and_add(out, p0, &p0_p1, t);
+
+        if min_z < out[2] && out[2] < max_z && min_x < out[0] && out[0] < max_x {
+            return true;
+        }
+    }
+
+    if max_p0[2] * max_p1[2] < 0.0 && max_p0[2] != max_p1[2] {
+        println!("case 6");
+        let t = max_p0[2] / (max_p0[2] - max_p1[2]);
+        vec3::scale_and_add(out, p0, &p0_p1, t);
+
+        if min_x < out[0] && out[0] < max_x && min_y < out[1] && out[1] < max_y {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]
