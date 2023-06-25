@@ -1060,12 +1060,12 @@ impl Katamari {
         // self.debug_log_clip_data("0x1e076");
         self.update_collision_rays();
         // TODO_PROPS: self.attract_props_to_center();
-        self.debug_log_clip_data("0x1e080");
+        // self.debug_log_clip_data("0x1e080");
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state);
 
-        self.debug_log_clip_data("0x1e13e");
+        // self.debug_log_clip_data("0x1e13e");
 
         // compute distance to camera
         let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);

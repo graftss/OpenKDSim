@@ -184,16 +184,16 @@ impl Katamari {
 
             // TODO: `kat_update_surface_contacts:267-294` (support all shell points)
 
-            for (_i, (point0, point1)) in
+            for (_i, (_point0, _point1)) in
                 Iterator::zip(shell_initial_pts.iter(), shell_final_pts.iter()).enumerate()
             {
-                // TODO: replace this when shell points are working
-                break;
-
                 // check collisions along each shell ray
-                self.raycast_state.load_ray(point0, point1);
+                self.raycast_state.load_ray(_point0, _point1);
                 self.raycast_state
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
+
+                // TODO: replace this when shell points are working
+                break;
 
                 // TODO: `kat_update_surface_contacts:308-372` (resolve shell ray hits)
             }
@@ -875,23 +875,22 @@ impl Katamari {
 
         let mut flag_a = true;
         let mut should_halve_speed = false;
-        let mut can_bonk_and_lose_props = false;
-        let mut flag_d = false;
+        let flag_d = false;
 
         // TODO_VS: `vs_attack` check here
         let contacts_wall = self.num_wall_contacts > 0;
 
-        if !self.physics_flags.moved_more_than_rad_0x1d {
-            can_bonk_and_lose_props = true;
+        let can_bonk_and_lose_props = if !self.physics_flags.moved_more_than_rad_0x1d {
+            true
         } else {
             flag_a = contacts_wall || self.falling_ticks < 10;
             should_halve_speed = contacts_wall;
-            can_bonk_and_lose_props = contacts_wall;
-        }
+            contacts_wall
+        };
 
         let mut surface_normal_unit = [0.0; 3];
-        let mut impact_directness = 0.0;
-        let mut impact_force = 0.0;
+        let mut _impact_directness = 0.0;
+        let mut _impact_force = 0.0;
         let mut _impact_volume = 0.0;
 
         if !self.physics_flags.airborne {
@@ -911,10 +910,10 @@ impl Katamari {
                 return;
             }
 
-            impact_force = self.compute_impact_force();
-            impact_directness =
+            _impact_force = self.compute_impact_force();
+            _impact_directness =
                 self.compute_impact_directness(&lateral_vel_unit, &surface_normal_unit);
-            _impact_volume = impact_force * impact_directness;
+            _impact_volume = _impact_force * _impact_directness;
 
             if self.can_climb_wall_contact(prince) {
                 return self.update_wallclimb();
@@ -954,12 +953,12 @@ impl Katamari {
                 return;
             }
 
-            impact_force = self.compute_impact_force();
-            impact_directness = self.compute_impact_directness(
+            _impact_force = self.compute_impact_force();
+            _impact_directness = self.compute_impact_directness(
                 &self.velocity.vel_accel_grav_unit,
                 &surface_normal_unit,
             );
-            _impact_volume = impact_force * impact_directness;
+            _impact_volume = _impact_force * _impact_directness;
 
             if self.physics_flags.moved_more_than_rad_0x14
                 && self.physics_flags.grounded_by_mesh_or_prop()
@@ -1008,8 +1007,8 @@ impl Katamari {
             self.falling_ticks = 0;
         }
 
-        if impact_directness <= 0.0 {
-            if impact_force > 0.0 {
+        if _impact_directness <= 0.0 {
+            if _impact_force > 0.0 {
                 return;
             }
             if self.physics_flags.hit_by_moving_prop {
@@ -1054,7 +1053,7 @@ impl Katamari {
             } else {
                 let speed_ratio = self.speed / self.scaled_params.base_max_speed;
                 _play_map_sound = speed_ratio > param_min_speed_ratio
-                    && impact_directness > param_min_impact_angle
+                    && _impact_directness > param_min_impact_angle
                     && global.game_time_ms - self.last_collision_game_time_ms
                         > param_sound_cooldown_ms;
                 speed *= self.y_elasticity;
@@ -1084,7 +1083,7 @@ impl Katamari {
             self.props_lost_from_bonks = 0;
             if !self.physics_flags.climbing_wall
                 && !self.last_physics_flags.climbing_wall
-                && impact_force > 0.0
+                && _impact_force > 0.0
             {
                 // TODO_LOW: `kat_begin_screen_shake()`
                 let _can_lose_props = !camera.state.cam_eff_1P && !global.map_change_mode;
@@ -1280,8 +1279,8 @@ impl Katamari {
 
     /// (??)
     /// offset: 0x12750
-    fn play_bonk_fx(&mut self, prop_moving: bool) {
-        // TODO
+    fn play_bonk_fx(&mut self, _prop_moving: bool) {
+        // TODO_FX
     }
 
     /// Check the current primary floor contact ray to see if a vault on that ray should be

@@ -9,8 +9,6 @@ impl Katamari {
     /// That way, this data can be compared to the analogous data via a breakpoint in the
     /// original simulation.
     pub fn debug_log_clip_data(&self, offset_note: &str) {
-        return;
-
         debug_log!("  {}", offset_note);
         debug_log!("    center:{:?}", self.center);
 

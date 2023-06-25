@@ -20,7 +20,7 @@ impl KatMesh {
         let mut mesh_points: Vec<Vec3> = vec![];
 
         for point_bytes in KAT_MESH_BIN.chunks(16) {
-            let mut point = [
+            let point = [
                 read_f32!(point_bytes, 0),
                 read_f32!(point_bytes, 4),
                 read_f32!(point_bytes, 8),

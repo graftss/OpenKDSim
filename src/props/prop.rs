@@ -713,10 +713,6 @@ impl Prop {
             delta_pos_unit: [0.0; 3],
         };
 
-        if (ctrl_idx == 224) {
-            temp_debug_log!("pos={:?}", result.pos);
-        }
-
         if let Some(aabbs) = &mono_data.aabbs {
             result.init_aabb_and_volume(aabbs, config);
         }
@@ -1022,11 +1018,11 @@ impl Prop {
 
         self.update_child_link();
 
-        if let Some(script) = self.motion_script.as_ref() {
+        if let Some(_script) = self.motion_script.as_ref() {
             // TODO_PROP_MOTION: `props_update_nonending:55-68`
         }
 
-        if let Some(script) = self.innate_script.as_ref() {
+        if let Some(_script) = self.innate_script.as_ref() {
             // TODO_PROP_MOTION: call `innate_script`
         }
 
@@ -1124,10 +1120,6 @@ impl Prop {
         mat4::rotate_z(&mut temp2, &temp1, self.rotation_vec[2]);
         mat4::rotate_x(&mut temp1, &temp2, self.rotation_vec[0]);
         mat4::rotate_y(&mut temp2, &temp1, self.rotation_vec[1]);
-
-        if self.ctrl_idx == 224 {
-            temp_debug_log!("rotation_vec: {:?}", self.rotation_vec);
-        }
 
         mat4::multiply(&mut self.unattached_transform, &self.rotation_mat, &temp2);
 
