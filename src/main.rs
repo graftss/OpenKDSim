@@ -2,11 +2,12 @@
 #![feature(vec_into_raw_parts)]
 #![allow(non_snake_case, dead_code, unused_imports)]
 
-use std::cell::RefCell;
+use std::{borrow::Borrow, cell::RefCell};
 
 use collision::raycast_state::ray_hits_aabb;
 use gamestate::GameState;
 use gl_matrix::{common::Vec3, mat4, quat, vec3};
+use mono_data::MonoData;
 use props::prop::AddPropArgs;
 
 use crate::collision::raycast_state::RaycastState;
@@ -33,7 +34,7 @@ thread_local! {
 // temporary hard copy of monodata for testing.
 // monodata for each mission is passed to the simulation from unity when the mission
 // is loading, so the simulation itself doesn't actually need a copy of any monodata.
-static MAS1_MONO_DATA: &'static [u8] = include_bytes!("../bin/mono_data_MAS1.bin");
+static MAS1_MONO_DATA: &'static [u8] = include_bytes!("./bin/monodata/mission1.bin");
 
 const CHILD_PROP_ARGS: AddPropArgs = AddPropArgs {
     pos_x: 1.0,
@@ -182,8 +183,19 @@ fn test_cam_pos(
     vec3::add(&mut target, &kat_center, &scaled_target_offset);
 }
 
+unsafe fn test_monodata() {
+    let mut md = MonoData::default();
+    md.init(MAS1_MONO_DATA.as_ptr());
+
+    for pd in md.props.iter() {
+        if let Some(mesh) = pd.collision_mesh.borrow() {
+            for _sector in mesh.sectors.iter() {}
+        }
+    }
+}
+
 fn test_triangle_hit() {
-    let mut raycast_state = RaycastState::default();
+    // let mut raycast_state = RaycastState::default();
 
     // let triangle = [[-2.6363091468811,0.020901577547193,-4.1993327140808],[-2.6363091468811,-6.4182171821594,4.274188041687],[-2.6363091468811,-6.4182171821594,-4.199333190918]];
     // let ray = [[-26.963624954224,-24.175483703613,17.492353439331],[-25.76362991333,-25.552066802979,15.770400047302]];
@@ -220,7 +232,7 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
-    {
-        test_triangle_hit();
+    unsafe {
+        test_monodata();
     }
 }
