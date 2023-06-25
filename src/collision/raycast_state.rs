@@ -8,7 +8,7 @@ use gl_matrix::{
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     delegates::Delegates,
-    macros::{panic_log, vec3_from, temp_debug_log},
+    macros::{panic_log, temp_debug_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 

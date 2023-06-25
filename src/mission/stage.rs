@@ -44,7 +44,9 @@ impl From<u8> for Stage {
             9 => Self::Ending,
             10 => Self::VsMode,
             12 => Self::Tutorial,
-            _ => { panic_log!("Encountered unknown stage: {}", value); }
+            _ => {
+                panic_log!("Encountered unknown stage: {}", value);
+            }
         }
     }
 }

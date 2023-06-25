@@ -5,15 +5,16 @@ use std::{
 };
 
 use gl_matrix::{
-    common::{Mat4, Vec3, Vec4},
-    mat4, vec3, vec4,
+    common::{Mat4, Vec3},
+    mat4, vec3,
 };
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, _4PI},
-    macros::{max_to_none, new_mat4_copy},
+    macros::{max_to_none, new_mat4_copy, temp_debug_log, vec3_from},
     mono_data::{PropAabbs, PropMonoData},
+    player::Player,
     props::config::NamePropConfig,
     util::scale_sim_transform,
 };
@@ -90,11 +91,11 @@ struct PropSubobject {
 
     /// (??) The position of this subobject (presumably relative to the prop).
     /// offset: 0x18
-    pub pos: Vec4,
+    pub pos: Vec3,
 
     /// (??) The Euler agnles of this subobject
     /// offset: 0x28
-    pub rot_vec: Vec4,
+    pub rot_vec: Vec3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,6 +180,18 @@ pub struct AddPropArgs {
 
 pub type PropScript = fn(prop: PropRef) -> ();
 
+/// The six different ways in which a prop's transform can be computed.
+/// Each state corresponds to one the six callbacks starting at offset 0x69e48,
+/// in the order defined in this enum.
+enum UnattachedTransformState {
+    Normal,
+    Stalled,
+    StationaryChild,
+    StationaryChildStalled,
+    MovingChild,
+    MovingChildStalled,
+}
+
 #[derive(Debug, Default)]
 pub struct Prop {
     /// The unique id of this prop.
@@ -212,9 +225,11 @@ pub struct Prop {
     /// offset: 0x14
     alpha: f32,
 
+    /// (??) The type of movement that this prop performs.
+    /// offset: 0x16
     move_type: Option<u16>,
 
-    /// (??) The prop is intangible until the player loads this area.
+    /// The prop is intangible until the player loads this area.
     /// offset: 0x1a
     hit_on_area: Option<u16>,
 
@@ -231,16 +246,16 @@ pub struct Prop {
     innate_motion_state: u8,
 
     /// True if the prop's motion action follows a path.
-    /// offset: 0x20
-    has_path_motion_action: bool,
+    /// offset: 0x1f
+    is_following_path: bool,
 
     /// If true, the prop cannot wobble.
-    /// offset: 0x21
+    /// offset: 0x20
     disable_wobble: bool,
 
     /// True if the prop's motion action applies any translation.
-    /// offset: 0x22
-    has_moving_motion: bool,
+    /// offset: 0x21
+    has_motion: bool,
 
     /// The next sibling of this prop in its family tree.
     /// offset: 0x28
@@ -256,7 +271,7 @@ pub struct Prop {
 
     /// The position at which this prop loaded.
     /// offset: 0x40
-    init_pos: Vec4,
+    init_pos: Vec3,
 
     /// The prop's rotation as a matrix.
     /// offset: 0x50
@@ -264,23 +279,23 @@ pub struct Prop {
 
     /// The prop's position.
     /// offset: 0x90
-    pos: Vec4,
+    pos: Vec3,
 
     /// The prop's rotation as Euler angles.
     /// offset: 0xa0
-    rotation_vec: Vec4,
+    rotation_vec: Vec3,
 
     /// The prop's scale. (unused in simulation)
     /// offset: 0xb0
-    scale: Vec4,
+    scale: Vec3,
 
     /// The prop's position on the previous tick.
     /// offset: 0xc0
-    last_pos: Vec4,
+    last_pos: Vec3,
 
     /// The prop's rotation as Euler angles on the previous tick.
     /// offset: 0xd0
-    last_rotation_vec: Vec4,
+    last_rotation_vec: Vec3,
 
     /// The prop's transform matrix while unattached from the katamari.
     /// offset: 0x110
@@ -444,11 +459,11 @@ pub struct Prop {
 
     /// While attached, the offset from the katamari center to the prop's center.
     /// offset: 0x9e8
-    kat_center_offset: Vec4,
+    kat_center_offset: Vec3,
 
     /// (??) The velocity of the katamari when it collided with the prop.
     /// offset: 0x9f8
-    kat_collision_vel: Vec4,
+    kat_collision_vel: Vec3,
 
     /// The prop's distance to player 0 on the previous frame.
     /// offset: 0xa08
@@ -511,9 +526,13 @@ pub struct Prop {
     /// offset: 0xb24
     init_transform: Mat4,
 
+    /// The vector that the prop moved between the previous frame and this frame.
+    /// offset: 0xb64
+    delta_pos_unit: Vec3,
+
     /// The Euler angles of this prop when it was loaded.
     /// offset: 0xbb8
-    init_rotation_vec: Vec4,
+    init_rotation_vec: Vec3,
 }
 
 pub type PropRef = Rc<RefCell<Prop>>;
@@ -611,20 +630,20 @@ impl Prop {
             link_action: max_to_none!(u16, args.link_action).map(|v| v.into()),
             innate_motion_type: max_to_none!(u8, config.innate_motion_type),
             innate_motion_state: 0,
-            has_path_motion_action: false,
+            is_following_path: false,
             disable_wobble: args.shake_off_flag != 0,
-            has_moving_motion: false,
+            has_motion: false,
             next_sibling: None,
             first_child: None,
             init_area: area,
-            init_pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
+            init_pos: [args.pos_x, args.pos_y, args.pos_z],
             rotation_mat: rotation_mat,
-            pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
-            rotation_vec: [args.rot_x, args.rot_y, args.rot_z, args.rot_w],
-            scale: [1.0, 1.0, 1.0, 1.0],
-            last_pos: [args.pos_x, args.pos_y, args.pos_z, 1.0],
-            last_rotation_vec: [args.rot_x, args.rot_y, args.rot_z, args.rot_w],
-            init_rotation_vec: [args.rot_x, args.rot_y, args.rot_z, args.rot_w],
+            pos: [args.pos_x, args.pos_y, args.pos_z],
+            rotation_vec: [args.rot_x, args.rot_y, args.rot_z],
+            scale: [1.0, 1.0, 1.0],
+            last_pos: [args.pos_x, args.pos_y, args.pos_z],
+            last_rotation_vec: [args.rot_x, args.rot_y, args.rot_z],
+            init_rotation_vec: [args.rot_x, args.rot_y, args.rot_z],
             unattached_transform: unattached_transform,
             init_rotation_mat: init_rotation_mat,
             init_transform: init_transform,
@@ -643,8 +662,8 @@ impl Prop {
             onattach_remain_ticks: 0,
             onattach_game_time_ms: 0,
             attached_transform: [0.0; 16],
-            kat_center_offset: [0.0; 4],
-            kat_collision_vel: [0.0; 4],
+            kat_center_offset: [0.0; 3],
+            kat_collision_vel: [0.0; 3],
             last_dist_to_p0: 0.0,
             last_dist_to_p1: 0.0,
             dist_to_p0: 0.0,
@@ -682,6 +701,8 @@ impl Prop {
             alt_motion_action_type: None, // TODO
             twin_prop: None,
             mono_data: None,
+
+            delta_pos_unit: [0.0; 3],
         };
 
         if let Some(aabbs) = &mono_data.aabbs {
@@ -826,8 +847,8 @@ impl Prop {
         self.global_state == PropGlobalState::Attached
     }
 
-    pub fn get_pos(&self, out: &mut Vec4) {
-        vec4::copy(out, &self.pos);
+    pub fn get_pos(&self, out: &mut Vec3) {
+        vec3::copy(out, &self.pos);
     }
 
     pub fn get_radius(&self) -> f32 {
@@ -845,6 +866,10 @@ impl Prop {
 
         scale_sim_transform(&mut transform);
 
+        if self.ctrl_idx == 224 {
+            temp_debug_log!("  pushpin transform={:?}", transform);
+        }
+
         mat4::copy(&mut *out, &transform);
     }
 
@@ -856,6 +881,10 @@ impl Prop {
 
     pub fn set_disabled(&mut self, force_disabled: i32) {
         self.force_disabled = force_disabled != 0;
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.force_disabled
     }
 
     pub fn set_no_parent(&mut self) {
@@ -962,5 +991,164 @@ impl Prop {
     /// after transforming the AABB with its current rotation matrix.
     pub fn max_aabb_y(&self) -> f32 {
         max_transformed_y(&self.aabb_vertices, &self.rotation_mat)
+    }
+}
+
+impl Prop {
+    /// Update a prop when not in the ending mission, i.e. the "normal" prop update logic.
+    /// offset: 0x50050 (note: that offset's function loops over all props, and this function is
+    ///                  one iteration of that loop.)
+    pub fn update_nonending(&mut self, player: &Player) {
+        if self.force_disabled {
+            return;
+        }
+
+        vec3::copy(&mut self.last_pos, &self.pos);
+        vec3::copy(&mut self.last_rotation_vec, &self.rotation_vec);
+
+        match self.global_state {
+            PropGlobalState::Unattached => self.update_unattached(),
+            PropGlobalState::Attached => self.update_attached(),
+            PropGlobalState::AirborneIntangible => self.update_airborne_intangible(),
+        }
+
+        self.update_child_link();
+
+        if let Some(script) = self.motion_script.as_ref() {
+            // TODO_PROP_MOTION: `props_update_nonending:55-68`
+        }
+
+        if let Some(script) = self.innate_script.as_ref() {
+            // TODO_PROP_MOTION: call `innate_script`
+        }
+
+        self.cache_distance_to_players(player);
+
+        let delta_pos = vec3_from!(-, self.pos, self.last_pos);
+        vec3::normalize(&mut self.delta_pos_unit, &delta_pos);
+
+        if self.global_state != PropGlobalState::Attached {
+            // TODO_LINKS: `props_update_nonending:96-133` (different transform logic for linked props)
+            // if (self.flags & 2) != 0 {
+            //     // if prop is wobbling (??)
+            // }
+            // TODO_LINKS: this value should depend on the above code
+            let transform_state = UnattachedTransformState::Normal;
+
+            match transform_state {
+                UnattachedTransformState::Normal => self.update_transform_normal(),
+                UnattachedTransformState::Stalled => self.update_transform_stalled(),
+                UnattachedTransformState::StationaryChild => {
+                    self.update_transform_stationary_child()
+                }
+                UnattachedTransformState::StationaryChildStalled => {
+                    self.update_transform_stationary_child_stalled()
+                }
+                UnattachedTransformState::MovingChild => self.update_transform_moving_child(),
+                UnattachedTransformState::MovingChildStalled => {
+                    self.update_transform_moving_child_stalled()
+                }
+            }
+        }
+    }
+
+    // TODO_PROPS
+    /// Update logic for a prop that's not attached to the katamari.
+    /// offset: 0x50f10
+    fn update_unattached(&mut self) {
+        // match self.unattached_state {
+        //     PropUnattachedState::Normal => todo!(),
+        //     PropUnattachedState::State1 => todo!(),
+        //     PropUnattachedState::State2 => todo!(),
+        //     PropUnattachedState::State3 => todo!(),
+        //     PropUnattachedState::State4 => todo!(),
+        //     PropUnattachedState::AirborneBounced => todo!(),
+        // }
+    }
+
+    /// Update logic for a prop that's attached to the katamari.
+    /// offset: 0x50f30
+    fn update_attached(&mut self) {
+        self.flags &= 0xdf;
+        self.flags2 &= 0xfe;
+        self.move_type = None;
+        self.has_motion = false;
+        self.unattached_state = PropUnattachedState::Normal;
+        self.animation_type = PropAnimationType::Animation2;
+        self.is_following_path = false;
+    }
+
+    /// TODO_PROPS
+    /// Update logic for a prop that's airborne.
+    /// offset: 0x50eb0
+    fn update_airborne_intangible(&mut self) {}
+
+    /// Update logic for props which have a parent.
+    /// offset: 0x2e030
+    fn update_child_link(&mut self) {
+        if self.parent.is_none() {
+            self.flags &= 0xfd;
+            return;
+        }
+
+        // TODO_PROPS: `prop_update_link:20-`
+    }
+
+    /// Compute the distance from this prop to other players and cache those
+    /// distances on the prop for later use.
+    /// offset: 0x50290
+    fn cache_distance_to_players(&mut self, player: &Player) {
+        self.last_dist_to_p0 = self.dist_to_p0;
+        self.dist_to_p0 = vec3::distance(&self.pos, player.katamari.get_center());
+
+        // TODO_VS: `prop_cache_distance_to_players:18+` (cache distance to other players)
+    }
+}
+
+/// Subroutines to update a prop's unattached transform depending on its `PropTransformState` state.
+impl Prop {
+    /// Update a prop's transform when it is not a linked child and not stalled.
+    /// offset: 0x51d90
+    fn update_transform_normal(&mut self) {
+        let mut temp1 = mat4::create();
+        let mut temp2 = mat4::create();
+
+        mat4::rotate_z(&mut temp2, &temp1, self.rotation_vec[2]);
+        mat4::rotate_x(&mut temp1, &temp2, self.rotation_vec[0]);
+        mat4::rotate_y(&mut temp2, &temp1, self.rotation_vec[1]);
+
+        mat4::multiply(&mut self.unattached_transform, &self.rotation_mat, &temp2);
+    }
+
+    /// Update a prop's transform when it is not a linked child and stalled.
+    /// offset: 0x51ac0
+    fn update_transform_stalled(&mut self) {
+        // TODO_STALLS
+    }
+
+    /// Update a prop's transform when it is a linked child, not moving, and not stalled.
+    /// offset: 0x518a0
+    fn update_transform_stationary_child(&mut self) {
+        // TODO_LINKS
+    }
+
+    /// Update a prop's transform when it is a linked child, not moving, and stalled.
+    /// offset: 0x51580
+    fn update_transform_stationary_child_stalled(&mut self) {
+        // TODO_LINKS
+        // TODO_STALLS
+    }
+
+    /// Update a prop's transform when it is a linked child, moving, and not stalled.
+    /// offset: 0x51f60
+    fn update_transform_moving_child(&mut self) {
+        // TODO_LINKS
+    }
+
+    /// Update a prop's transform when it is a linked child, moving, and stalled.
+    /// offset: 0x52230
+    fn update_transform_moving_child_stalled(&mut self) {
+        // TODO_LINKS
+        // TODO_STALLS
     }
 }

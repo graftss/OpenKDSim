@@ -16,6 +16,7 @@ mod player;
 mod props;
 mod util;
 
+use backtrace::Backtrace;
 use collision::raycast_state::{RaycastCallType, RaycastState};
 use delegates::*;
 use gamestate::GameState;
@@ -26,8 +27,7 @@ use props::{
     config::NamePropConfig,
     prop::{AddPropArgs, Prop},
 };
-use std::{cell::RefCell};
-use backtrace::Backtrace;
+use std::cell::RefCell;
 
 use crate::macros::{log, panic_log};
 
@@ -899,7 +899,6 @@ pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission:
 
 #[no_mangle]
 pub unsafe extern "C" fn TakesCallbackDebugDrawLine(cb: DebugDrawLineDelegate) {
-    temp_debug_log!("calling tcddl");
     STATE.with(|state| {
         state.borrow_mut().delegates.borrow_mut().debug_draw_line = Some(cb);
     });

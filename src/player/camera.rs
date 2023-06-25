@@ -6,7 +6,7 @@ use gl_matrix::{
 use crate::{
     collision::raycast_state::RaycastState,
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    macros::{log, max, min, set_translation, set_y, vec3_from, temp_debug_log},
+    macros::{log, max, min, set_translation, set_y, temp_debug_log, vec3_from},
     math::{
         change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
         vec3_inplace_scale, vec3_inplace_subtract_vec,

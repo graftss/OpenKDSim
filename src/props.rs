@@ -2,7 +2,13 @@ use std::{rc::Rc, slice};
 
 use gl_matrix::common::Mat4;
 
-use crate::{constants::ZERO, mono_data::PropMonoData};
+use crate::{
+    constants::ZERO,
+    macros::temp_debug_log,
+    mission::{state::MissionState, Mission},
+    mono_data::PropMonoData,
+    player::Player,
+};
 
 use self::{
     config::NamePropConfig,
@@ -62,6 +68,10 @@ impl Props {
         mono_data: Option<&Rc<PropMonoData>>,
     ) {
         if let Some(md) = mono_data {
+            if (ctrl_idx == 224) {
+                temp_debug_log!("adding prop {}, {:?}", ctrl_idx, md);
+            }
+
             let prop = Prop::new(ctrl_idx, args, area, md);
             self.props.push(prop);
         }
@@ -93,6 +103,7 @@ impl Props {
     }
 
     /// Mimicks the `GetPropMatrices` API function.
+    /// Returns the number
     pub unsafe fn get_prop_matrices(&self, out: *mut f32) -> i32 {
         let mut next_mat = out;
         let mut result = 0;
@@ -116,4 +127,28 @@ impl Props {
 
         result
     }
+
+    /// Root method to update all props.
+    /// offset: 0x259c0
+    pub fn update(&mut self, player: &Player, mission_state: &MissionState) {
+        // TODO_ZONE: `props_update_nonending:28` (`kat_find_zone()`; this should probably be moved somewhere else)
+        if mission_state.is_ending() {
+            self.update_ending();
+        } else {
+            self.update_nonending(player)
+        }
+    }
+
+    /// Root function to update all props when not in the `Ending` game mode.
+    /// offset: 0x50050
+    pub fn update_nonending(&mut self, player: &Player) {
+        for prop_ref in self.props.iter_mut() {
+            let mut prop = prop_ref.borrow_mut();
+            prop.update_nonending(player);
+        }
+    }
+
+    /// Root function to update all props when in the `Ending` game mode.
+    /// offset: 0x259f0 (note: this offset is in the middle of a function in the original simulation)
+    pub fn update_ending(&mut self) {}
 }

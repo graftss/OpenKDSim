@@ -15,7 +15,8 @@ use crate::{
     },
     mission::{state::MissionState, GameMode},
     player::{camera::Camera, prince::Prince},
-    props::prop::WeakPropRef, util::debug_log,
+    props::prop::WeakPropRef,
+    util::debug_log,
 };
 
 use self::{hit::SurfaceHit, ray::KatCollisionRayType};
@@ -250,8 +251,8 @@ impl Katamari {
         };
 
         let dot = vec3::dot(&impact_unit, &self.raycast_state.ray_unit);
-        let ray_clip_len =
-            (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant) * self.raycast_state.ray_len;
+        let ray_clip_len = (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant)
+            * self.raycast_state.ray_len;
         // temp_debug_log!("ray_idx={}, dot={}, impact_unit={:?}, ray_unit={:?}", ray_idx, dot, impact_unit, self.raycast_state.ray_unit);
         // temp_debug_log!("ray_clip_len={:?}, impact_dist_ratio={:?}, clip_len_const={:?}, impact_dist={:?}", ray_clip_len, hit.impact_dist_ratio, self.params.clip_len_constant, self.raycast_state.ray_len);
 
@@ -477,7 +478,8 @@ impl Katamari {
             self.climb_radius_cm = max_ray_len;
         }
 
-        if min_ratio_ray_idx.is_none() || self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
+        if min_ratio_ray_idx.is_none()
+            || self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
         {
             // if the primary floor contact point is from the bottom ray:
             self.fc_ray_idx = min_ratio_ray_idx;
@@ -490,7 +492,7 @@ impl Katamari {
                 self.collision_rays[0].ray_len
             };
         } else if min_ratio_ray_idx == self.vault_ray_idx {
-            // if the primary floor contact point is from the vault ray:    
+            // if the primary floor contact point is from the vault ray:
             self.fc_ray_idx = self.vault_ray_idx;
         } else {
             // if the primary floor contact point is from a non-bottom, non-vault ray:
@@ -1400,8 +1402,8 @@ impl Katamari {
                 let wall_normal_xz_unit = vec3_unit_xz!(self.contact_wall_normal_unit);
 
                 // the katamari is moving towards the wall if:
-                // its velocity dot the wall normal is below the similarity threshold 
-                // (since the wall normal should be pointing away from katamari movement, any 
+                // its velocity dot the wall normal is below the similarity threshold
+                // (since the wall normal should be pointing away from katamari movement, any
                 // negative similarity should also work)
                 vec3::dot(&move_xz_unit, &wall_normal_xz_unit)
                     <= self.params.move_into_wall_similarity

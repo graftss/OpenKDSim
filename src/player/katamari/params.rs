@@ -265,7 +265,7 @@ impl Default for KatamariParams {
             surface_similarity_threshold: f32::from_bits(0x3f7ffeb0), // 0.99998
             sloped_floor_normal_y_threshold: f32::from_bits(0x3f7ff972), // 0.9999
             wall_to_floor_angle_stuck_threshold: f32::from_bits(0x40060a92), // 3pi/2
-            wall_to_wall_angle_stuck_threshold: f32::from_bits(0x40278d36),  // 5pi/6
+            wall_to_wall_angle_stuck_threshold: f32::from_bits(0x40278d36), // 5pi/6
             detach_cooldown_when_stuck_btwn_walls: 15,
             base_detached_prop_vol_mult: f32::from_bits(0x3cf5c28f),
             stuck_detached_prop_vol_mult: 0.5,

@@ -21,7 +21,7 @@ use crate::{
     },
     delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{min, set_translation, temp_debug_log, vec3_from, temp_debug_write},
+    macros::{min, set_translation, temp_debug_log, temp_debug_write, vec3_from},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
     props::prop::PropRef,
@@ -69,12 +69,14 @@ pub enum CamRelativeDir {
 
 #[derive(Debug)]
 pub struct DebugConfig {
-    pub draw_collision_rays: bool
+    pub draw_collision_rays: bool,
 }
 
 impl Default for DebugConfig {
     fn default() -> Self {
-        Self { draw_collision_rays: true }
+        Self {
+            draw_collision_rays: false,
+        }
     }
 }
 
@@ -986,7 +988,6 @@ impl Katamari {
         global: &GlobalState,
         mission_state: &MissionState,
     ) {
-        temp_debug_log!("tick");
         // self.debug_log_clip_data("0x1dba8");
 
         let stage_config = &mission_state.stage_config;

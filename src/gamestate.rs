@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     delegates::Delegates,
     global::GlobalState,
-    macros::panic_log,
+    macros::{panic_log, temp_debug_log},
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
@@ -338,7 +338,7 @@ impl GameState {
         // `update_game()`
         // TODO: `update_game:23-89` (if store flag is on, which seems to be irrelevant)
         self.global.updating_player = 0;
-        // TODO: `props_update()`
+        self.props.update(&self.players[0], &self.mission_state);
         // TODO: `update_game:93-101` (but put this in `props_update`)
         // TODO: `tutorial_update_flags`
 

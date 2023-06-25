@@ -185,25 +185,25 @@ impl From<u8> for Mission {
             23 => Self::Eternal2,          // eternal 2
             24 => Self::Eternal3,          // eternal 3
             25 => Self::Mission25ShopDemo, // (unused) debug l evel with starting size 0
-            26 => Self::Mission26,         // (unused) debug level with no collision, spawn above pond in mas8
-            27 => Self::Mission27,         // (unused) mas7 area with no objects
-            28 => Self::Tutorial,          // tutorial (opens with PRESS START)
-            29 => Self::Ending,            // countries level, gametype N
-            30 => Self::Mission30Load,     // nothing loads
+            26 => Self::Mission26, // (unused) debug level with no collision, spawn above pond in mas8
+            27 => Self::Mission27, // (unused) mas7 area with no objects
+            28 => Self::Tutorial,  // tutorial (opens with PRESS START)
+            29 => Self::Ending,    // countries level, gametype N
+            30 => Self::Mission30Load, // nothing loads
             31 => Self::Vs0,
             32 => Self::Vs1,
             33 => Self::Vs2,
-            34 => Self::Vs3,               // vs level with magazine bridge
+            34 => Self::Vs3, // vs level with magazine bridge
             35 => Self::Vs4,
             36 => Self::Vs5,
             37 => Self::Vs6,
             38 => Self::Vs7,
-            39 => Self::GameShow,          // nothing loads
-            40 => Self::Test0,             // nothing loads
-            41 => Self::Test1,             // nothing loads
-            42 => Self::Test2,             // nothing loads
-            43 => Self::Test3,             // nothing loads
-            44 => Self::Test4,             // nothing loads
+            39 => Self::GameShow, // nothing loads
+            40 => Self::Test0,    // nothing loads
+            41 => Self::Test1,    // nothing loads
+            42 => Self::Test2,    // nothing loads
+            43 => Self::Test3,    // nothing loads
+            44 => Self::Test4,    // nothing loads
             _ => {
                 panic_log!("encountered unknown `Mission` value: {}", value);
             }

@@ -54,8 +54,17 @@ pub type SetCameraDelegate = extern "C" fn(
 pub type VsVolumeDiffDelegate =
     extern "C" fn(f1: i32, f2: i32, f3: i32, ratio: f32, time: f32, recover: i32) -> ();
 
-pub type DebugDrawLineDelegate =
-    extern "C" fn(p0x: f32, p0y: f32, p0z: f32, p1x: f32, p1y: f32, p1z: f32, r: f32, g: f32, b: f32) -> ();
+pub type DebugDrawLineDelegate = extern "C" fn(
+    p0x: f32,
+    p0y: f32,
+    p0z: f32,
+    p1x: f32,
+    p1y: f32,
+    p1z: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+) -> ();
 
 #[derive(Default)]
 pub struct Delegates {
@@ -75,7 +84,7 @@ pub struct Delegates {
     pub set_camera: Option<SetCameraDelegate>,
     pub vs_volume_diff: Option<VsVolumeDiffDelegate>,
 
-    // delegates unique to the open simulation 
+    // delegates unique to the open simulation
     pub debug_draw_line: Option<DebugDrawLineDelegate>,
 }
 

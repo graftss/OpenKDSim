@@ -988,7 +988,8 @@ impl Katamari {
         let speed = vec3::len(velocity);
         let pivot_circumf = max!(self.fc_ray_len, 0.1) * TAU;
 
-        if !self.physics_flags.airborne { // 0x200ba
+        if !self.physics_flags.airborne {
+            // 0x200ba
             let mut net_normal_unit = [0.0, 0.0, 0.0];
 
             if !self.physics_flags.climbing_wall {

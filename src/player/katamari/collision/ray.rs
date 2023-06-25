@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, temp_debug_log, vec3_from, temp_debug_write},
+    macros::{inv_lerp_clamp, lerp, temp_debug_log, temp_debug_write, vec3_from},
     math::{vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::prop::WeakPropRef,
@@ -261,7 +261,11 @@ impl Katamari {
 
         bottom_ray.ray_len = radius;
         vec3_inplace_zero_small(&mut bottom_ray.endpoint, 0.0001);
-        vec3::subtract(&mut bottom_ray.ray_local, &bottom_ray.endpoint, &self.center);
+        vec3::subtract(
+            &mut bottom_ray.ray_local,
+            &bottom_ray.endpoint,
+            &self.center,
+        );
         vec3::normalize(&mut bottom_ray.ray_local_unit, &bottom_ray.ray_local);
         vec3::subtract(
             &mut bottom_ray.kat_to_endpoint,

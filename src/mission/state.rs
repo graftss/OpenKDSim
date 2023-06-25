@@ -60,6 +60,10 @@ impl MissionState {
         self.gamemode == GameMode::Tutorial
     }
 
+    pub fn is_ending(&self) -> bool {
+        self.gamemode == GameMode::Ending
+    }
+
     pub fn set_gamemode(&mut self, gamemode: u8) {
         self.gamemode = gamemode.into();
     }

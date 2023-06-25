@@ -1,5 +1,13 @@
 /// Log a formatted string to the main debug log file. Used temporarily while debugging.
 #[allow(unused_macros)]
+macro_rules! debug_log {
+    ($($y: expr),+) => {
+        crate::util::debug_log(&format!($($y),+));
+    }
+}
+
+/// Log a formatted string to the main debug log file. Used temporarily while debugging.
+#[allow(unused_macros)]
 macro_rules! temp_debug_log {
     ($($y: expr),+) => {
         crate::util::debug_log(&format!($($y),+));
@@ -182,6 +190,7 @@ macro_rules! set_y {
 
 #[allow(unused_imports)]
 pub(crate) use {
+    debug_log,
     inv_lerp,
     inv_lerp_clamp,
     lerp,
