@@ -900,6 +900,14 @@ impl Prop {
         self.aabb_radius
     }
 
+    pub fn get_aabb_mesh(&self) -> &Mesh {
+        &self.aabb_mesh
+    }
+
+    pub fn get_unattached_transform(&self) -> &Mat4 {
+        &self.unattached_transform
+    }
+
     pub fn get_dist_to_katamari(&self, player: i32) -> f32 {
         match player {
             0 => self.dist_to_p0,

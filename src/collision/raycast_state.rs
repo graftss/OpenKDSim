@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ptr::copy, rc::Rc};
 
 use gl_matrix::{
     common::{Mat4, Vec3},
@@ -15,12 +15,16 @@ use crate::{
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
-use super::{hit_attribute::HitAttribute, mesh::Mesh};
+use super::{
+    aabb,
+    hit_attribute::HitAttribute,
+    mesh::{Mesh, TriVertex},
+};
 
 const IMPACT_EPS: f32 = 0.0001;
 
 /// A triangle hit by a raycast.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct RaycastTriHit {
     /// The point on the triangle that was hit.
     /// offset: 0x0
@@ -106,7 +110,7 @@ pub struct RaycastState {
 
     /// The triangles hit by the raycast.
     /// offset: 0x238
-    pub hit_tris: Vec<RaycastTriHit>,
+    pub tri_hits: Vec<RaycastTriHit>,
 
     /// Data computed as a side effect of calling  `ray_hits_triangle`.
     /// offset: 0x7f8
@@ -159,7 +163,7 @@ impl RaycastState {
     /// Read the closest hit from the `hit_tris` list.
     pub fn get_closest_hit(&self) -> Option<&RaycastTriHit> {
         self.closest_hit_idx
-            .map(|idx| self.hit_tris.get(idx as usize))
+            .map(|idx| self.tri_hits.get(idx as usize))
             .flatten()
     }
 
@@ -171,7 +175,7 @@ impl RaycastState {
     ) -> bool {
         let scale = UNITY_TO_SIM_SCALE;
 
-        self.hit_tris.clear();
+        self.tri_hits.clear();
 
         let delegates = self
             .delegates
@@ -247,7 +251,7 @@ impl RaycastState {
                 // write hit to the raycast state at index 0 (it will be the only stored hit)
                 self.closest_hit_idx = Some(0);
                 self.ray_len = ray_len;
-                self.hit_tris.push(RaycastTriHit {
+                self.tri_hits.push(RaycastTriHit {
                     impact_point: impact_point.clone(),
                     normal_unit: impact_normal_unit.clone(),
                     tri: Default::default(),
@@ -266,10 +270,10 @@ impl RaycastState {
     }
 
     /// offset: 0x11d70
-    pub fn ray_hits_triangle(&mut self, triangle: &[Vec3; 3], transform: &Option<Mat4>) -> f32 {
+    pub fn ray_hits_triangle(&mut self, triangle: &[Vec3; 3], transform: Option<&Mat4>) -> f32 {
         let EPS = 0.000001;
 
-        let [mut p0, mut p1, mut p2] = triangle.clone();
+        let [mut p0, mut p1, mut p2] = &triangle;
 
         if let Some(mat) = transform {
             vec3::transform_mat4(&mut p0, &triangle[0], mat);
@@ -352,8 +356,178 @@ impl RaycastState {
         return t;
     }
 
-    pub fn ray_hits_mesh(&mut self, mesh: &Mesh, transform: &Option<Mat4>) -> i32 {
-        0
+    /// Returns the number of triangles in `mesh` hit by the ray.
+    /// offset: 0x10da0
+    pub fn ray_hits_mesh(
+        &mut self,
+        mesh: &Mesh,
+        transform: &Mat4,
+        is_ray_transformed: bool,
+    ) -> i32 {
+        let mut p0 = self.point0.clone();
+        let mut p1 = self.point1.clone();
+
+        // the original simulation doesn't seem to use the ray-to-aabb intersection point, but it
+        // still computes it. so whatever
+        let mut aabb_collision_out = vec3::create();
+
+        // if the collision ray isn't already transformed, multiply the endpoints of
+        // the collision ray by the inverse of `transform`.
+        if !is_ray_transformed {
+            let mut transform_inv = mat4::create();
+
+            mat4::invert(&mut transform_inv, &transform);
+            vec3::transform_mat4(&mut p0, &self.point0, &transform_inv);
+            vec3::transform_mat4(&mut p1, &self.point1, &transform_inv);
+        }
+
+        // iterate over the mesh sectors, checking if the ray meets each sector's AABB
+        let mut hit_aabbs = vec![];
+        let mut hit_any_aabb = false;
+        for sector in mesh.sectors.iter() {
+            let hit_aabb = ray_hits_aabb(
+                &p0,
+                &p1,
+                &sector.aabb.min,
+                &sector.aabb.max,
+                &mut aabb_collision_out,
+            );
+            hit_aabbs.push(hit_aabb);
+            hit_any_aabb |= hit_aabb;
+        }
+
+        self.num_hit_tris = 0;
+        if !hit_any_aabb {
+            return 0;
+        }
+
+        // iterate over the sectors again, this time refining the successful AABB collisions with
+        // more precise triangle mesh collisions
+
+        let transform = match is_ray_transformed {
+            true => Some(transform),
+            false => None,
+        };
+
+        // compute the nearest triangle collision to the ray as the triangle whose distance
+        // from the ray's initial point is smallest
+        let mut min_tri_hit_dist = self.ray_len;
+        let mut min_tri_hit_point = vec3::create();
+        self.tri_hits.clear();
+
+        for (sector_idx, sector) in mesh.sectors.iter().enumerate() {
+            if !hit_aabbs[sector_idx] {
+                continue;
+            }
+            for tri_group in sector.tri_groups.iter() {
+                // TODO: this is gross, there should really be a way to abstract the iterator
+                if tri_group.is_tri_strip {
+                    for vertices in tri_group.vertices.windows(3) {
+                        let mut triangle =
+                            [vertices[0].point, vertices[1].point, vertices[2].point];
+                        // TODO: not sure if this is actually negating the coordinates here?
+                        // TODO: if it is, then this should probably be done when the mono data is parsed??
+                        for i in 0..3 {
+                            for j in 0..3 {
+                                triangle[i][j] *= -1.0;
+                            }
+                        }
+
+                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform);
+                        if tri_hit_dist > 0.0 {
+                            // if we hit the triangle:
+
+                            // finish copying data to the triangle (this should probably be in `ray_hits_triangle`)
+                            let mut hit = self.ray_to_triangle_hit;
+                            hit.metadata = vertices[2].metadata as i32;
+                            for i in 0..3 {
+                                vec3::copy(&mut hit.tri[i], &vertices[i].point);
+                            }
+
+                            // save the hit to the raycast state
+                            self.tri_hits.push(hit);
+
+                            // update the minimum distance
+                            if tri_hit_dist < min_tri_hit_dist {
+                                self.closest_hit_idx = Some(self.tri_hits.len() as u8 - 1);
+                                min_tri_hit_dist = tri_hit_dist;
+                                vec3::copy(&mut min_tri_hit_point, &hit.impact_point);
+                            }
+                        }
+                    }
+                } else {
+                    for vertices in tri_group.vertices.chunks_exact(3) {
+                        let mut triangle =
+                            [vertices[0].point, vertices[1].point, vertices[2].point];
+                        // TODO: not sure if this is actually negating the coordinates here?
+                        for i in 0..3 {
+                            for j in 0..3 {
+                                triangle[i][j] *= -1.0;
+                            }
+                        }
+
+                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform);
+                        if tri_hit_dist > 0.0 {
+                            // if we hit the triangle:
+
+                            // finish copying data to the triangle (this should probably be in `ray_hits_triangle`)
+                            let mut hit = self.ray_to_triangle_hit;
+                            hit.metadata = vertices[2].metadata as i32;
+                            for i in 0..3 {
+                                vec3::copy(&mut hit.tri[i], &vertices[i].point);
+                            }
+
+                            // save the hit to the raycast state
+                            self.tri_hits.push(hit);
+
+                            // update the minimum distance
+                            if tri_hit_dist < min_tri_hit_dist {
+                                self.closest_hit_idx = Some(self.tri_hits.len() as u8 - 1);
+                                min_tri_hit_dist = tri_hit_dist;
+                                vec3::copy(&mut min_tri_hit_point, &hit.impact_point);
+                            }
+                            self.num_hit_tris += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // early return if no mesh triangles were hit
+        if self.num_hit_tris == 0 {
+            return 0;
+        }
+
+        let impact_dist_ratio = self.get_closest_hit().unwrap().impact_dist_ratio;
+
+        for hit in self.tri_hits.iter_mut() {
+            // TODO: undo goofy hack where `ray_hits_triangle` misuses the z coordinate of the
+            // impact point to store the impact distance. why?? who knows
+            let impact_dist = hit.impact_point[2];
+
+            hit.impact_dist = impact_dist;
+            hit.impact_dist_ratio = impact_dist / self.ray_len;
+
+            // TODO: no clue what this is doing
+            if is_ray_transformed {
+                hit.impact_point = min_tri_hit_point
+            } else {
+                let mut normal_unit = hit.normal_unit;
+                vec3_inplace_zero_small(&mut normal_unit, 0.00001);
+
+                let ray_dot_normal = vec3::dot(&normal_unit, &self.ray_unit);
+                let t = (1.0 - impact_dist_ratio - 0.0005) * self.ray_len;
+
+                vec3::scale_and_add(
+                    &mut hit.impact_point,
+                    &self.point1,
+                    &normal_unit,
+                    t * ray_dot_normal,
+                );
+            }
+        }
+
+        self.num_hit_tris as i32
     }
 }
 
@@ -485,7 +659,7 @@ mod tests {
 
         let mut raycast_state = RaycastState::default();
         raycast_state.load_ray(&ray[0], &ray[1]);
-        raycast_state.ray_hits_triangle(&triangle, &None);
+        // raycast_state.ray_hits_triangle(&triangle, &None);
         println!("result: {:?}", raycast_state.ray_to_triangle_hit);
     }
 }

@@ -121,6 +121,7 @@ impl Katamari {
         }
 
         // TODO: `kat_update_collision:222-266` (destroy collected props that are sucked inside the ball)
+        temp_debug_log!("  nearby collectible props: \n{:?}", self.nearby_collectible_props);
         self.process_nearby_collectible_props(mission_state);
         // TODO: `kat_process_collected_props()`
         // TODO: `kat_update_world_size_threshold??()`
@@ -223,13 +224,14 @@ impl Katamari {
         if mission_state.is_ending() {
             // TODO_ENDING: `kat_process_nearby_collectible_props:13-33`
         } else {
-            for prop_ref in self.nearby_collectible_props.iter_mut() {
+            // TODO: not amazing having to clone the `nearby_collectible_props` list here
+            for prop_ref in self.nearby_collectible_props.clone() {
                 let prop = prop_ref.borrow_mut();
                 let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
 
                 let link_cond = prop.parent.is_none() || prop.get_flags() & 4 == 0;
                 let is_dummy = prop_config.is_dummy_hit;
-                let did_collide = false; // TODO: `kat_intersects_prop_bbox()`
+                let did_collide = self.intersects_prop_bbox(&prop, mission_state);
                 if link_cond && !is_dummy && did_collide {
                     // if the katamari collided with the prop's bbox:
                     let can_prop_be_airborne = prop.get_move_type().is_some()
@@ -262,25 +264,25 @@ impl Katamari {
         if prop.get_dist_to_katamari(0) < prop.get_aabb_radius() + self.radius_cm {
             return true;
         }
-
+    
         let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
-
+    
         let mut kat_sphere_rad = if prop_config.easier_to_collect {
             self.avg_mesh_ray_len
         } else {
             self.larger_avg_mesh_ray_len
         };
-
+    
         if mission_state.is_ending() {
             kat_sphere_rad += kat_sphere_rad;
         }
-
+    
         // compute the unit vector from the prop to the katamari
         let mut prop_pos = vec3::create();
         prop.get_pos(&mut prop_pos);
         let mut prop_to_kat_unit = vec3_from!(-, self.center, prop_pos);
         vec3_inplace_normalize(&mut prop_to_kat_unit);
-
+    
         // compute the ray from the katamari's center towards the prop, with length `kat_sphere_rad`.
         let kat_center = self.center.clone();
         let mut ray_endpoint = vec3::create();
@@ -290,10 +292,10 @@ impl Katamari {
             &prop_to_kat_unit,
             -kat_sphere_rad,
         );
-
+    
         self.raycast_state.load_ray(&kat_center, &ray_endpoint);
-        // TODO: `collision_segment_hits_meshes(prop.aabb_mesh, prop.unattached_transform, false)`
-        false
+        let num_hit_tris = self.raycast_state.ray_hits_mesh(prop.get_aabb_mesh(), prop.get_unattached_transform(), false);
+        num_hit_tris > 0
     }
 
     fn update_surface_contacts(&mut self) {

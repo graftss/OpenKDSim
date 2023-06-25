@@ -2,7 +2,7 @@ use gl_matrix::common::Vec3;
 
 use super::aabb::Aabb;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct TriVertex {
     pub point: Vec3,
     pub metadata: u32,
