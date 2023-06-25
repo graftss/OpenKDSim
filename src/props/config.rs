@@ -87,7 +87,7 @@ pub struct NamePropConfig {
     /// is bigger than it actually is when checking for the kat-prop collision).
     /// Used to make flat objects (e.g. "welcome mat") easier to collect when laying flat on the ground.
     /// offset: 0x26
-    pub collect_from_further: bool,
+    pub easier_to_collect: bool,
 
     /// If true, the prop is an unhatched egg and will need to transform when collected.
     /// offset: 0x27
@@ -139,7 +139,7 @@ impl NamePropConfig {
             config.const_parent_name_idx = read_u16!(table, base + 0x22);
             config.has_treasure_fx = read_bool!(table, base + 0x24);
             config.is_dummy_hit = read_bool!(table, base + 0x25);
-            config.collect_from_further = read_bool!(table, base + 0x26);
+            config.easier_to_collect = read_bool!(table, base + 0x26);
             config.is_unhatched_egg = read_bool!(table, base + 0x27);
         }
     }

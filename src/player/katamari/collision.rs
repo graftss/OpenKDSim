@@ -9,15 +9,15 @@ use crate::{
         temp_debug_log, vec3_from, vec3_unit_xz,
     },
     math::{
-        self, acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_normalize,
-        vec3_inplace_scale, vec3_inplace_subtract, vec3_inplace_subtract_vec,
-        vec3_inplace_zero_small, vec3_projection, vec3_reflection,
+        self, acos_f32, vec3_inplace_add, vec3_inplace_add_scaled, vec3_inplace_add_vec,
+        vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract,
+        vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection, vec3_reflection,
     },
     mission::{self, state::MissionState, GameMode},
     player::{camera::Camera, prince::Prince},
     props::{
         config::NAME_PROP_CONFIGS,
-        prop::{PropGlobalState, WeakPropRef},
+        prop::{Prop, PropGlobalState, WeakPropRef},
         Props,
     },
     util::debug_log,
@@ -161,8 +161,6 @@ impl Katamari {
         for prop_ref in props.props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
 
-            let PROP_CONFIG = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
-
             // return early from the collision check if the prop is still intangible.
             if prop.intangible_timer > 0 {
                 return prop.intangible_timer -= 1;
@@ -185,13 +183,14 @@ impl Katamari {
             // The prop-katamari distance decreased at most by the distance the katamari just moved.
             // If that minimum distance is still bigger than the sum of the kat's and prop's bounding
             // spheres, they can't collide.
-            let min_dist_to_kat = max!(prop.dist_to_p0 - kat_move_len, 0.0);
+            let min_dist_to_kat = max!(prop.get_dist_to_katamari(0) - kat_move_len, 0.0);
             if min_dist_to_kat > self.radius_cm + prop.get_radius() {
                 return;
             }
 
+            let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
             let collectible =
-                self.diam_trunc_mm >= prop.get_attach_diam_mm() && !PROP_CONFIG.is_dummy_hit;
+                self.diam_trunc_mm >= prop.get_attach_diam_mm() && !prop_config.is_dummy_hit;
             // TODO_VS: `kat_find_nearby_props:105-111` (different vol required to collect props in vs mode)
 
             // if the prop and katamari sphere might meet AND the prop is collectible, save this
@@ -226,16 +225,16 @@ impl Katamari {
         } else {
             for prop_ref in self.nearby_collectible_props.iter_mut() {
                 let prop = prop_ref.borrow_mut();
-                let PROP_CONFIG = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
+                let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
 
                 let link_cond = prop.parent.is_none() || prop.get_flags() & 4 == 0;
-                let is_dummy = PROP_CONFIG.is_dummy_hit;
+                let is_dummy = prop_config.is_dummy_hit;
                 let did_collide = false; // TODO: `kat_intersects_prop_bbox()`
                 if link_cond && !is_dummy && did_collide {
                     // if the katamari collided with the prop's bbox:
                     let can_prop_be_airborne = prop.get_move_type().is_some()
                         && !prop.get_stationary()
-                        && PROP_CONFIG.can_be_airborne;
+                        && prop_config.can_be_airborne;
                     let is_prop_squashed = self.max_attach_vol_m3
                         > SQUASH_PROP_VOL_MULTIPLIER * prop.get_compare_vol_m3();
 
@@ -256,6 +255,45 @@ impl Katamari {
                 }
             }
         }
+    }
+
+    fn intersects_prop_bbox(&mut self, prop: &Prop, mission_state: &MissionState) -> bool {
+        // if the prop-player distance is less than the sum of radii, we must have a collision.
+        if prop.get_dist_to_katamari(0) < prop.get_aabb_radius() + self.radius_cm {
+            return true;
+        }
+
+        let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
+
+        let mut kat_sphere_rad = if prop_config.easier_to_collect {
+            self.avg_mesh_ray_len
+        } else {
+            self.larger_avg_mesh_ray_len
+        };
+
+        if mission_state.is_ending() {
+            kat_sphere_rad += kat_sphere_rad;
+        }
+
+        // compute the unit vector from the prop to the katamari
+        let mut prop_pos = vec3::create();
+        prop.get_pos(&mut prop_pos);
+        let mut prop_to_kat_unit = vec3_from!(-, self.center, prop_pos);
+        vec3_inplace_normalize(&mut prop_to_kat_unit);
+
+        // compute the ray from the katamari's center towards the prop, with length `kat_sphere_rad`.
+        let kat_center = self.center.clone();
+        let mut ray_endpoint = vec3::create();
+        vec3::scale_and_add(
+            &mut ray_endpoint,
+            &kat_center,
+            &prop_to_kat_unit,
+            -kat_sphere_rad,
+        );
+
+        self.raycast_state.load_ray(&kat_center, &ray_endpoint);
+        // TODO: `collision_segment_hits_meshes(prop.aabb_mesh, prop.unattached_transform, false)`
+        false
     }
 
     fn update_surface_contacts(&mut self) {

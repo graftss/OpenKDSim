@@ -19,6 +19,8 @@ use crate::{
     util::scale_sim_transform,
 };
 
+use super::config::NAME_PROP_CONFIGS;
+
 const FLAG_HAS_PARENT: u8 = 0x2;
 const FLAG_INTANGIBLE_CHILD: u8 = 0x4;
 
@@ -484,7 +486,7 @@ pub struct Prop {
 
     /// The prop's distance to player 0.
     /// offset: 0xa10
-    pub dist_to_p0: f32,
+    dist_to_p0: f32,
 
     /// The prop's distance to player 1.
     /// offset: 0xa14
@@ -892,6 +894,20 @@ impl Prop {
 
     pub fn get_compare_vol_m3(&self) -> f32 {
         self.compare_vol_m3
+    }
+
+    pub fn get_aabb_radius(&self) -> f32 {
+        self.aabb_radius
+    }
+
+    pub fn get_dist_to_katamari(&self, player: i32) -> f32 {
+        match player {
+            0 => self.dist_to_p0,
+            1 => self.dist_to_p1,
+            _ => {
+                panic!("tried to read distance of nonexistent player: {}", player);
+            }
+        }
     }
 
     /// Writes the active transform to `out`.
