@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use gl_matrix::{
     common::{Mat4, Vec3},
+    mat2::create,
     mat4, vec3,
 };
 
@@ -49,8 +50,13 @@ pub struct RaycastTriHit {
 /// offset: 0x1941e0 (it's allocated in the heap, but this is a pointer to it)
 #[derive(Debug, Default)]
 pub struct RaycastState {
+    // BEGIN fields not in the original simulation
     delegates: Option<Rc<RefCell<Delegates>>>,
 
+    /// For some reason this was a global vector instead of part of the raycast state...
+    /// offset: 0xb3230
+    ray_to_triangle_hit_point: Vec3,
+    // END fields not in the original simulation
     /// Initial point of the collision ray.
     /// offset: 0x0
     pub point0: Vec3,
@@ -99,6 +105,10 @@ pub struct RaycastState {
     /// The triangles hit by the raycast.
     /// offset: 0x238
     pub hit_tris: Vec<RaycastTriHit>,
+
+    /// Data computed as a side effect of calling  `ray_hits_triangle`.
+    /// offset: 0x7f8
+    pub ray_to_triangle_hit: RaycastTriHit,
 
     /// The index in `hit_tris` of the closest triangle that was hit, if any.
     /// offset: 0x858
@@ -251,5 +261,132 @@ impl RaycastState {
         }
 
         false
+    }
+
+    /// offset: 0x11d70
+    pub fn ray_hits_triangle(&mut self, triangle: &[Vec3; 3], transform: &Option<Mat4>) -> f32 {
+        let EPS = 0.000001;
+
+        let [mut p0, mut p1, mut p2] = triangle.clone();
+
+        if let Some(mat) = transform {
+            vec3::transform_mat4(&mut p0, &triangle[0], mat);
+            vec3::transform_mat4(&mut p1, &triangle[1], mat);
+            vec3::transform_mat4(&mut p2, &triangle[2], mat);
+        }
+
+        println!("trangle={:?}", triangle);
+
+        // just naively copy this i guess
+        let p0p1 = vec3_from!(-, p1, p0);
+        let p0p2 = vec3_from!(-, p2, p0);
+        let ray = vec3_from!(-, self.point1, self.point0);
+        let ray_len = vec3::length(&ray);
+
+        let d0 = p0p2[2] * ray[1] - p0p2[1] * ray[2];
+        let d1 = p0p2[0] * ray[2] - p0p2[2] * ray[0];
+        let d2 = p0p2[1] * ray[0] - p0p2[0] * ray[1];
+        let d = d1 * p0p1[1] + d0 * p0p1[0] + d2 * p0p1[2];
+
+        println!("d={}", d);
+
+        // if d is (almost) 0, the ray is parallel (enough) to the plane of the triangle (to admit defeat)
+        if d > -EPS && d < EPS {
+            return 0.0;
+        }
+
+        let d_inv = 1.0 / d;
+
+        let p0r0 = vec3_from!(-, self.point0, p0);
+        let dt = (p0r0[1] * d1 + p0r0[0] * d0 + p0r0[2] * d2) * d_inv;
+
+        println!("dt={}", dt);
+
+        if dt < 0.0 || dt > 1.0 {
+            return 0.0;
+        }
+
+        let x0 = p0r0[1] * p0p1[2] - p0r0[2] * p0p1[1];
+        let x1 = p0r0[2] * p0p1[0] - p0r0[0] * p0p1[2];
+        let x2 = p0r0[0] * p0p1[1] - p0r0[1] * p0p1[0];
+        let du = (x0 * ray[0] + x1 * ray[1] + x2 * ray[2]) * d_inv;
+
+        println!("du={}", du);
+
+        if du < 0.0 || (du + dt) > 1.0 {
+            return 0.0;
+        }
+
+        let dv = (x0 * p0p2[0] + x1 * p0p2[1] + x2 * p0p2[2]) * d_inv;
+
+        println!("dv={}, d0={}", dv, d0);
+
+        if dv <= EPS || dv > ray_len
+        /* something else here maybe */
+        {
+            return 0.0;
+        }
+
+        // compute the point at which the stored ray hits the input triangle
+        let t = dv * ray_len;
+        vec3::scale_and_add(
+            &mut self.ray_to_triangle_hit_point,
+            &self.point0,
+            &self.ray_unit,
+            t,
+        );
+
+        println!("t={}", t);
+
+        if t < 0.0 || t > self.ray_len {
+            return 0.0;
+        }
+
+        self.ray_to_triangle_hit.impact_point = self.ray_to_triangle_hit_point;
+        // TODO: ?? what is this doing
+        if transform.is_none() {
+            self.ray_to_triangle_hit.impact_point[2] = t;
+        }
+
+        let l0 = p0p2[2] * p0p1[1] - p0p2[1] * p0p1[2];
+        let l1 = p0p2[0] * p0p1[2] - p0p2[2] * p0p1[0];
+        let l2 = p0p2[1] * p0p1[0] - p0p2[0] * p0p1[1];
+        let mut normal_unit = [l0, l1, l2];
+        vec3_inplace_normalize(&mut normal_unit);
+        vec3::scale(
+            &mut self.ray_to_triangle_hit.normal_unit,
+            &normal_unit,
+            -1.0,
+        );
+
+        return t;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RaycastState;
+
+    #[test]
+    fn test_triangle_collision() {
+        let triangle = [
+            [-2.6363091468811, 0.020901577547193, -4.1993327140808],
+            [-2.6363091468811, -6.4182171821594, 4.274188041687],
+            [-2.6363091468811, -6.4182171821594, -4.199333190918],
+        ];
+        let ray = [
+            [-26.963624954224, -24.175483703613, 17.492353439331],
+            [-25.76362991333, -25.552066802979, 15.770400047302],
+        ];
+        let result = [
+            [-26.267070770264, -24.974540710449, 1.4569648504257],
+            [0.70710015296936, 2.0945599032984e-007, 0.70711332559586],
+        ];
+        let t = 1.46;
+
+        let mut raycast_state = RaycastState::default();
+        raycast_state.load_ray(&ray[0], &ray[1]);
+        raycast_state.ray_hits_triangle(&triangle, &None);
+        println!("result: {:?}", raycast_state.ray_to_triangle_hit);
     }
 }

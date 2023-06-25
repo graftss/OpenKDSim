@@ -8,6 +8,8 @@ use gamestate::GameState;
 use gl_matrix::{common::Vec3, mat4, quat, vec3};
 use props::prop::AddPropArgs;
 
+use crate::collision::raycast_state::RaycastState;
+
 // reference this first so it's available to all other modules
 pub mod macros;
 
@@ -179,6 +181,13 @@ fn test_cam_pos(
     vec3::add(&mut target, &kat_center, &scaled_target_offset);
 }
 
+fn test_triangle_hit() {
+    // let triangle = [[-2.6363091468811,0.020901577547193,-4.1993327140808],[-2.6363091468811,-6.4182171821594,4.274188041687],[-2.6363091468811,-6.4182171821594,-4.199333190918]];
+    // let ray = [[-26.963624954224,-24.175483703613,17.492353439331],[-25.76362991333,-25.552066802979,15.770400047302]];
+    // let result=[[-26.267070770264,-24.974540710449,1.4569648504257],[0.70710015296936,2.0945599032984e-007,0.70711332559586]];
+    // let t = 1.46;
+}
+
 fn main() {
     println!("start");
 
@@ -187,7 +196,7 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
-    unsafe {
-        test();
+    {
+        test_triangle_hit();
     }
 }
