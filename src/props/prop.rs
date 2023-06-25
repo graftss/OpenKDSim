@@ -389,7 +389,8 @@ pub struct Prop {
     /// offset: 0x58c
     tree_id: Option<u16>,
 
-    /// True if the prop isn't moving.
+    /// True if the prop isn't moving (used when the prop has a move type that makes it
+    /// occasionally stop moving, e.g. random roaming movement).
     /// offset: 0x58e
     stationary: bool,
 
@@ -875,6 +876,22 @@ impl Prop {
 
     pub fn get_attach_diam_mm(&self) -> i32 {
         self.attach_diam_mm
+    }
+
+    pub fn get_flags(&self) -> u8 {
+        self.flags
+    }
+
+    pub fn get_move_type(&self) -> Option<u16> {
+        self.move_type
+    }
+
+    pub fn get_stationary(&self) -> bool {
+        self.stationary
+    }
+
+    pub fn get_compare_vol_m3(&self) -> f32 {
+        self.compare_vol_m3
     }
 
     /// Writes the active transform to `out`.

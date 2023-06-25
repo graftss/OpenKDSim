@@ -144,6 +144,11 @@ pub struct Katamari {
     /// Cleared and recomputed each frame.
     /// offset: 0xd34c50
     nearby_collectible_props: Vec<PropRef>,
+
+    /// The list of props which will be collected, computed by `Katamari::process_nearby_collectible_props`.
+    /// Cleared and recomputed each frame.
+    /// offset: 0xd35050
+    collected_props: Vec<PropRef>,
     // END new fields
     /// A reference to the vector of katamari meshes.
     /// offset: 0x0

@@ -13,7 +13,7 @@ use crate::{
         vec3_inplace_scale, vec3_inplace_subtract, vec3_inplace_subtract_vec,
         vec3_inplace_zero_small, vec3_projection, vec3_reflection,
     },
-    mission::{state::MissionState, GameMode},
+    mission::{self, state::MissionState, GameMode},
     player::{camera::Camera, prince::Prince},
     props::{
         config::NAME_PROP_CONFIGS,
@@ -121,7 +121,7 @@ impl Katamari {
         }
 
         // TODO: `kat_update_collision:222-266` (destroy collected props that are sucked inside the ball)
-        // TODO: `kat_process_props_inside_sphere()`
+        self.process_nearby_collectible_props(mission_state);
         // TODO: `kat_process_collected_props()`
         // TODO: `kat_update_world_size_threshold??()`
 
@@ -141,7 +141,7 @@ impl Katamari {
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
 
         // TODO_PARAM: make this a global parameter
-        let MAX_COLLECTION_CHECKS_PER_FRAME = 0x7f;
+        let MAX_COLLECTION_CHECKS_PER_FRAME = 0x80;
 
         // compute the distance the katamari moved since the last frame
         let kat_move = vec3_from!(-, self.center, self.last_center);
@@ -150,6 +150,8 @@ impl Katamari {
         vec3_inplace_normalize(&mut lateral_move_unit);
 
         self.nearby_collectible_props.clear();
+        self.collected_props.clear();
+
         self.contact_prop = None;
 
         if self.ignore_prop_collision_timer != 0 {
@@ -196,7 +198,7 @@ impl Katamari {
             // prop for later to fully check if it should be collected.
             if collectible {
                 self.nearby_collectible_props.push(prop_ref.clone());
-                if self.nearby_collectible_props.len() > MAX_COLLECTION_CHECKS_PER_FRAME {
+                if self.nearby_collectible_props.len() >= MAX_COLLECTION_CHECKS_PER_FRAME {
                     return;
                 }
                 continue;
@@ -209,6 +211,49 @@ impl Katamari {
             let did_collide = false;
             if did_collide {
                 // TODO_PROPS: `kat_find_nearby_props:138-221`
+            }
+        }
+    }
+
+    /// offset: 0x28640
+    fn process_nearby_collectible_props(&mut self, mission_state: &MissionState) {
+        // TODO_PARAM
+        let SQUASH_PROP_VOL_MULTIPLIER = 3.0;
+        let MAX_COLLECTED_PROPS_PER_FRAME = 0x40;
+
+        if mission_state.is_ending() {
+            // TODO_ENDING: `kat_process_nearby_collectible_props:13-33`
+        } else {
+            for prop_ref in self.nearby_collectible_props.iter_mut() {
+                let prop = prop_ref.borrow_mut();
+                let PROP_CONFIG = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
+
+                let link_cond = prop.parent.is_none() || prop.get_flags() & 4 == 0;
+                let is_dummy = PROP_CONFIG.is_dummy_hit;
+                let did_collide = false; // TODO: `kat_intersects_prop_bbox()`
+                if link_cond && !is_dummy && did_collide {
+                    // if the katamari collided with the prop's bbox:
+                    let can_prop_be_airborne = prop.get_move_type().is_some()
+                        && !prop.get_stationary()
+                        && PROP_CONFIG.can_be_airborne;
+                    let is_prop_squashed = self.max_attach_vol_m3
+                        > SQUASH_PROP_VOL_MULTIPLIER * prop.get_compare_vol_m3();
+
+                    if can_prop_be_airborne && !is_prop_squashed {
+                        // TODO_AIRBORNE: `kat_init_prop_launch()`
+                    } else {
+                        self.collected_props.push(prop_ref.clone());
+                        if self.collected_props.len() >= MAX_COLLECTED_PROPS_PER_FRAME {
+                            return;
+                        }
+                        if let Some(delegates) = &self.delegates {
+                            if let Some(log_prop_collected) = delegates.borrow().log_prop_collected
+                            {
+                                log_prop_collected(prop.get_ctrl_idx() as i32);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
