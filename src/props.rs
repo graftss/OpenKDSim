@@ -70,6 +70,7 @@ impl Props {
         if let Some(md) = mono_data {
             if (ctrl_idx == 224) {
                 temp_debug_log!("adding prop {}, {:?}", ctrl_idx, md);
+                temp_debug_log!("pos: {:?}, {}, {}", args.pos_x, args.pos_y, args.pos_z);
             }
 
             let prop = Prop::new(ctrl_idx, args, area, md);

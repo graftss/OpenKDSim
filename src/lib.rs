@@ -568,6 +568,7 @@ pub unsafe extern "C" fn MonoGetPlacementDataFloat(ctrl_idx: i32, data_type: i32
 }
 
 /// Write the transform of the prop at `ctrl_idx` to `out`.
+/// Note: unused in original game
 #[no_mangle]
 pub unsafe extern "C" fn GetPropMatrix(ctrl_idx: i32, out: *mut Mat4) {
     with_prop_mut(ctrl_idx, |prop| {
@@ -742,7 +743,7 @@ pub unsafe extern "C" fn MonoInitAddProp(
     twin_id: u16,
     shake_off_flag: u16,
 ) -> i32 {
-    let args = AddPropArgs {
+    let mut args = AddPropArgs {
         pos_x,
         pos_y,
         pos_z,
@@ -768,6 +769,8 @@ pub unsafe extern "C" fn MonoInitAddProp(
         twin_id,
         shake_off_flag,
     };
+
+    args.transform_coords_to_sim();
 
     STATE.with(|state| state.borrow_mut().add_prop(&args))
 }

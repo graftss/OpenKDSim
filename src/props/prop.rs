@@ -11,8 +11,8 @@ use gl_matrix::{
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
-    constants::{FRAC_1_3, FRAC_PI_750, _4PI},
-    macros::{max_to_none, new_mat4_copy, temp_debug_log, vec3_from},
+    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
+    macros::{max_to_none, new_mat4_copy, set_translation, temp_debug_log, vec3_from},
     mono_data::{PropAabbs, PropMonoData},
     player::Player,
     props::config::NamePropConfig,
@@ -178,6 +178,14 @@ pub struct AddPropArgs {
     pub shake_off_flag: u16,
 }
 
+impl AddPropArgs {
+    pub fn transform_coords_to_sim(&mut self) {
+        self.pos_x *= UNITY_TO_SIM_SCALE;
+        self.pos_y *= UNITY_TO_SIM_SCALE;
+        self.pos_z *= UNITY_TO_SIM_SCALE;
+    }
+}
+
 pub type PropScript = fn(prop: PropRef) -> ();
 
 /// The six different ways in which a prop's transform can be computed.
@@ -217,9 +225,9 @@ pub struct Prop {
     /// offset: 0x9
     force_disabled: bool,
 
-    /// (??) If true, the prop won't be displayed.
+    /// If false, the prop won't be displayed, but it will still be tangible.
     /// offset: 0xa
-    display_off: bool,
+    display_on: bool,
 
     /// The alpha level of the prop (fades out as it gets further from the player camera).
     /// offset: 0x14
@@ -623,7 +631,7 @@ impl Prop {
             global_state: PropGlobalState::Unattached,
             flags2: 0,
             force_disabled: false,
-            display_off: false,
+            display_on: false,
             alpha: 1.0,
             move_type: max_to_none!(u16, args.mono_move_type),
             hit_on_area: max_to_none!(u16, args.mono_hit_on_area),
@@ -639,7 +647,7 @@ impl Prop {
             init_pos: [args.pos_x, args.pos_y, args.pos_z],
             rotation_mat: rotation_mat,
             pos: [args.pos_x, args.pos_y, args.pos_z],
-            rotation_vec: [args.rot_x, args.rot_y, args.rot_z],
+            rotation_vec: [0.0, 0.0, 0.0],
             scale: [1.0, 1.0, 1.0],
             last_pos: [args.pos_x, args.pos_y, args.pos_z],
             last_rotation_vec: [args.rot_x, args.rot_y, args.rot_z],
@@ -704,6 +712,10 @@ impl Prop {
 
             delta_pos_unit: [0.0; 3],
         };
+
+        if (ctrl_idx == 224) {
+            temp_debug_log!("pos={:?}", result.pos);
+        }
 
         if let Some(aabbs) = &mono_data.aabbs {
             result.init_aabb_and_volume(aabbs, config);
@@ -866,10 +878,6 @@ impl Prop {
 
         scale_sim_transform(&mut transform);
 
-        if self.ctrl_idx == 224 {
-            temp_debug_log!("  pushpin transform={:?}", transform);
-        }
-
         mat4::copy(&mut *out, &transform);
     }
 
@@ -953,7 +961,7 @@ impl Prop {
         }
 
         // status & 0x10: prop is hidden
-        if self.display_off {
+        if !self.display_on {
             status |= 0x10;
         }
 
@@ -1117,7 +1125,13 @@ impl Prop {
         mat4::rotate_x(&mut temp1, &temp2, self.rotation_vec[0]);
         mat4::rotate_y(&mut temp2, &temp1, self.rotation_vec[1]);
 
+        if self.ctrl_idx == 224 {
+            temp_debug_log!("rotation_vec: {:?}", self.rotation_vec);
+        }
+
         mat4::multiply(&mut self.unattached_transform, &self.rotation_mat, &temp2);
+
+        set_translation!(self.unattached_transform, self.pos);
     }
 
     /// Update a prop's transform when it is not a linked child and stalled.
