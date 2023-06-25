@@ -24,7 +24,7 @@ use crate::{
     macros::{min, set_translation, temp_debug_log, temp_debug_write, vec3_from},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
-    props::prop::PropRef,
+    props::{prop::PropRef, Props},
 };
 
 use self::{
@@ -140,6 +140,10 @@ pub struct Katamari {
     /// offset: 0xd34c4c
     props_lost_from_bonks: u32,
 
+    /// The list of collectible props near the katamari computed by `Katamari::find_nearby_props`.
+    /// Cleared and recomputed each frame.
+    /// offset: 0xd34c50
+    nearby_collectible_props: Vec<PropRef>,
     // END new fields
     /// A reference to the vector of katamari meshes.
     /// offset: 0x0
@@ -530,7 +534,7 @@ pub struct Katamari {
 
     /// (??)
     /// offset: 0x880
-    prop_ignore_collision_timer: u32,
+    ignore_prop_collision_timer: u32,
 
     /// The (real-time) game time when the last collision occurred.
     /// offset: 0x884
@@ -940,7 +944,7 @@ impl Katamari {
 
         self.reset_collision_rays();
 
-        self.prop_ignore_collision_timer = 0;
+        self.ignore_prop_collision_timer = 0;
 
         self.set_immobile(mission_state);
         self.update_scaled_params(&mission_state.mission_config);
@@ -987,6 +991,7 @@ impl Katamari {
         camera: &Camera,
         global: &GlobalState,
         mission_state: &MissionState,
+        props: &mut Props,
     ) {
         // self.debug_log_clip_data("0x1dba8");
 
@@ -1063,7 +1068,7 @@ impl Katamari {
         // self.debug_log_clip_data("0x1e080");
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
-        self.update_collision(prince, camera, global, &mission_state);
+        self.update_collision(prince, camera, global, &mission_state, props);
 
         // self.debug_log_clip_data("0x1e13e");
 

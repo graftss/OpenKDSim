@@ -5,17 +5,21 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, min, panic_log, set_translation, set_y, temp_debug_log,
-        vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y,
+        temp_debug_log, vec3_from, vec3_unit_xz,
     },
     math::{
-        acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_normalize,
+        self, acos_f32, vec3_inplace_add, vec3_inplace_add_vec, vec3_inplace_normalize,
         vec3_inplace_scale, vec3_inplace_subtract, vec3_inplace_subtract_vec,
         vec3_inplace_zero_small, vec3_projection, vec3_reflection,
     },
     mission::{state::MissionState, GameMode},
     player::{camera::Camera, prince::Prince},
-    props::prop::WeakPropRef,
+    props::{
+        config::NAME_PROP_CONFIGS,
+        prop::{PropGlobalState, WeakPropRef},
+        Props,
+    },
     util::debug_log,
 };
 
@@ -56,6 +60,7 @@ impl Katamari {
         camera: &Camera,
         global: &GlobalState,
         mission_state: &MissionState,
+        props: &mut Props,
     ) {
         self.last_num_floor_contacts = self.num_floor_contacts;
         self.last_num_wall_contacts = self.num_wall_contacts;
@@ -76,8 +81,8 @@ impl Katamari {
         if self.prop_pseudo_iframes_timer > 0 {
             self.prop_pseudo_iframes_timer -= 1;
         }
-        if self.prop_ignore_collision_timer > 0 {
-            self.prop_ignore_collision_timer -= 1;
+        if self.ignore_prop_collision_timer > 0 {
+            self.ignore_prop_collision_timer -= 1;
         }
 
         self.lowest_wall_contact_y = 100000.0;
@@ -96,7 +101,8 @@ impl Katamari {
 
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
-        // TODO_PROPS: `kat_initial_process_props()`
+        self.find_nearby_props(props);
+
         if mission_state.gamemode == GameMode::Ending {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
@@ -123,6 +129,87 @@ impl Katamari {
             || self.fc_ray_len < 1.0
         {
             self.fc_ray_len = self.radius_cm;
+        }
+    }
+
+    /// Iterate over all props to find those which are "nearby" the katamari.
+    /// In the original implementation, "nearby" means the prop-katamari distance is
+    /// less than the sum of (1) the radii of the bounding spheres of the katamari and the prop,
+    /// and (2) the distance that the katamari moved over the last frame.
+    /// offset: 0x28870
+    fn find_nearby_props(&mut self, props: &mut Props) {
+        // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
+
+        // TODO_PARAM: make this a global parameter
+        let MAX_COLLECTION_CHECKS_PER_FRAME = 0x7f;
+
+        // compute the distance the katamari moved since the last frame
+        let kat_move = vec3_from!(-, self.center, self.last_center);
+        let kat_move_len = vec3::length(&kat_move);
+        let mut lateral_move_unit = [kat_move[0], 0.0, kat_move[2]];
+        vec3_inplace_normalize(&mut lateral_move_unit);
+
+        self.nearby_collectible_props.clear();
+        self.contact_prop = None;
+
+        if self.ignore_prop_collision_timer != 0 {
+            return;
+        }
+
+        for prop_ref in props.props.iter_mut() {
+            let mut prop = prop_ref.borrow_mut();
+
+            let PROP_CONFIG = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
+
+            // return early from the collision check if the prop is still intangible.
+            if prop.intangible_timer > 0 {
+                return prop.intangible_timer -= 1;
+            }
+
+            if prop.scream_cooldown_timer > 0 {
+                prop.scream_cooldown_timer -= 1;
+            }
+
+            prop.near_player = false;
+
+            // more early return conditions where collision with the katamari isn't checked
+            if prop.global_state != PropGlobalState::Unattached
+                || prop.is_disabled()
+                || prop.force_intangible
+            {
+                return;
+            }
+
+            // The prop-katamari distance decreased at most by the distance the katamari just moved.
+            // If that minimum distance is still bigger than the sum of the kat's and prop's bounding
+            // spheres, they can't collide.
+            let min_dist_to_kat = max!(prop.dist_to_p0 - kat_move_len, 0.0);
+            if min_dist_to_kat > self.radius_cm + prop.get_radius() {
+                return;
+            }
+
+            let collectible =
+                self.diam_trunc_mm >= prop.get_attach_diam_mm() && !PROP_CONFIG.is_dummy_hit;
+            // TODO_VS: `kat_find_nearby_props:105-111` (different vol required to collect props in vs mode)
+
+            // if the prop and katamari sphere might meet AND the prop is collectible, save this
+            // prop for later to fully check if it should be collected.
+            if collectible {
+                self.nearby_collectible_props.push(prop_ref.clone());
+                if self.nearby_collectible_props.len() > MAX_COLLECTION_CHECKS_PER_FRAME {
+                    return;
+                }
+                continue;
+            }
+
+            // otherwise, the prop is nearby, but uncollectible.
+            prop.near_player = true;
+
+            // TODO_PROPS: `kat_check_prop_mesh_collision()` instead of `false` below
+            let did_collide = false;
+            if did_collide {
+                // TODO_PROPS: `kat_find_nearby_props:138-221`
+            }
         }
     }
 

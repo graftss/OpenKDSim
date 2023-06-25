@@ -23,7 +23,7 @@ const FLAG_HAS_PARENT: u8 = 0x2;
 const FLAG_INTANGIBLE_CHILD: u8 = 0x4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PropGlobalState {
+pub enum PropGlobalState {
     /// Normal unattached state.
     Unattached = 1,
 
@@ -215,7 +215,7 @@ pub struct Prop {
     flags: u8,
 
     /// offset: 0x7
-    global_state: PropGlobalState,
+    pub global_state: PropGlobalState,
 
     /// (??) some more flags
     /// offset: 0x8
@@ -483,7 +483,7 @@ pub struct Prop {
 
     /// The prop's distance to player 0.
     /// offset: 0xa10
-    dist_to_p0: f32,
+    pub dist_to_p0: f32,
 
     /// The prop's distance to player 1.
     /// offset: 0xa14
@@ -493,6 +493,10 @@ pub struct Prop {
     /// Initialized to the prop's unscaled volume when the prop is attached.
     /// offset: 0xa18
     remain_knockoff_volume: f32,
+
+    /// (??) True if the prop is near a player
+    /// offset: 0xa20
+    pub near_player: bool,
 
     /// A multiple of the prop's volume that seems to be used somewhere. Hell if I know
     /// offset: 0xa24
@@ -510,14 +514,18 @@ pub struct Prop {
     /// offset: 0xa88
     nearest_kat_ray: Option<u16>,
 
-    /// If >0, this prop is intangible. Decrements by 1 each tick.
+    /// If >0, this prop is intangible to the katamari. Decrements by 1 each tick.
     /// offset: 0xa8a
-    intangible_ticks: u16,
+    pub intangible_timer: u16,
+
+    /// If true, this prop is intangible to the katamari.
+    /// offset: 0xa8e
+    pub force_intangible: bool,
 
     /// The cooldown on when this prop can scream, when >0. If 0, the prop is ready to scream again
     /// upon collision with the katamari.
     /// offset: 0xa8f
-    scream_cooldown_ticks: u8,
+    pub scream_cooldown_timer: u8,
 
     /// True if this prop has a twin prop on the Gemini mission.
     /// offset: 0xb10
@@ -682,8 +690,8 @@ impl Prop {
             has_twin: args.twin_id != u16::MAX,
             twin_id: max_to_none!(u16, args.twin_id),
             nearest_kat_ray: None,
-            intangible_ticks: 0,
-            scream_cooldown_ticks: 0,
+            intangible_timer: 0,
+            scream_cooldown_timer: 0,
             parent: None,
 
             // initialized in `self.init_aabb_and_volume()`
@@ -711,6 +719,8 @@ impl Prop {
             mono_data: None,
 
             delta_pos_unit: [0.0; 3],
+            near_player: false,
+            force_intangible: false,
         };
 
         if let Some(aabbs) = &mono_data.aabbs {
@@ -861,6 +871,10 @@ impl Prop {
 
     pub fn get_radius(&self) -> f32 {
         self.radius
+    }
+
+    pub fn get_attach_diam_mm(&self) -> i32 {
+        self.attach_diam_mm
     }
 
     /// Writes the active transform to `out`.

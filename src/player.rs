@@ -117,6 +117,7 @@ impl GameState {
         let mission_state = &mut self.mission_state;
         let global = &mut self.global;
         let player = &mut self.players[player_idx];
+        let props = &mut self.props;
 
         if global.freeze {
             player.katamari.update_collision_rays();
@@ -124,9 +125,13 @@ impl GameState {
         } else {
             // update the prince, then the katamari
             player.update_prince(mission_state);
-            player
-                .katamari
-                .update(&mut player.prince, &player.camera, global, mission_state);
+            player.katamari.update(
+                &mut player.prince,
+                &player.camera,
+                global,
+                mission_state,
+                props,
+            );
 
             // update the prince's transform now that the katamari is updated
             player.prince.update_transform(&player.katamari);
