@@ -6,13 +6,13 @@ use std::{
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4::{self, get_translation},
+    mat4::{self, get_translation, transpose},
     vec3,
 };
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
-    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
+    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
     macros::{max_to_none, new_mat4_copy, set_translation, temp_debug_log, vec3_from},
     mono_data::{PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
@@ -294,7 +294,7 @@ pub struct Prop {
 
     /// The prop's position.
     /// offset: 0x90
-    pos: Vec3,
+    pub pos: Vec3,
 
     /// The prop's rotation as Euler angles.
     /// offset: 0xa0
@@ -471,11 +471,11 @@ pub struct Prop {
 
     /// (??) The additional transform applied to the prop while it is attached to the katamari.
     /// offset: 0x968
-    own_attached_transform: Mat4,
+    pub init_attached_transform: Mat4,
 
     /// (??)
     /// offset: 0x9a8
-    attached_transform: Mat4,
+    pub attached_transform: Mat4,
 
     /// While attached, the offset from the katamari center to the prop's center.
     /// offset: 0x9e8
@@ -700,7 +700,7 @@ impl Prop {
             onattach_added_vol: 0.0,
             onattach_remain_ticks: 0,
             onattach_game_time_ms: 0,
-            own_attached_transform: [0.0; 16],
+            init_attached_transform: [0.0; 16],
             kat_center_offset: [0.0; 3],
             kat_collision_vel: [0.0; 3],
             last_dist_to_p0: 0.0,
@@ -974,7 +974,7 @@ impl Prop {
     /// This can either be the unattached transform or the attached transform.
     pub unsafe fn unsafe_copy_transform(&self, out: *mut Mat4) {
         let mut transform = if self.is_attached() {
-            self.own_attached_transform.clone()
+            self.attached_transform.clone()
         } else {
             self.unattached_transform.clone()
         };
@@ -1096,6 +1096,8 @@ impl Prop {
         should_destroy
     }
 
+    /// Contains most the behavior of `Katamari::attach_prop` that writes to the attached prop.
+    /// offset: 0x28fe4 (mid-function)
     pub fn attach_to_kat(&mut self, kat: &Katamari) {
         self.remain_knockoff_volume = self.compare_vol_m3;
 
@@ -1108,27 +1110,27 @@ impl Prop {
         self.onattach_added_vol = self.attach_vol_m3 * kat.get_attach_vol_penalty();
         self.kat_center_offset = vec3_from!(-, self.pos, kat.get_center());
 
-        let mut own_attached_transform = mat4::create();
-        if NamePropConfig::get(self.name_idx as i32).is_unhatched_egg {
-            mat4::copy(&mut own_attached_transform, &self.unattached_transform);
+        let mut init_attached_transform = mat4::create();
+        if !NamePropConfig::get(self.name_idx as i32).is_unhatched_egg {
+            mat4::copy(&mut init_attached_transform, &self.unattached_transform);
         } else {
             // TODO: `prop_adjust_bbox_when_hatching_egg`
         }
-        set_translation!(own_attached_transform, self.kat_center_offset);
+        set_translation!(init_attached_transform, self.kat_center_offset);
 
         let mut kat_rot_inv = mat4::create();
         mat4::transpose(&mut kat_rot_inv, kat.get_rotation_mat());
 
         // compute the prop's transform both not including and including the katamari's transform
         mat4::multiply(
-            &mut self.own_attached_transform,
+            &mut self.init_attached_transform,
             &kat_rot_inv,
-            &own_attached_transform,
+            &init_attached_transform,
         );
         mat4::multiply(
             &mut self.attached_transform,
             kat.get_transform(),
-            &self.own_attached_transform,
+            &self.init_attached_transform,
         );
 
         // compute the prop's position from the computed attached transform
@@ -1226,6 +1228,18 @@ impl Prop {
         self.unattached_state = PropUnattachedState::Normal;
         self.animation_type = PropAnimationType::Animation2;
         self.is_following_path = false;
+    }
+
+    /// Called from `Katamari::update_rays_with_attached_props` to position this prop while
+    /// it is attached to the katamari, based on the katamari's transform `kat_transform`.
+    /// offset: 0x2c330 (mid-function)
+    pub fn update_transform_when_attached(&mut self, kat_transform: &Mat4) {
+        mat4::multiply(
+            &mut self.attached_transform,
+            &kat_transform,
+            &self.init_attached_transform,
+        );
+        mat4::get_translation(&mut self.pos, &self.attached_transform);
     }
 
     /// TODO_PROPS

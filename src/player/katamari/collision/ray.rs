@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, temp_debug_log, temp_debug_write, vec3_from},
+    macros::{inv_lerp_clamp, lerp, set_translation, temp_debug_log, temp_debug_write, vec3_from},
     math::{vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::prop::WeakPropRef,
@@ -121,7 +121,7 @@ impl Katamari {
         self.orient_mesh_rays();
         // self.debug_log_clip_data("0x1af2e");
 
-        // TODO: `kat_update_rays_with_attached_props()`
+        self.update_rays_with_attached_props();
 
         if !self.physics_flags.wheel_spin {
             // if not spinning:
@@ -224,8 +224,27 @@ impl Katamari {
     }
 
     fn update_rays_with_attached_props(&mut self) {
+        // TODO_PARAM
+        let _MAX_PROP_RAYS = 0xc;
+
         // TODO: `kat_update_rays_with_attached_props:137-143` (actually compute this based on game state)
-        // let prop_rays_enabled = true;
+        let prop_rays_enabled = false;
+
+        // TODO: isn't this literally just `self.transform`
+        let mut kat_transform = self.rotation_mat.clone();
+        set_translation!(kat_transform, self.center);
+
+        if prop_rays_enabled {
+        } else {
+            for prop_ref in self.attached_props.iter_mut() {
+                let mut prop = prop_ref.borrow_mut();
+
+                if prop.is_disabled() {
+                    continue;
+                }
+                prop.update_transform_when_attached(&kat_transform);
+            }
+        }
     }
 
     pub fn set_bottom_ray_contact(&mut self) {

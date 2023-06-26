@@ -224,6 +224,70 @@ fn test_triangle_hit() {
     println!("result={}, out={:?}", result, out)
 }
 
+fn test_prop_attached_transform() {
+    let attached_transform = [
+        -0.19054834544659,
+        -0.89341020584106,
+        0.40682968497276,
+        1.0,
+        0.87931722402573,
+        0.028920263051987,
+        0.47535651922226,
+        1.0,
+        -0.43645426630974,
+        0.4483103454113,
+        0.78008151054382,
+        1.0,
+        -5.0977182388306,
+        -22.424993515015,
+        15.465428352356,
+        1.0,
+    ];
+    let init_attached_transform = [
+        0.27798637747765,
+        0.95570695400238,
+        -0.096681341528893,
+        0.0,
+        -0.38871890306473,
+        0.20396044850349,
+        0.89849746227264,
+        0.0,
+        0.87841999530792,
+        -0.21218830347061,
+        0.42820021510124,
+        0.0,
+        1.6850664615631,
+        -0.42052561044693,
+        2.0007081031799,
+        1.0,
+    ];
+    let kat_transform = [
+        -0.77816718816757,
+        0.13420666754246,
+        0.6135516166687,
+        0.0,
+        0.089848108589649,
+        -0.94306635856628,
+        0.32024013996124,
+        0.0,
+        0.62159723043442,
+        0.30432695150375,
+        0.72180438041687,
+        0.0,
+        -4.9923057556152,
+        -23.656593322754,
+        13.122102737427,
+        1.0,
+    ];
+
+    let mut tmp = mat4::create();
+    mat4::multiply(&mut tmp, &kat_transform, &init_attached_transform);
+    // mat4::get_translation(&mut pos, &attached_transform);
+
+    println!("tmp: {:?}", tmp);
+    println!("attached_transform: {:?}", attached_transform);
+}
+
 fn main() {
     println!("start");
 
@@ -232,7 +296,7 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
-    unsafe {
-        test_monodata();
+    {
+        test_prop_attached_transform();
     }
 }
