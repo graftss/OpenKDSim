@@ -208,14 +208,14 @@ impl Katamari {
             if let Some(delegates) = &self.delegates {
                 if let Some(draw) = delegates.borrow().debug_draw_line {
                     for ray in self.collision_rays.iter() {
-                        let p0 = vec3_from!(+, ray.kat_to_endpoint, ray.endpoint);
+                        let p0 = vec3_from!(+, ray.kat_to_endpoint, self.center);
                         draw(
                             p0[0],
                             p0[1],
                             p0[2],
-                            ray.endpoint[0],
-                            ray.endpoint[1],
-                            ray.endpoint[2],
+                            self.center[0],
+                            self.center[1],
+                            self.center[2],
                             1.0,
                             0.0,
                             0.0,

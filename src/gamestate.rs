@@ -38,6 +38,14 @@ pub struct GameState {
 }
 
 impl GameState {
+    pub fn reset(&mut self) {
+        self.players = PlayersState::default();
+        self.global = GlobalState::default();
+        self.props = Props::default();
+        self.mission_state = MissionState::default();
+        self.mono_data = MonoData::default();
+    }
+
     pub fn get_player(&self, player_idx: usize) -> &Player {
         self.players.get(player_idx).unwrap()
     }

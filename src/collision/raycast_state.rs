@@ -361,7 +361,7 @@ impl RaycastState {
     pub fn ray_hits_mesh(
         &mut self,
         mesh: &Mesh,
-        transform: &Mat4,
+        mesh_transform: &Mat4,
         is_ray_transformed: bool,
     ) -> i32 {
         let mut p0 = self.point0.clone();
@@ -376,7 +376,7 @@ impl RaycastState {
         if !is_ray_transformed {
             let mut transform_inv = mat4::create();
 
-            mat4::invert(&mut transform_inv, &transform);
+            mat4::invert(&mut transform_inv, &mesh_transform);
             vec3::transform_mat4(&mut p0, &self.point0, &transform_inv);
             vec3::transform_mat4(&mut p1, &self.point1, &transform_inv);
         }
@@ -405,7 +405,7 @@ impl RaycastState {
         // more precise triangle mesh collisions
 
         let transform = match is_ray_transformed {
-            true => Some(transform),
+            true => Some(mesh_transform),
             false => None,
         };
 
