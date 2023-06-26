@@ -144,13 +144,14 @@ impl Katamari {
 
             self.max_ray_len = self.radius_cm * self.params.max_ray_len_radii;
 
-
             // keep a running sum of the total ray length as we iterate over all rays, which
             // will be used to find the average length of mesh rays.
             let mut total_mesh_ray_len = 0.0;
 
             for (ray_idx, ray) in self.collision_rays.iter_mut().enumerate() {
-                if ray_idx == 0 { continue; }
+                if ray_idx == 0 {
+                    continue;
+                }
                 let adjusted_ray_len = lerp!(ray_rescale_t, self.radius_cm, ray.ray_len);
                 if adjusted_ray_len > self.max_ray_len {
                     ray.ray_len = self.max_ray_len;

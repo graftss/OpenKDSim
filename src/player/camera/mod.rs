@@ -1,5 +1,6 @@
 use gl_matrix::{
     common::{Mat4, Vec3},
+    mat3::from_scaling,
     mat4, quat, vec3, vec4,
 };
 
@@ -8,7 +9,7 @@ use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     macros::{log, max, min, set_translation, set_y, temp_debug_log, vec3_from},
     math::{
-        change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
+        self, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
         vec3_inplace_scale, vec3_inplace_subtract_vec,
     },
     mission::{
@@ -333,20 +334,41 @@ impl CameraState {
 
         match self.override_type {
             None => {
+                // TODO_PARAM
+                // the ratio of the way that the camera's position and target will move towards their
+                // true intended position on each frame. e.g. if this value is 1, the camera teleports to its
+                // true position on every frame, and values less than 1 ease the camera towards its true position.
+                let mut easing_speed = 0.85 * 0.85 * 0.3;
+
                 // if there's no camera override:
                 if mission_state.gamemode == GameMode::Ending || self.mode == CameraMode::Normal {
                     // in the ending mission or normal mode:
                     self.compute_normal_pos_and_target(&mut pos, &mut target, katamari, prince);
                 } else {
-                    self.compute_abnormal_pos_and_target(&mut pos, &mut target)
+                    self.compute_abnormal_pos_and_target(&mut pos, &mut target);
+
+                    // increase easing speed when falling
+                    let moved_y = katamari.get_center()[1] - katamari.get_last_center()[1];
+                    if moved_y.abs() > 0.1 {
+                        easing_speed *= 4.0 / 3.0;
+                    }
                 }
 
                 // TODO: `camera_update_main:174-236` (easing camera)
+                let mut pos_moved = vec3_from!(-, pos, self.last_pos);
+                let mut target_moved = vec3_from!(-, target, self.last_target);
 
-                // this line is temporary until the easing is added
-                self.pos = pos;
-                self.target = target;
+                if self.apply_easing {
+                    vec3_inplace_scale(&mut pos_moved, easing_speed);
+                    vec3_inplace_scale(&mut target_moved, easing_speed);
+                }
+
+                vec3::add(&mut self.pos, &self.last_pos, &pos_moved);
+                vec3::add(&mut self.target, &self.last_target, &target_moved);
+                // self.pos = pos;
+                // self.target = target;
             }
+
             Some(CamOverrideType::PrinceLocked) => {
                 self.compute_normal_pos_and_target(&mut pos, &mut target, katamari, prince);
                 self.pos = pos;

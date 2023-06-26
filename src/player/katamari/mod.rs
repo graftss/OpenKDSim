@@ -777,6 +777,10 @@ impl Katamari {
         &self.center
     }
 
+    pub fn get_last_center(&self) -> &Vec3 {
+        &self.last_center
+    }
+
     pub fn get_bottom(&self) -> &Vec3 {
         &self.bottom
     }

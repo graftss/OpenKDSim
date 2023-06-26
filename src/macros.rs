@@ -128,19 +128,20 @@ macro_rules! inv_lerp {
 /// [$min, $max] -> [0, 1]
 /// [$max, +inf] -> 1
 macro_rules! inv_lerp_clamp {
-    ($value: expr, $min: expr, $max: expr) => {
-        {
-            debug_assert!(($min) <= ($max), "tried to use `inv_lerp_clamp` with reversed bounds.");
+    ($value: expr, $min: expr, $max: expr) => {{
+        debug_assert!(
+            ($min) <= ($max),
+            "tried to use `inv_lerp_clamp` with reversed bounds."
+        );
 
-            if ($value) <= ($min) {
-                0.0
-            } else if ($value) >= ($max) {
-                1.0
-            } else {
-                (($value) - ($min)) / (($max) - ($min))
-            }
+        if ($value) <= ($min) {
+            0.0
+        } else if ($value) >= ($max) {
+            1.0
+        } else {
+            (($value) - ($min)) / (($max) - ($min))
         }
-    };
+    }};
 }
 
 /// Linearly rescale the value `$val` from the interval `[$val_min, $val_max]`
