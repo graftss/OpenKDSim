@@ -690,6 +690,10 @@ pub unsafe extern "C" fn MonoInitStart(
     clear_flag: i32,
     end_flag: i32,
 ) {
+    // since this is the first initialization API call made by unity (before `Init`, go figure)
+    // this seems like a reasonable place to reset the game state between attempts
+    STATE.with(|state| state.replace(GameState::default()));
+
     std::panic::set_hook(Box::new(|panic_info| {
         log!("panic: {:?}", panic_info);
         log!("trace: {:?}", Backtrace::new());

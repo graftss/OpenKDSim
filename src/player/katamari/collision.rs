@@ -295,6 +295,7 @@ impl Katamari {
         );
 
         self.raycast_state.load_ray(&kat_center, &ray_endpoint);
+        temp_debug_log!("testing kat-mesh collision: {}", prop.get_ctrl_idx());
         let num_hit_tris = self.raycast_state.ray_hits_mesh(
             prop.get_aabb_mesh(),
             prop.get_unattached_transform(),

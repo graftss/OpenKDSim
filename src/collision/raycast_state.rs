@@ -573,7 +573,6 @@ pub fn ray_hits_aabb(
     if min_p0[0] * min_p1[0] < 0.0 && min_p0[0] != min_p1[0] {
         let t = min_p0[0] / (min_p0[0] - min_p1[0]);
         vec3::scale_and_add(out, p0, &p0_p1, t);
-        println!("case 1, {}", t);
 
         if min_z < out[2] && out[2] < max_z && min_y < out[1] && out[1] < max_y {
             return true;
@@ -581,7 +580,6 @@ pub fn ray_hits_aabb(
     }
 
     if min_p1[1] * min_p0[1] < 0.0 && min_p0[1] != min_p1[1] {
-        println!("case 2");
         let t = min_p0[1] / (min_p0[1] - min_p1[1]);
         vec3::scale_and_add(out, p0, &p0_p1, t);
 
@@ -591,7 +589,6 @@ pub fn ray_hits_aabb(
     }
 
     if min_p0[2] * min_p1[2] < 0.0 && min_p0[2] != min_p1[2] {
-        println!("case 3");
         let t = min_p0[2] / (min_p0[2] - min_p1[2]);
         vec3::scale_and_add(out, p0, &p0_p1, t);
 
@@ -604,7 +601,6 @@ pub fn ray_hits_aabb(
     let max_p1 = vec3_from!(-, p1, aabb_max);
 
     if max_p0[0] * max_p1[0] < 0.0 && max_p0[0] != max_p1[0] {
-        println!("case 4");
         let t = max_p0[0] / (max_p0[0] - max_p1[0]);
         vec3::scale_and_add(out, p0, &p0_p1, t);
 
@@ -614,7 +610,6 @@ pub fn ray_hits_aabb(
     }
 
     if max_p0[1] * max_p1[1] < 0.0 && max_p0[1] != max_p1[1] {
-        println!("case 5");
         let t = max_p0[1] / (max_p0[1] - max_p1[1]);
         vec3::scale_and_add(out, p0, &p0_p1, t);
 
@@ -624,7 +619,6 @@ pub fn ray_hits_aabb(
     }
 
     if max_p0[2] * max_p1[2] < 0.0 && max_p0[2] != max_p1[2] {
-        println!("case 6");
         let t = max_p0[2] / (max_p0[2] - max_p1[2]);
         vec3::scale_and_add(out, p0, &p0_p1, t);
 

@@ -129,12 +129,16 @@ macro_rules! inv_lerp {
 /// [$max, +inf] -> 1
 macro_rules! inv_lerp_clamp {
     ($value: expr, $min: expr, $max: expr) => {
-        if ($value) <= ($min) {
-            0.0
-        } else if ($value) >= ($max) {
-            1.0
-        } else {
-            (($value) - ($min)) / (($max) - ($min))
+        {
+            debug_assert!(($min) <= ($max), "tried to use `inv_lerp_clamp` with reversed bounds.");
+
+            if ($value) <= ($min) {
+                0.0
+            } else if ($value) >= ($max) {
+                1.0
+            } else {
+                (($value) - ($min)) / (($max) - ($min))
+            }
         }
     };
 }
