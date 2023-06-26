@@ -223,6 +223,11 @@ impl Katamari {
         }
     }
 
+    fn update_rays_with_attached_props(&mut self) {
+        // TODO: `kat_update_rays_with_attached_props:137-143` (actually compute this based on game state)
+        // let prop_rays_enabled = true;
+    }
+
     pub fn set_bottom_ray_contact(&mut self) {
         self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
         self.vault_ray_idx = None;

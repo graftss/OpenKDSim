@@ -149,6 +149,8 @@ pub struct Katamari {
     /// Cleared and recomputed each frame.
     /// offset: 0xd35050
     collected_props: Vec<PropRef>,
+
+    attached_props: Vec<PropRef>,
     // END new fields
     /// A reference to the vector of katamari meshes.
     /// offset: 0x0
@@ -1006,7 +1008,7 @@ impl Katamari {
         &mut self,
         prince: &mut Prince,
         camera: &Camera,
-        global: &GlobalState,
+        global: &mut GlobalState,
         mission_state: &MissionState,
         props: &mut Props,
     ) {
@@ -1100,6 +1102,13 @@ impl Katamari {
         if !camera.preclear.get_enabled() {
             // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
+
+        let indices: Vec<u16> = self
+            .attached_props
+            .iter()
+            .map(|p| p.borrow().get_ctrl_idx())
+            .collect();
+        temp_debug_log!("attached: {:?}", indices);
     }
 
     /// Update the katamari's scaled params by interpolating the mission's param control points.

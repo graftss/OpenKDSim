@@ -13,11 +13,11 @@ use crate::{
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract,
         vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection, vec3_reflection,
     },
-    mission::{self, state::MissionState, GameMode, config::MissionConfig, GameType, Mission},
+    mission::{self, config::MissionConfig, state::MissionState, GameMode, GameType, Mission},
     player::{camera::Camera, prince::Prince},
     props::{
         config::NAME_PROP_CONFIGS,
-        prop::{Prop, PropGlobalState, WeakPropRef, PropRef},
+        prop::{Prop, PropGlobalState, PropRef, WeakPropRef},
         Props,
     },
     util::debug_log,
@@ -58,7 +58,7 @@ impl Katamari {
         &mut self,
         prince: &mut Prince,
         camera: &Camera,
-        global: &GlobalState,
+        global: &mut GlobalState,
         mission_state: &MissionState,
         props: &mut Props,
     ) {
@@ -122,7 +122,7 @@ impl Katamari {
 
         // TODO: `kat_update_collision:222-266` (destroy collected props that are sucked inside the ball)
         self.process_nearby_collectible_props(mission_state);
-        // TODO: `kat_process_collected_props()`
+        self.process_collected_props(mission_state, global);
         // TODO: `kat_update_world_size_threshold??()`
 
         if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
@@ -139,8 +139,6 @@ impl Katamari {
     /// offset: 0x28870
     fn find_nearby_props(&mut self, props: &mut Props) {
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
-
-        temp_debug_log!("hi find_nearby_props, {}", self.ignore_prop_collision_timer);
 
         // TODO_PARAM: make this a global parameter
         let MAX_COLLECTION_CHECKS_PER_FRAME = 0x80;
@@ -267,25 +265,25 @@ impl Katamari {
         if prop.get_dist_to_katamari(0) < prop.get_aabb_radius() + self.radius_cm {
             return true;
         }
-    
+
         let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
-    
+
         let mut kat_sphere_rad = if prop_config.easier_to_collect {
             self.avg_mesh_ray_len
         } else {
             self.larger_avg_mesh_ray_len
         };
-    
+
         if mission_state.is_ending() {
             kat_sphere_rad += kat_sphere_rad;
         }
-    
+
         // compute the unit vector from the prop to the katamari
         let mut prop_pos = vec3::create();
         prop.get_pos(&mut prop_pos);
         let mut prop_to_kat_unit = vec3_from!(-, self.center, prop_pos);
         vec3_inplace_normalize(&mut prop_to_kat_unit);
-    
+
         // compute the ray from the katamari's center towards the prop, with length `kat_sphere_rad`.
         let kat_center = self.center.clone();
         let mut ray_endpoint = vec3::create();
@@ -295,9 +293,13 @@ impl Katamari {
             &prop_to_kat_unit,
             -kat_sphere_rad,
         );
-    
+
         self.raycast_state.load_ray(&kat_center, &ray_endpoint);
-        let num_hit_tris = self.raycast_state.ray_hits_mesh(prop.get_aabb_mesh(), prop.get_unattached_transform(), false);
+        let num_hit_tris = self.raycast_state.ray_hits_mesh(
+            prop.get_aabb_mesh(),
+            prop.get_unattached_transform(),
+            false,
+        );
         num_hit_tris > 0
     }
 
@@ -306,8 +308,7 @@ impl Katamari {
         if !self.collected_props.is_empty() {
             // if at least one prop was collected:
             if let Some(delegates) = &self.delegates {
-                if let Some(_vibration) = delegates.borrow().vibration
-                {
+                if let Some(_vibration) = delegates.borrow().vibration {
                     // TODO_VIBRATION (have to figure out the arguments)
                 }
             }
@@ -319,11 +320,13 @@ impl Katamari {
         let mut collected_props = self.collected_props.clone();
 
         for (collection_idx, prop_ref) in collected_props.iter_mut().enumerate().rev() {
-            // TODO_LOW: early exit from this loop if we reached the gametype c goal 
+            // TODO_LOW: early exit from this loop if we reached the gametype c goal
             //           (which is a fixed # of collected props)
             let mut prop = prop_ref.borrow_mut();
 
-            if prop.global_state == PropGlobalState::Attached { continue; }
+            if prop.global_state == PropGlobalState::Attached {
+                continue;
+            }
 
             // TODO_LOW: prop.game_time_when_collected = game_time_ms (move to `prop.attach_to_kat` or whatever)
             prop.add_katamari_contact(self.player);
@@ -338,7 +341,7 @@ impl Katamari {
             if collection_idx == 0 {
                 self.last_attached_prop_name_idx = prop.get_name_idx();
                 self.last_attached_prop = Some(prop_ref.clone());
-            }   
+            }
             // TODO_COMBO: `kat_process_collected_props:111-164` (update collection combo)
             // TODO_FX: `kat_process_collected_props:165-179` (play shiny fx for e.g. trophies/crowns)
         }
@@ -346,15 +349,27 @@ impl Katamari {
 
     /// Attaches `prop` to the katamari.
     /// offset: 0x28ef0
-    fn attach_prop(&mut self, prop_ref: &PropRef, prop: &mut Prop, mission_state: &MissionState, global: &mut GlobalState) {
+    fn attach_prop(
+        &mut self,
+        prop_ref: &PropRef,
+        prop: &mut Prop,
+        mission_state: &MissionState,
+        global: &mut GlobalState,
+    ) {
         // early return if the prop is already attached
-        if prop.get_global_state() == PropGlobalState::Attached { return; }
+        if prop.get_global_state() == PropGlobalState::Attached {
+            return;
+        }
+
+        temp_debug_log!("attaching {}", prop.get_ctrl_idx());
 
         // immediately force disable dummy hit objects when attached and early return.
         // the four name index constants below are dummy putter hit and dummy hit 01 to 03.
         match prop.get_name_idx() {
-            0x89 | 0x277 | 499 | 0x26b  => { return prop.set_disabled(1); }
-            _ => ()
+            0x89 | 0x277 | 499 | 0x26b => {
+                return prop.set_disabled(1);
+            }
+            _ => (),
         }
 
         // TODO: `kat_attach_props:52-53` (increment global counter of # attached props for some reason)
@@ -367,11 +382,11 @@ impl Katamari {
                     let twin_ref = twin_weakref.upgrade().unwrap();
                     let twin = twin_ref.borrow();
                     if twin.is_attached() {
-                       global.catch_count_b += 1;
+                        global.catch_count_b += 1;
                     }
                 }
             } else {
-                // in other constellations, increment the score if the prop's name index belongs to 
+                // in other constellations, increment the score if the prop's name index belongs to
                 // the mission's list of applicable name indices
                 if let Some(name_indices) = &mission_state.mission_config.theme_prop_names {
                     if name_indices.contains(&prop.get_name_idx()) {
@@ -387,13 +402,9 @@ impl Katamari {
         // update collection order linked list
         if self.first_attached_prop.is_none() {
             self.first_attached_prop = Some(prop_ref.clone());
-            self.last_attached_prop = Some(prop_ref.clone());
-            // TODO: `kat_attach_prop:196-197` (update prop links)
-        } else {
-            self.last_attached_prop = Some(prop_ref.clone());
-            // TODO: `kat_attach_prop:200-203` (update prop links)
         }
-        
+        self.attached_props.push(prop_ref.clone());
+
         // compute the unit vector from this katamari to `prop`
         let mut prop_pos = vec3::create();
         prop.get_pos(&mut prop_pos);

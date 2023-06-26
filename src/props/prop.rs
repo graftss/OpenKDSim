@@ -6,7 +6,8 @@ use std::{
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4::{self, get_translation}, vec3,
+    mat4::{self, get_translation},
+    vec3,
 };
 
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
     macros::{max_to_none, new_mat4_copy, set_translation, temp_debug_log, vec3_from},
     mono_data::{PropAabbs, PropMonoData},
-    player::{Player, katamari::Katamari},
+    player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
     util::scale_sim_transform,
 };
@@ -472,7 +473,7 @@ pub struct Prop {
     /// offset: 0x968
     own_attached_transform: Mat4,
 
-    /// (??) 
+    /// (??)
     /// offset: 0x9a8
     attached_transform: Mat4,
 
@@ -514,12 +515,14 @@ pub struct Prop {
     weird_vol_multiple: f32,
 
     /// If this prop is attached, points to the prop that was attached before this (if one exists).
+    /// NOTE: this linked list of collected props is replaced by the vector `Katamari::collected_props`
     /// offset: 0xa28
-    collected_before: Option<WeakPropRef>,
+    // last_collected_prop: Option<WeakPropRef>,
 
     /// If this prop is attached, points to the prop that was attached after this (if one exists).
     /// offset: 0xa30
-    collected_next: Option<WeakPropRef>,
+    /// NOTE: this linked list of collected props is replaced by the vector `Katamari::collected_props`
+    // next_collected_prop: Option<WeakPropRef>,
 
     /// True if this prop's collision mesh contacts a katamari.
     /// offset: 0xa41
@@ -705,8 +708,6 @@ impl Prop {
             dist_to_p0: 0.0,
             dist_to_p1: 0.0,
             remain_knockoff_volume: 0.0,
-            collected_before: None,
-            collected_next: None,
             has_twin: args.twin_id != u16::MAX,
             twin_id: max_to_none!(u16, args.twin_id),
             nearest_kat_ray_idx: None,
@@ -1119,8 +1120,16 @@ impl Prop {
         mat4::transpose(&mut kat_rot_inv, kat.get_rotation_mat());
 
         // compute the prop's transform both not including and including the katamari's transform
-        mat4::multiply(&mut self.own_attached_transform, &kat_rot_inv, &own_attached_transform);
-        mat4::multiply(&mut self.attached_transform, kat.get_transform(), &self.own_attached_transform);
+        mat4::multiply(
+            &mut self.own_attached_transform,
+            &kat_rot_inv,
+            &own_attached_transform,
+        );
+        mat4::multiply(
+            &mut self.attached_transform,
+            kat.get_transform(),
+            &self.own_attached_transform,
+        );
 
         // compute the prop's position from the computed attached transform
         mat4::get_translation(&mut self.pos, &self.attached_transform);
