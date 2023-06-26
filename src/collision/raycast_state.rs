@@ -160,10 +160,17 @@ impl RaycastState {
         self.ray_len = vec3::length(&self.ray);
     }
 
-    /// Read the closest hit from the `hit_tris` list.
+    /// Get a reference to the closest hit from the `hit_tris` list.
     pub fn get_closest_hit(&self) -> Option<&RaycastTriHit> {
         self.closest_hit_idx
             .map(|idx| self.tri_hits.get(idx as usize))
+            .flatten()
+    }
+
+    /// Get a mutable reference to the closest hit from the `hit_tris` list.
+    pub fn get_closest_hit_mut(&mut self) -> Option<&mut RaycastTriHit> {
+        self.closest_hit_idx
+            .map(|idx| self.tri_hits.get_mut(idx as usize))
             .flatten()
     }
 

@@ -456,42 +456,114 @@ impl Katamari {
         if self.physics_flags.moved_more_than_rad {
             // TODO: `kat_update_surface_contacts:110-235` (weird crap when katamari moved a lot)
         } else {
-            let last_center = self.last_center.clone();
+            // TODO_PARAM: make 0.15 a katamari param
+            let SHELL_RAY_RADIUS_MULT = 0.15;
 
-            // TODO: make 0.15 a katamari param
-            let shell_ray_len = self.radius_cm * 0.15;
-            let mut shell_ray_vec = self.delta_pos.clone();
-            vec3_inplace_scale(&mut shell_ray_vec, shell_ray_len);
+            // each shell ray has the same direction and magnitude.
+            // the magnitude is a constant multiple of the current katamari radius.
+            // the direction is the katamari's movement vector over the previous frame (`self.delta_pos`).
+            let shell_ray_len = self.radius_cm * SHELL_RAY_RADIUS_MULT;
+            let shell_initial_base = &self.last_center;
+            let mut shell_final_base = vec3::create();
+            vec3::scale_and_add(
+                &mut shell_final_base,
+                &self.center,
+                &self.delta_pos,
+                shell_ray_len,
+            );
+            vec3_inplace_scale(&mut shell_final_base, shell_ray_len);
 
-            // TODO: support all 5 shell points
-            let mut shell_initial_pts: [Vec3; 1] = Default::default();
-            let mut shell_final_pts: [Vec3; 1] = Default::default();
+            let mut shell_initial_pts: [Vec3; 5] = Default::default();
+            let mut shell_final_pts: [Vec3; 5] = Default::default();
 
-            vec3::copy(&mut shell_initial_pts[0], &self.shell_top);
-            vec3_inplace_add(
+            vec3::add(
                 &mut shell_initial_pts[0],
-                last_center[0],
-                0.0,
-                last_center[2],
+                &self.shell_top,
+                shell_initial_base,
+            );
+            vec3::add(
+                &mut shell_initial_pts[1],
+                &self.shell_left,
+                shell_initial_base,
+            );
+            vec3::add(
+                &mut shell_initial_pts[2],
+                &self.shell_right,
+                shell_initial_base,
+            );
+            vec3::add(
+                &mut shell_initial_pts[3],
+                &self.shell_top_left,
+                shell_initial_base,
+            );
+            vec3::add(
+                &mut shell_initial_pts[4],
+                &self.shell_top_right,
+                shell_initial_base,
             );
 
-            vec3::copy(&mut shell_final_pts[0], &self.shell_top);
-            vec3_inplace_add_vec(&mut shell_final_pts[0], &shell_ray_vec);
+            vec3::add(&mut shell_final_pts[0], &self.shell_top, &shell_final_base);
+            vec3::add(&mut shell_final_pts[1], &self.shell_left, &shell_final_base);
+            vec3::add(
+                &mut shell_final_pts[2],
+                &self.shell_right,
+                &shell_final_base,
+            );
+            vec3::add(
+                &mut shell_final_pts[3],
+                &self.shell_top_left,
+                &shell_final_base,
+            );
+            vec3::add(
+                &mut shell_final_pts[4],
+                &self.shell_top_right,
+                &shell_final_base,
+            );
 
-            // TODO: `kat_update_surface_contacts:267-294` (support all shell points)
-
-            for (_i, (_point0, _point1)) in
-                Iterator::zip(shell_initial_pts.iter(), shell_final_pts.iter()).enumerate()
-            {
-                // check collisions along each shell ray
-                self.raycast_state.load_ray(_point0, _point1);
+            for i in 0..5 {
                 self.raycast_state
+                    .load_ray(&shell_initial_pts[i], &shell_final_pts[i]);
+                let found_hit = self
+                    .raycast_state
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
-                // TODO: replace this when shell points are working
-                break;
+                if !found_hit {
+                    continue;
+                }
 
-                // TODO: `kat_update_surface_contacts:308-372` (resolve shell ray hits)
+                self.physics_flags.shell_ray_hit_surface = true;
+                let mut shell_base_pt = vec3::create();
+
+                match i {
+                    1 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_top);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Top);
+                    }
+                    2 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_left);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Left);
+                    }
+                    3 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_right);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Right);
+                    }
+                    4 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_top_left);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::TopLeft);
+                    }
+                    5 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_top_right);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::TopRight);
+                    }
+                    _ => (),
+                }
+
+                if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                    let shell_ray_idx = -(i as i32 + 1);
+                    vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_base_pt);
+                    vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_base_pt);
+                    self.record_surface_contact(shell_ray_idx, None);
+                }
             }
 
             // check collision rays for surface contacts
@@ -969,7 +1041,7 @@ impl Katamari {
         camera: &Camera,
         global: &GlobalState,
     ) {
-        if self.physics_flags.hit_shell_ray == Some(ray::ShellRay::TopCenter)
+        if self.physics_flags.hit_shell_ray == Some(ray::ShellRay::Top)
             && self.physics_flags.contacts_floor
             && !self.physics_flags.contacts_wall
             && self.num_floor_contacts == 1

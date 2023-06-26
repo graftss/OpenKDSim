@@ -14,7 +14,7 @@ use super::mesh::KAT_MESHES;
 /// (see https://discord.com/channels/232268612285497345/805240416894713866/842591732229996544)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShellRay {
-    TopCenter = 1,
+    Top = 1,
     Left = 2,
     Right = 3,
     Bottom = 4,
@@ -366,8 +366,6 @@ impl Katamari {
             &bottom_ray.endpoint,
             &self.center,
         );
-
-        // TODO: `kat_orient_mesh_rays:164-174` (orient other shell rays)
 
         // orient the mesh collision rays
         self.num_mesh_rays = 0;

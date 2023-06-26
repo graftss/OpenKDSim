@@ -73,11 +73,11 @@ pub struct KatPhysicsFlags {
     /// offset: 0xc
     pub moved_more_than_rad_0xc: bool,
 
-    /// If true, the katamari is contacting a prop.
+    /// If true, a katamari shell ray hit a surface.
     /// offset: 0xd
-    pub contacts_prop_0xd: bool,
+    pub shell_ray_hit_surface: bool,
 
-    /// (??) A shell ray which collided with something
+    /// (??) The shell ray which collided with something
     /// offset: 0xe
     pub hit_shell_ray: Option<ShellRay>,
 
@@ -160,7 +160,7 @@ impl KatPhysicsFlags {
     pub fn reset_for_collision_update(&mut self) {
         self.contacts_down_slanted_ceiling = false;
         self.moved_more_than_rad_0xc = false;
-        self.contacts_prop_0xd = false;
+        self.shell_ray_hit_surface = false;
         self.hit_shell_ray = None;
         self.moved_more_than_rad_0x1d = false;
         self.hit_by_moving_prop = false;
