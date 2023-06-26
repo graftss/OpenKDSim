@@ -13,11 +13,11 @@ use crate::{
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract,
         vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection, vec3_reflection,
     },
-    mission::{self, state::MissionState, GameMode},
+    mission::{self, state::MissionState, GameMode, config::MissionConfig, GameType, Mission},
     player::{camera::Camera, prince::Prince},
     props::{
         config::NAME_PROP_CONFIGS,
-        prop::{Prop, PropGlobalState, WeakPropRef},
+        prop::{Prop, PropGlobalState, WeakPropRef, PropRef},
         Props,
     },
     util::debug_log,
@@ -299,6 +299,118 @@ impl Katamari {
         self.raycast_state.load_ray(&kat_center, &ray_endpoint);
         let num_hit_tris = self.raycast_state.ray_hits_mesh(prop.get_aabb_mesh(), prop.get_unattached_transform(), false);
         num_hit_tris > 0
+    }
+
+    /// offset: 0x280c0
+    fn process_collected_props(&mut self, mission_state: &MissionState, global: &mut GlobalState) {
+        if !self.collected_props.is_empty() {
+            // if at least one prop was collected:
+            if let Some(delegates) = &self.delegates {
+                if let Some(_vibration) = delegates.borrow().vibration
+                {
+                    // TODO_VIBRATION (have to figure out the arguments)
+                }
+            }
+
+            // TODO_LOW: the rest of this block should only be run if gamemode isn't 4
+            // TODO_FX: `kat_process_collected_props:41-67` (play the object collected sfx)
+        }
+
+        let mut collected_props = self.collected_props.clone();
+
+        for (collection_idx, prop_ref) in collected_props.iter_mut().enumerate().rev() {
+            // TODO_LOW: early exit from this loop if we reached the gametype c goal 
+            //           (which is a fixed # of collected props)
+            let mut prop = prop_ref.borrow_mut();
+
+            if prop.global_state == PropGlobalState::Attached { continue; }
+
+            // TODO_LOW: prop.game_time_when_collected = game_time_ms (move to `prop.attach_to_kat` or whatever)
+            prop.add_katamari_contact(self.player);
+
+            self.attach_prop(prop_ref, &mut prop, mission_state, global);
+            // TODO: `attach_prop_with_children(prop)`
+            prop.stop_following_parent();
+            // TODO_FX: `kat_process_collected_props:96-104` (play scream sound)
+
+            // TODO: check that this (meaning `collection_idx == 0`) actually hits the last iteration
+            // of this loop
+            if collection_idx == 0 {
+                self.last_attached_prop_name_idx = prop.get_name_idx();
+                self.last_attached_prop = Some(prop_ref.clone());
+            }   
+            // TODO_COMBO: `kat_process_collected_props:111-164` (update collection combo)
+            // TODO_FX: `kat_process_collected_props:165-179` (play shiny fx for e.g. trophies/crowns)
+        }
+    }
+
+    /// Attaches `prop` to the katamari.
+    /// offset: 0x28ef0
+    fn attach_prop(&mut self, prop_ref: &PropRef, prop: &mut Prop, mission_state: &MissionState, global: &mut GlobalState) {
+        // early return if the prop is already attached
+        if prop.get_global_state() == PropGlobalState::Attached { return; }
+
+        // immediately force disable dummy hit objects when attached and early return.
+        // the four name index constants below are dummy putter hit and dummy hit 01 to 03.
+        match prop.get_name_idx() {
+            0x89 | 0x277 | 499 | 0x26b  => { return prop.set_disabled(1); }
+            _ => ()
+        }
+
+        // TODO: `kat_attach_props:52-53` (increment global counter of # attached props for some reason)
+
+        // update the score in theme object constellations
+        if mission_state.mission_config.game_type == GameType::NumThemeProps {
+            // increment gemini score if the attached prop's twin is already attached
+            if mission_state.mission == Mission::Gemini {
+                if let Some(twin_weakref) = prop.get_twin() {
+                    let twin_ref = twin_weakref.upgrade().unwrap();
+                    let twin = twin_ref.borrow();
+                    if twin.is_attached() {
+                       global.catch_count_b += 1;
+                    }
+                }
+            } else {
+                // in other constellations, increment the score if the prop's name index belongs to 
+                // the mission's list of applicable name indices
+                if let Some(name_indices) = &mission_state.mission_config.theme_prop_names {
+                    if name_indices.contains(&prop.get_name_idx()) {
+                        global.catch_count_b += 1;
+                    }
+                }
+            }
+        }
+
+        prop.attach_to_kat(&self);
+        self.vol_m3 += self.attach_vol_penalty * prop.get_attach_vol_m3();
+
+        // update collection order linked list
+        if self.first_attached_prop.is_none() {
+            self.first_attached_prop = Some(prop_ref.clone());
+            self.last_attached_prop = Some(prop_ref.clone());
+            // TODO: `kat_attach_prop:196-197` (update prop links)
+        } else {
+            self.last_attached_prop = Some(prop_ref.clone());
+            // TODO: `kat_attach_prop:200-203` (update prop links)
+        }
+        
+        // compute the unit vector from this katamari to `prop`
+        let mut prop_pos = vec3::create();
+        prop.get_pos(&mut prop_pos);
+        let mut kat_to_prop_unit = vec3_from!(-, prop_pos, self.center);
+        vec3_inplace_normalize(&mut kat_to_prop_unit);
+
+        let mut max_ray_similarity = -1.0;
+        let mut nearest_ray_idx = None;
+        for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
+            let ray_similarity = vec3::dot(&ray.ray_local_unit, &kat_to_prop_unit);
+            if ray_similarity > max_ray_similarity {
+                max_ray_similarity = ray_similarity;
+                nearest_ray_idx = Some(ray_idx as u16);
+            }
+        }
+
+        prop.set_nearest_kat_ray_idx(nearest_ray_idx)
     }
 
     fn update_surface_contacts(&mut self) {

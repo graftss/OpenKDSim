@@ -884,6 +884,18 @@ impl Katamari {
         self.airborne_ticks = 0;
         self.falling_ticks = 0;
     }
+
+    pub fn get_attach_vol_penalty(&self) -> f32 {
+        self.attach_vol_penalty
+    }
+
+    pub fn get_rotation_mat(&self) -> &Mat4 {
+        &self.rotation_mat
+    }
+
+    pub fn get_transform(&self) -> &Mat4 {
+        &self.transform
+    }
 }
 
 impl Katamari {

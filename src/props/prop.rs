@@ -6,7 +6,7 @@ use std::{
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4, vec3,
+    mat4::{self, get_translation}, vec3,
 };
 
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
     macros::{max_to_none, new_mat4_copy, set_translation, temp_debug_log, vec3_from},
     mono_data::{PropAabbs, PropMonoData},
-    player::Player,
+    player::{Player, katamari::Katamari},
     props::config::NamePropConfig,
     util::scale_sim_transform,
 };
@@ -230,6 +230,10 @@ pub struct Prop {
     /// If false, the prop won't be displayed, but it will still be tangible.
     /// offset: 0xa
     display_on: bool,
+
+    /// (??) Presumably, true when the prop is attached to a katamari, but this is redundant
+    /// offset: 0xd
+    is_attached: bool,
 
     /// The alpha level of the prop (fades out as it gets further from the player camera).
     /// offset: 0x14
@@ -466,6 +470,10 @@ pub struct Prop {
 
     /// (??) The additional transform applied to the prop while it is attached to the katamari.
     /// offset: 0x968
+    own_attached_transform: Mat4,
+
+    /// (??) 
+    /// offset: 0x9a8
     attached_transform: Mat4,
 
     /// While attached, the offset from the katamari center to the prop's center.
@@ -513,9 +521,18 @@ pub struct Prop {
     /// offset: 0xa30
     collected_next: Option<WeakPropRef>,
 
+    /// True if this prop's collision mesh contacts a katamari.
+    /// offset: 0xa41
+    mesh_contacts_katamari: bool,
+
+    /// If none, this prop's collision mesh doesn't contact any katamaris.
+    /// If some, the player index of the katamari meeting this prop's collision mesh.
+    /// offset: 0xa42
+    contact_katamari_idx: Option<u8>,
+
     /// When attached, the index of the katamari collision ray nearest to this prop.
     /// offset: 0xa88
-    nearest_kat_ray: Option<u16>,
+    nearest_kat_ray_idx: Option<u16>,
 
     /// If >0, this prop is intangible to the katamari. Decrements by 1 each tick.
     /// offset: 0xa8a
@@ -680,7 +697,7 @@ impl Prop {
             onattach_added_vol: 0.0,
             onattach_remain_ticks: 0,
             onattach_game_time_ms: 0,
-            attached_transform: [0.0; 16],
+            own_attached_transform: [0.0; 16],
             kat_center_offset: [0.0; 3],
             kat_collision_vel: [0.0; 3],
             last_dist_to_p0: 0.0,
@@ -692,7 +709,7 @@ impl Prop {
             collected_next: None,
             has_twin: args.twin_id != u16::MAX,
             twin_id: max_to_none!(u16, args.twin_id),
-            nearest_kat_ray: None,
+            nearest_kat_ray_idx: None,
             intangible_timer: 0,
             scream_cooldown_timer: 0,
             parent: None,
@@ -724,6 +741,10 @@ impl Prop {
             delta_pos_unit: [0.0; 3],
             near_player: false,
             force_intangible: false,
+            mesh_contacts_katamari: false,
+            contact_katamari_idx: None,
+            is_attached: false,
+            attached_transform: [0.0; 16],
         };
 
         if let Some(aabbs) = &mono_data.aabbs {
@@ -872,6 +893,10 @@ impl Prop {
         vec3::copy(out, &self.pos);
     }
 
+    pub fn get_global_state(&self) -> PropGlobalState {
+        self.global_state
+    }
+
     pub fn get_radius(&self) -> f32 {
         self.radius
     }
@@ -880,8 +905,17 @@ impl Prop {
         self.attach_diam_mm
     }
 
+    pub fn get_attach_vol_m3(&self) -> f32 {
+        self.attach_vol_m3
+    }
+
     pub fn get_flags(&self) -> u8 {
         self.flags
+    }
+
+    /// Turn off the lowest bit of `flags2`, which corresponds to following this prop's parent.
+    pub fn stop_following_parent(&mut self) {
+        self.flags2 &= 0xf7;
     }
 
     pub fn get_move_type(&self) -> Option<u16> {
@@ -908,6 +942,18 @@ impl Prop {
         &self.unattached_transform
     }
 
+    pub fn get_has_twin(&self) -> bool {
+        self.has_twin
+    }
+
+    pub fn get_twin(&self) -> &Option<WeakPropRef> {
+        &self.twin_prop
+    }
+
+    pub fn set_nearest_kat_ray_idx(&mut self, value: Option<u16>) {
+        self.nearest_kat_ray_idx = value;
+    }
+
     pub fn get_dist_to_katamari(&self, player: i32) -> f32 {
         match player {
             0 => self.dist_to_p0,
@@ -918,11 +964,16 @@ impl Prop {
         }
     }
 
+    pub fn add_katamari_contact(&mut self, player_idx: u8) {
+        self.mesh_contacts_katamari = true;
+        self.contact_katamari_idx = Some(player_idx);
+    }
+
     /// Writes the active transform to `out`.
     /// This can either be the unattached transform or the attached transform.
     pub unsafe fn unsafe_copy_transform(&self, out: *mut Mat4) {
         let mut transform = if self.is_attached() {
-            self.attached_transform.clone()
+            self.own_attached_transform.clone()
         } else {
             self.unattached_transform.clone()
         };
@@ -1042,6 +1093,37 @@ impl Prop {
         // TODO: if `should_destroy` is true, call `prop_destroy`
 
         should_destroy
+    }
+
+    pub fn attach_to_kat(&mut self, kat: &Katamari) {
+        self.remain_knockoff_volume = self.compare_vol_m3;
+
+        // TODO_LOW: fix these two fields
+        self.onattach_remain_ticks = 0;
+        self.onattach_game_time_ms = 0;
+
+        self.is_attached = true;
+        self.global_state = PropGlobalState::Attached;
+        self.onattach_added_vol = self.attach_vol_m3 * kat.get_attach_vol_penalty();
+        self.kat_center_offset = vec3_from!(-, self.pos, kat.get_center());
+
+        let mut own_attached_transform = mat4::create();
+        if NamePropConfig::get(self.name_idx as i32).is_unhatched_egg {
+            mat4::copy(&mut own_attached_transform, &self.unattached_transform);
+        } else {
+            // TODO: `prop_adjust_bbox_when_hatching_egg`
+        }
+        set_translation!(own_attached_transform, self.kat_center_offset);
+
+        let mut kat_rot_inv = mat4::create();
+        mat4::transpose(&mut kat_rot_inv, kat.get_rotation_mat());
+
+        // compute the prop's transform both not including and including the katamari's transform
+        mat4::multiply(&mut self.own_attached_transform, &kat_rot_inv, &own_attached_transform);
+        mat4::multiply(&mut self.attached_transform, kat.get_transform(), &self.own_attached_transform);
+
+        // compute the prop's position from the computed attached transform
+        mat4::get_translation(&mut self.pos, &self.attached_transform);
     }
 }
 
