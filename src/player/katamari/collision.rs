@@ -121,7 +121,6 @@ impl Katamari {
         }
 
         // TODO: `kat_update_collision:222-266` (destroy collected props that are sucked inside the ball)
-        temp_debug_log!("  nearby collectible props: \n{:?}", self.nearby_collectible_props);
         self.process_nearby_collectible_props(mission_state);
         // TODO: `kat_process_collected_props()`
         // TODO: `kat_update_world_size_threshold??()`
@@ -140,6 +139,8 @@ impl Katamari {
     /// offset: 0x28870
     fn find_nearby_props(&mut self, props: &mut Props) {
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
+
+        temp_debug_log!("hi find_nearby_props, {}", self.ignore_prop_collision_timer);
 
         // TODO_PARAM: make this a global parameter
         let MAX_COLLECTION_CHECKS_PER_FRAME = 0x80;
@@ -164,7 +165,8 @@ impl Katamari {
 
             // return early from the collision check if the prop is still intangible.
             if prop.intangible_timer > 0 {
-                return prop.intangible_timer -= 1;
+                prop.intangible_timer -= 1;
+                continue;
             }
 
             if prop.scream_cooldown_timer > 0 {
@@ -178,15 +180,16 @@ impl Katamari {
                 || prop.is_disabled()
                 || prop.force_intangible
             {
-                return;
+                continue;
             }
 
             // The prop-katamari distance decreased at most by the distance the katamari just moved.
             // If that minimum distance is still bigger than the sum of the kat's and prop's bounding
             // spheres, they can't collide.
             let min_dist_to_kat = max!(prop.get_dist_to_katamari(0) - kat_move_len, 0.0);
+
             if min_dist_to_kat > self.radius_cm + prop.get_radius() {
-                return;
+                continue;
             }
 
             let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
