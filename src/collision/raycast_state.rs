@@ -630,30 +630,30 @@ pub fn ray_hits_aabb(
     false
 }
 
-#[cfg(test)]
-mod tests {
-    use super::RaycastState;
+// #[cfg(test)]
+// mod tests {
+//     use super::RaycastState;
 
-    #[test]
-    fn test_triangle_collision() {
-        let triangle = [
-            [-2.6363091468811, 0.020901577547193, -4.1993327140808],
-            [-2.6363091468811, -6.4182171821594, 4.274188041687],
-            [-2.6363091468811, -6.4182171821594, -4.199333190918],
-        ];
-        let ray = [
-            [-26.963624954224, -24.175483703613, 17.492353439331],
-            [-25.76362991333, -25.552066802979, 15.770400047302],
-        ];
-        let result = [
-            [-26.267070770264, -24.974540710449, 1.4569648504257],
-            [0.70710015296936, 2.0945599032984e-007, 0.70711332559586],
-        ];
-        let t = 1.46;
+//     #[test]
+//     fn test_triangle_collision() {
+//         let triangle = [
+//             [-2.6363091468811, 0.020901577547193, -4.1993327140808],
+//             [-2.6363091468811, -6.4182171821594, 4.274188041687],
+//             [-2.6363091468811, -6.4182171821594, -4.199333190918],
+//         ];
+//         let ray = [
+//             [-26.963624954224, -24.175483703613, 17.492353439331],
+//             [-25.76362991333, -25.552066802979, 15.770400047302],
+//         ];
+//         let result = [
+//             [-26.267070770264, -24.974540710449, 1.4569648504257],
+//             [0.70710015296936, 2.0945599032984e-007, 0.70711332559586],
+//         ];
+//         let t = 1.46;
 
-        let mut raycast_state = RaycastState::default();
-        raycast_state.load_ray(&ray[0], &ray[1]);
-        // raycast_state.ray_hits_triangle(&triangle, &None);
-        println!("result: {:?}", raycast_state.ray_to_triangle_hit);
-    }
-}
+//         let mut raycast_state = RaycastState::default();
+//         raycast_state.load_ray(&ray[0], &ray[1]);
+//         // raycast_state.ray_hits_triangle(&triangle, &None);
+//         println!("result: {:?}", raycast_state.ray_to_triangle_hit);
+//     }
+// }
