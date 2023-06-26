@@ -3,7 +3,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 use crate::{
     constants::VEC3_ZERO,
     macros::{inv_lerp_clamp, lerp, set_translation, temp_debug_log, temp_debug_write, vec3_from},
-    math::{vec3_inplace_scale, vec3_inplace_zero_small},
+    math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::prop::WeakPropRef,
 };
@@ -225,20 +225,87 @@ impl Katamari {
 
     fn update_rays_with_attached_props(&mut self) {
         // TODO_PARAM
-        let _MAX_PROP_RAYS = 0xc;
+        let MAX_PROP_EFFECTS = 0xc;
+        let NERFED_DANGLING_BOY_EFFECT = 0.8;
 
         // TODO: `kat_update_rays_with_attached_props:137-143` (actually compute this based on game state)
-        let prop_rays_enabled = false;
+        let prop_rays_enabled = true;
 
         // TODO: isn't this literally just `self.transform`
         let mut kat_transform = self.rotation_mat.clone();
         set_translation!(kat_transform, self.center);
 
         if prop_rays_enabled {
+            let mut remaining_prop_effects = MAX_PROP_EFFECTS;
+
+            // first, grow mesh collision rays that have attached objects nearby to them.
+
+            // note that attached props are iterated over in reverse order, i.e. most recently
+            // collected props are processed first
+            for prop_ref in self.attached_props.iter().rev() {
+                let mut prop = prop_ref.borrow_mut();
+
+                // early return for disabled and unattached props, which shouldn't affect
+                // the katamari's collision rays
+                if prop.is_disabled() || !prop.is_attached() {
+                    continue;
+                }
+
+                prop.update_transform_when_attached(&kat_transform);
+
+                // early return if the maximum number of prop effects on the
+                // katamari's mesh have already been made
+                if remaining_prop_effects == 0 {
+                    continue;
+                }
+
+                remaining_prop_effects -= 1;
+
+                // compute the unit vector from the katamari to `prop`
+                let kat_to_prop = vec3_from!(-, prop.get_position(), self.center);
+                let mut kat_to_prop_unit = kat_to_prop.clone();
+                vec3_inplace_normalize(&mut kat_to_prop_unit);
+
+                let mut max_similarity = -1.0;
+                let mut nearest_ray_idx = None;
+
+                let mesh_rays_slice = &self.collision_rays[1..=self.num_mesh_rays as usize];
+                for (idx, mesh_ray) in mesh_rays_slice.iter().enumerate() {
+                    let similarity = vec3::dot(&mesh_ray.ray_local_unit, &kat_to_prop_unit);
+                    if similarity > max_similarity {
+                        max_similarity = similarity;
+                        // add 1 to `idx` since we skipped the collision ray of index 0, which is the bottom ray
+                        nearest_ray_idx = Some(idx as usize + 1);
+                    }
+                }
+
+                if max_similarity <= 0.0 {
+                    return;
+                }
+
+                let kat_to_prop_len = vec3::len(&kat_to_prop);
+                let mut increased_ray_len = kat_to_prop_len * max_similarity;
+
+                // name index 0x58b is "dangling boy"; this nerfs its effect on growing the katamari
+                // when it's collected
+                if prop.get_name_idx() == 0x58b {
+                    increased_ray_len *= NERFED_DANGLING_BOY_EFFECT
+                }
+
+                if let Some(closest_ray) = self.collision_rays.get_mut(nearest_ray_idx.unwrap()) {
+                    if closest_ray.ray_len < increased_ray_len {
+                        closest_ray.ray_len = increased_ray_len;
+                    }
+                }
+            }
+
+            // TODO_VAULT: `kat_update_rays_with_attached_props:330-606`
+            for prop_ref in self.attached_props.iter().rev() {
+                let _prop = prop_ref.borrow_mut();
+            }
         } else {
             for prop_ref in self.attached_props.iter_mut() {
                 let mut prop = prop_ref.borrow_mut();
-
                 if prop.is_disabled() {
                     continue;
                 }

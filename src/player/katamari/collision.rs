@@ -361,8 +361,6 @@ impl Katamari {
             return;
         }
 
-        temp_debug_log!("attaching {}", prop.get_ctrl_idx());
-
         // immediately force disable dummy hit objects when attached and early return.
         // the four name index constants below are dummy putter hit and dummy hit 01 to 03.
         match prop.get_name_idx() {

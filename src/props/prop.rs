@@ -226,7 +226,7 @@ pub struct Prop {
 
     /// If true, the prop won't update.
     /// offset: 0x9
-    force_disabled: bool,
+    disabled: bool,
 
     /// If false, the prop won't be displayed, but it will still be tangible.
     /// offset: 0xa
@@ -661,7 +661,7 @@ impl Prop {
             flags: 0,
             global_state: PropGlobalState::Unattached,
             flags2: 0,
-            force_disabled: false,
+            disabled: false,
             display_on: false,
             alpha: 1.0,
             move_type: max_to_none!(u16, args.mono_move_type),
@@ -890,8 +890,13 @@ impl Prop {
         self.global_state == PropGlobalState::Attached
     }
 
+    // TODO: remove this and replace with `get_position`
     pub fn get_pos(&self, out: &mut Vec3) {
         vec3::copy(out, &self.pos);
+    }
+
+    pub fn get_position(&self) -> &Vec3 {
+        &self.pos
     }
 
     pub fn get_global_state(&self) -> PropGlobalState {
@@ -990,12 +995,12 @@ impl Prop {
         *collect_diam = self.attach_diam_mm;
     }
 
-    pub fn set_disabled(&mut self, force_disabled: i32) {
-        self.force_disabled = force_disabled != 0;
+    pub fn set_disabled(&mut self, value: i32) {
+        self.disabled = value != 0;
     }
 
     pub fn is_disabled(&self) -> bool {
-        self.force_disabled
+        self.disabled
     }
 
     pub fn set_no_parent(&mut self) {
@@ -1059,7 +1064,7 @@ impl Prop {
         }
 
         // status & 8: prop is disabled
-        if self.force_disabled {
+        if self.disabled {
             status |= 0x8;
         }
 
@@ -1151,7 +1156,7 @@ impl Prop {
     /// offset: 0x50050 (note: that offset's function loops over all props, and this function is
     ///                  one iteration of that loop.)
     pub fn update_nonending(&mut self, player: &Player) {
-        if self.force_disabled {
+        if self.disabled {
             return;
         }
 
