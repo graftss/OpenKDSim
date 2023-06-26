@@ -24,14 +24,14 @@ pub mod prop;
 
 /// State of all props in the current mission.
 #[derive(Debug, Default)]
-pub struct Props {
+pub struct PropsState {
     pub props: Vec<PropRef>,
     pub global_paths: GlobalPathState,
     pub config: Option<&'static Vec<NamePropConfig>>,
     pub params: PropParams,
 }
 
-impl Props {
+impl PropsState {
     pub fn get_prop(&self, ctrl_idx: usize) -> Option<&PropRef> {
         self.props.get(ctrl_idx)
     }

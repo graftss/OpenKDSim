@@ -9,7 +9,7 @@ use crate::{
     player::{Player, PlayersState},
     props::{
         prop::{AddPropArgs, Prop},
-        Props,
+        PropsState,
     },
 };
 
@@ -23,7 +23,7 @@ pub struct GameState {
     pub global: GlobalState,
 
     /// State relating to props.
-    pub props: Props,
+    pub props: PropsState,
 
     /// State relating to the mission in progress.
     pub mission_state: MissionState,
@@ -41,7 +41,7 @@ impl GameState {
     pub fn reset(&mut self) {
         self.players = PlayersState::default();
         self.global = GlobalState::default();
-        self.props = Props::default();
+        self.props = PropsState::default();
         self.mission_state = MissionState::default();
         self.mono_data = MonoData::default();
     }

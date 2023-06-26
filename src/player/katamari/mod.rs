@@ -24,7 +24,7 @@ use crate::{
     macros::{min, set_translation, temp_debug_log, temp_debug_write, vec3_from},
     math::{normalize_bounded_angle, vol_to_rad},
     mission::{config::MissionConfig, state::MissionState},
-    props::{prop::PropRef, Props},
+    props::{prop::PropRef, PropsState},
 };
 
 use self::{
@@ -1014,7 +1014,7 @@ impl Katamari {
         camera: &Camera,
         global: &mut GlobalState,
         mission_state: &MissionState,
-        props: &mut Props,
+        props: &mut PropsState,
     ) {
         // self.debug_log_clip_data("0x1dba8");
 

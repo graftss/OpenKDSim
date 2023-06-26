@@ -18,7 +18,7 @@ use crate::{
     props::{
         config::NAME_PROP_CONFIGS,
         prop::{Prop, PropGlobalState, PropRef, WeakPropRef},
-        Props,
+        PropsState,
     },
     util::debug_log,
 };
@@ -60,7 +60,7 @@ impl Katamari {
         camera: &Camera,
         global: &mut GlobalState,
         mission_state: &MissionState,
-        props: &mut Props,
+        props: &mut PropsState,
     ) {
         self.last_num_floor_contacts = self.num_floor_contacts;
         self.last_num_wall_contacts = self.num_wall_contacts;
@@ -137,7 +137,7 @@ impl Katamari {
     /// less than the sum of (1) the radii of the bounding spheres of the katamari and the prop,
     /// and (2) the distance that the katamari moved over the last frame.
     /// offset: 0x28870
-    fn find_nearby_props(&mut self, props: &mut Props) {
+    fn find_nearby_props(&mut self, props: &mut PropsState) {
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
 
         // TODO_PARAM: make this a global parameter
