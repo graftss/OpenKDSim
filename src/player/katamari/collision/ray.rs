@@ -379,8 +379,6 @@ impl Katamari {
             vec3::normalize(&mut mesh_ray.ray_local_unit, &mesh_ray.ray_local);
             mesh_ray.ray_len = radius;
             self.num_mesh_rays += 1;
-
-            // temp_debug_write!("rays-open.log", "{}\t{:?}\t{:?}\t{:?}", mesh_ray_idx+1, mesh_ray.endpoint, mesh_ray.ray_local, mesh_ray.kat_to_endpoint);
         }
 
         self.first_prop_ray_index = self.num_mesh_rays + 1;

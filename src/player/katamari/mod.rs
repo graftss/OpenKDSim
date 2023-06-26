@@ -75,7 +75,7 @@ pub struct DebugConfig {
 impl Default for DebugConfig {
     fn default() -> Self {
         Self {
-            draw_collision_rays: true,
+            draw_collision_rays: false,
         }
     }
 }

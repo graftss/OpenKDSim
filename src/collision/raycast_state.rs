@@ -270,15 +270,20 @@ impl RaycastState {
     }
 
     /// offset: 0x11d70
-    pub fn ray_hits_triangle(&mut self, triangle: &[Vec3; 3], transform: Option<&Mat4>) -> f32 {
+    pub fn ray_hits_triangle(
+        &mut self,
+        triangle: &[Vec3; 3],
+        transform: &Mat4,
+        transform_tri: bool,
+    ) -> f32 {
         let EPS = 0.000001;
 
         let [mut p0, mut p1, mut p2] = &triangle;
 
-        if let Some(mat) = transform {
-            vec3::transform_mat4(&mut p0, &triangle[0], mat);
-            vec3::transform_mat4(&mut p1, &triangle[1], mat);
-            vec3::transform_mat4(&mut p2, &triangle[2], mat);
+        if !transform_tri {
+            vec3::transform_mat4(&mut p0, &triangle[0], transform);
+            vec3::transform_mat4(&mut p1, &triangle[1], transform);
+            vec3::transform_mat4(&mut p2, &triangle[2], transform);
         }
 
         // just naively copy this i guess
@@ -338,7 +343,7 @@ impl RaycastState {
 
         self.ray_to_triangle_hit.impact_point = self.ray_to_triangle_hit_point;
         // TODO: ?? what is this doing
-        if transform.is_none() {
+        if !transform_tri {
             self.ray_to_triangle_hit.impact_point[2] = t;
         }
 
@@ -358,12 +363,7 @@ impl RaycastState {
 
     /// Returns the number of triangles in `mesh` hit by the ray.
     /// offset: 0x10da0
-    pub fn ray_hits_mesh(
-        &mut self,
-        mesh: &Mesh,
-        mesh_transform: &Mat4,
-        is_ray_transformed: bool,
-    ) -> i32 {
+    pub fn ray_hits_mesh(&mut self, mesh: &Mesh, mesh_transform: &Mat4, flag: bool) -> i32 {
         let mut p0 = self.point0.clone();
         let mut p1 = self.point1.clone();
 
@@ -373,7 +373,7 @@ impl RaycastState {
 
         // if the collision ray isn't already transformed, multiply the endpoints of
         // the collision ray by the inverse of `transform`.
-        if !is_ray_transformed {
+        if !flag {
             let mut transform_inv = mat4::create();
 
             mat4::invert(&mut transform_inv, &mesh_transform);
@@ -404,11 +404,6 @@ impl RaycastState {
         // iterate over the sectors again, this time refining the successful AABB collisions with
         // more precise triangle mesh collisions
 
-        let transform = match is_ray_transformed {
-            true => Some(mesh_transform),
-            false => None,
-        };
-
         // compute the nearest triangle collision to the ray as the triangle whose distance
         // from the ray's initial point is smallest
         let mut min_tri_hit_dist = self.ray_len;
@@ -433,7 +428,7 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform);
+                        let tri_hit_dist = self.ray_hits_triangle(&triangle, mesh_transform, flag);
                         if tri_hit_dist > 0.0 {
                             // if we hit the triangle:
 
@@ -466,7 +461,7 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform);
+                        let tri_hit_dist = self.ray_hits_triangle(&triangle, mesh_transform, flag);
                         if tri_hit_dist > 0.0 {
                             // if we hit the triangle:
 
@@ -509,7 +504,7 @@ impl RaycastState {
             hit.impact_dist_ratio = impact_dist / self.ray_len;
 
             // TODO: no clue what this is doing
-            if is_ray_transformed {
+            if flag {
                 hit.impact_point = min_tri_hit_point
             } else {
                 let mut normal_unit = hit.normal_unit;
