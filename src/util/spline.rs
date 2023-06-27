@@ -2,7 +2,7 @@ use gl_matrix::{
     common::{Mat4, Vec4},
     vec4,
 };
-use lazy_static::lazy_static;
+
 
 const SPLINE_COEFFS: Mat4 = [
     2.0, 1.0, 1.0, -2.0, -3.0, -2.0, -1.0, 3.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,

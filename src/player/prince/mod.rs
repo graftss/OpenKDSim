@@ -7,7 +7,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, temp_debug_log},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log},
     math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{

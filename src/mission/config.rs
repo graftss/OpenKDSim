@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     constants::{NUM_MISSIONS, PI},
-    macros::{panic_log, read_bool, read_f32, read_u16, read_u8, rescale, temp_debug_log},
+    macros::{panic_log, read_bool, read_f32, read_u16, read_u8, rescale},
     math::vec3_inplace_scale,
     mission::GameType,
     player::{

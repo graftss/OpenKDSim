@@ -21,9 +21,9 @@ use crate::{
     },
     delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{inv_lerp, min, set_translation, temp_debug_log, temp_debug_write, vec3_from},
+    macros::{inv_lerp, min, set_translation, temp_debug_log, vec3_from},
     math::{
-        self, normalize_bounded_angle, vec3_inplace_add, vec3_inplace_add_scaled,
+        normalize_bounded_angle, vec3_inplace_add_scaled,
         vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
     },
     mission::{config::MissionConfig, state::MissionState},
@@ -32,7 +32,6 @@ use crate::{
 };
 
 use self::{
-    collision::mesh::KatMesh,
     collision::{history::HitHistory, hit::SurfaceHit, mesh::KAT_MESHES, ray::KatCollisionRays},
     flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,

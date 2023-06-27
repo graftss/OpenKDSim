@@ -1,4 +1,4 @@
-use crate::macros::{debug_log, temp_debug_log, vec3_from};
+use crate::macros::{debug_log, vec3_from};
 
 use super::Katamari;
 

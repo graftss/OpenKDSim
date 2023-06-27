@@ -1,22 +1,20 @@
 use gl_matrix::{
     common::{Mat4, Vec3},
     mat4,
-    vec2::dot,
     vec3,
 };
 
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, max, panic_log, set_y, temp_debug_log, vec3_from,
-        vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, max, panic_log, set_y, vec3_from,
     },
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
-        vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract_vec,
+        vec3_inplace_normalize, vec3_inplace_scale,
         vec3_inplace_zero_small, vec3_projection,
     },
-    mission::{self, stage::Stage, state::MissionState, GameMode},
+    mission::{stage::Stage, state::MissionState, GameMode},
     player::{
         camera::{mode::CameraMode, Camera},
         katamari::{spline::compute_spline_accel_mult, CamRelativeDir},

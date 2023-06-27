@@ -1,6 +1,6 @@
 use gl_matrix::common::Vec3;
 
-use crate::{macros::read_f32, math::vec3_inplace_scale};
+use crate::{macros::read_f32};
 
 static KAT_MESH_BIN: &'static [u8] = include_bytes!("bin/kat_mesh.bin");
 

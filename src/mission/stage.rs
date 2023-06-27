@@ -1,4 +1,4 @@
-use crate::macros::{log, panic_log, rescale};
+use crate::macros::{panic_log, rescale};
 
 /// A stage is a map (notably: House, Town, World).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

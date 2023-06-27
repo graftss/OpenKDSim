@@ -1,16 +1,15 @@
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat3::from_scaling,
-    mat4, quat, vec3, vec4,
+    mat4, vec3,
 };
 
 use crate::{
     collision::raycast_state::RaycastState,
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    macros::{log, max, min, set_translation, set_y, temp_debug_log, vec3_from},
+    macros::{max, min, set_y, vec3_from},
     math::{
-        self, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
-        vec3_inplace_scale, vec3_inplace_subtract_vec,
+        change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
+        vec3_inplace_scale,
     },
     mission::{
         config::{CamScaledCtrlPt, MissionConfig},

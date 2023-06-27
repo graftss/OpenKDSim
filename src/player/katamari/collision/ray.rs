@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, set_translation, temp_debug_write, vec3_from},
+    macros::{inv_lerp_clamp, lerp, set_translation, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::prop::WeakPropRef,

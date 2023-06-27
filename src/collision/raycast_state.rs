@@ -1,24 +1,21 @@
-use std::{cell::RefCell, ptr::copy, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat2::create,
     mat4,
-    vec2::scale_and_add,
     vec3,
 };
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     delegates::Delegates,
-    macros::{panic_log, temp_debug_log, vec3_from},
+    macros::{panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
 use super::{
-    aabb,
     hit_attribute::HitAttribute,
-    mesh::{Mesh, TriVertex},
+    mesh::{Mesh},
 };
 
 const IMPACT_EPS: f32 = 0.0001;

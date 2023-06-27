@@ -4,8 +4,7 @@ use gl_matrix::common::Mat4;
 
 use crate::{
     constants::ZERO,
-    macros::temp_debug_log,
-    mission::{state::MissionState, Mission},
+    mission::{state::MissionState},
     mono_data::PropMonoData,
     player::Player,
 };

@@ -6,21 +6,21 @@ use std::{
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4::{self, get_translation, transpose},
+    mat4::{self},
     vec3,
 };
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
-    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
-    macros::{max_to_none, new_mat4_copy, set_translation, temp_debug_log, vec3_from},
+    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
+    macros::{max_to_none, new_mat4_copy, set_translation, vec3_from},
     mono_data::{PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
     util::scale_sim_transform,
 };
 
-use super::config::NAME_PROP_CONFIGS;
+
 
 const FLAG_HAS_PARENT: u8 = 0x2;
 const FLAG_INTANGIBLE_CHILD: u8 = 0x4;

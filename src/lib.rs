@@ -1,5 +1,5 @@
 #![feature(const_float_bits_conv)]
-#![allow(non_snake_case, dead_code, unused_imports)]
+#![allow(non_snake_case, dead_code)]
 
 // reference this first so it's available to all other modules
 mod macros;
@@ -21,7 +21,7 @@ use collision::raycast_state::{RaycastCallType, RaycastState};
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
-use macros::temp_debug_log;
+
 use player::prince::OujiState;
 use props::{
     config::NamePropConfig,

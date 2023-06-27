@@ -1,11 +1,11 @@
 use lazy_static::lazy_static;
 
 use crate::{
-    macros::{inv_lerp, panic_log, temp_debug_log},
+    macros::{inv_lerp, panic_log},
     util::spline::compute_spline_point,
 };
 
-use super::Katamari;
+
 
 const SPLINE_CTRL_PTS_DATA: [[f32; 2]; 11] = [
     [0.0, 0.184],

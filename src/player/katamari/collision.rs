@@ -5,22 +5,20 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y,
-        temp_debug_log, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
     },
     math::{
-        self, acos_f32, vec3_inplace_add, vec3_inplace_add_scaled, vec3_inplace_add_vec,
+        acos_f32, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract,
         vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection, vec3_reflection,
     },
-    mission::{self, config::MissionConfig, state::MissionState, GameMode, GameType, Mission},
+    mission::{state::MissionState, GameMode, GameType, Mission},
     player::{camera::Camera, prince::Prince},
     props::{
         config::NAME_PROP_CONFIGS,
         prop::{Prop, PropGlobalState, PropRef, WeakPropRef},
         PropsState,
     },
-    util::debug_log,
 };
 
 use self::{hit::SurfaceHit, ray::KatCollisionRayType};
