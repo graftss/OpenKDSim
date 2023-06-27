@@ -3,10 +3,8 @@ use std::{rc::Rc, slice};
 use gl_matrix::common::Mat4;
 
 use crate::{
-    constants::ZERO,
-    mission::{state::MissionState},
-    mono_data::PropMonoData,
-    player::Player, delegates::DelegatesRef,
+    constants::ZERO, delegates::DelegatesRef, mission::state::MissionState,
+    mono_data::PropMonoData, player::Player,
 };
 
 use self::{

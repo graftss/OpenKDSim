@@ -2,21 +2,17 @@ use std::{cell::RefCell, rc::Rc};
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4,
-    vec3,
+    mat4, vec3,
 };
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     delegates::Delegates,
-    macros::{panic_log, vec3_from, temp_debug_log},
+    macros::{panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
-use super::{
-    hit_attribute::HitAttribute,
-    mesh::{Mesh},
-};
+use super::{hit_attribute::HitAttribute, mesh::Mesh};
 
 const IMPACT_EPS: f32 = 0.0001;
 
@@ -398,7 +394,6 @@ impl RaycastState {
             );
             hit_aabbs.push(hit_aabb);
             hit_any_aabb |= hit_aabb;
-            temp_debug_log!("hit_aabb={hit_aabb}");
         }
 
         self.num_hit_tris = 0;

@@ -116,7 +116,7 @@ impl PropMonoData {
     /// `w` component is 1.0 (which can be ignored, resulting in a list of `Vec3` points).
     unsafe fn parse_vault_points(mono_data: *const u8, name_idx: usize) -> Vec<Vec3> {
         let mut result = vec![];
-        let num_vault_pts = NamePropConfig::get(name_idx as i32).num_vault_pts;
+        let num_vault_pts = NamePropConfig::get(name_idx as u16).num_vault_pts;
 
         for i in 0..num_vault_pts as isize {
             result.push(md_read!(mono_data, Vec3, i * 0x10));

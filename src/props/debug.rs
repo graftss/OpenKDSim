@@ -1,6 +1,6 @@
 use gl_matrix::vec3;
 
-use crate::macros::temp_debug_log;
+
 
 use super::PropsState;
 
@@ -17,7 +17,9 @@ impl PropsState {
                     let mut max = vec3::create();
                     vec3::transform_mat4(&mut min, &aabb.min, prop.get_unattached_transform());
                     vec3::transform_mat4(&mut max, &aabb.max, prop.get_unattached_transform());
-                    debug_draw_box(min[0], min[1], min[2], max[0], max[1], max[2], 0.0, 0.0, 1.0);
+                    debug_draw_box(
+                        min[0], min[1], min[2], max[0], max[1], max[2], 0.0, 0.0, 1.0,
+                    );
                 }
             }
         }

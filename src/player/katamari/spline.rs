@@ -5,8 +5,6 @@ use crate::{
     util::spline::compute_spline_point,
 };
 
-
-
 const SPLINE_CTRL_PTS_DATA: [[f32; 2]; 11] = [
     [0.0, 0.184],
     [0.074, 0.185],

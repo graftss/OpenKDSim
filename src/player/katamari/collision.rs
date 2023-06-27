@@ -5,12 +5,13 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y, vec3_from,
+        vec3_unit_xz,
     },
     math::{
-        acos_f32, vec3_inplace_add_vec,
-        vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_subtract,
-        vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection, vec3_reflection,
+        acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
+        vec3_inplace_subtract, vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection,
+        vec3_reflection,
     },
     mission::{state::MissionState, GameMode, GameType, Mission},
     player::{camera::Camera, prince::Prince},
@@ -1511,7 +1512,7 @@ impl Katamari {
                 //   - the katamari is colliding with exactly 1 wall
                 //   - the katamari is colliding with a floor
 
-                // TODO_PROPS: `kat_can_climb_wall_contact:69-82` (init prop wallclimb)
+                // TODO_CLIMB: `kat_can_climb_wall_contact:69-82` (init prop wallclimb)
             }
 
             if self.num_wall_contacts > 1 {

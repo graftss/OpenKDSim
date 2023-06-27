@@ -22,7 +22,7 @@ use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
 
-use macros::temp_debug_log;
+
 use player::prince::OujiState;
 use props::{
     config::NamePropConfig,

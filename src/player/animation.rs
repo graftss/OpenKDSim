@@ -1,7 +1,7 @@
 use crate::{
     delegates::DelegatesRef,
     global::rng::RngState,
-    macros::{log},
+    macros::log,
     mission::{state::MissionState, tutorial::TutorialMove},
     player::{
         camera::{mode::CameraMode, CamR1JumpState, Camera},

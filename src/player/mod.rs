@@ -1,7 +1,4 @@
-use crate::{
-    delegates::DelegatesRef, gamestate::GameState,
-    mission::state::MissionState,
-};
+use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
 
 use self::{
     animation::Animation,

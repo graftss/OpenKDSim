@@ -194,7 +194,7 @@ macro_rules! set_y {
 }
 
 macro_rules! mark_address {
-    ($addr: literal) => {}
+    ($addr: literal) => {};
 }
 
 #[allow(unused_imports)]

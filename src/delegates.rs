@@ -78,7 +78,6 @@ pub type DebugDrawBoxDelegate = extern "C" fn(
     b: f32,
 ) -> ();
 
-
 #[derive(Default)]
 pub struct Delegates {
     pub mono_generate: Option<MonoGenerateDelegate>,

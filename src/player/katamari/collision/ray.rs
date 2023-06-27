@@ -1,3 +1,8 @@
+use std::{
+    cell::RefCell,
+    rc::{Rc},
+};
+
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
@@ -5,7 +10,10 @@ use crate::{
     macros::{inv_lerp_clamp, lerp, set_translation, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
-    props::prop::WeakPropRef,
+    props::{
+        config::{NamePropConfig},
+        prop::{Prop, WeakPropRef},
+    },
 };
 
 use super::mesh::KAT_MESHES;
@@ -75,11 +83,11 @@ pub struct KatCollisionRay {
 impl KatCollisionRay {
     /// Reset the collision ray.
     pub fn reset(&mut self, rad_cm: f32) {
-        vec3::copy(&mut self.endpoint, &VEC3_ZERO);
-        vec3::copy(&mut self.ray_local, &VEC3_ZERO);
-        vec3::copy(&mut self.kat_to_endpoint, &VEC3_ZERO);
-        vec3::copy(&mut self.ray_local_unit, &VEC3_ZERO);
-        vec3::copy(&mut self.prop_ray_local_unit, &VEC3_ZERO);
+        vec3::zero(&mut self.endpoint);
+        vec3::zero(&mut self.ray_local);
+        vec3::zero(&mut self.kat_to_endpoint);
+        vec3::zero(&mut self.ray_local_unit);
+        vec3::zero(&mut self.prop_ray_local_unit);
         self.ray_len = rad_cm;
         self.prop = None;
         self.contacts_surface = false;
@@ -88,13 +96,26 @@ impl KatCollisionRay {
 
 pub type KatCollisionRays = Vec<KatCollisionRay>;
 
+// pub struct KatCollisionRays {
+//     pub bottom: KatCollisionRay,
+//     pub mesh: Vec<KatCollisionRay>,
+//     pub prop: Vec<KatCollisionRay>,
+// }
+
+#[derive(Debug, Default)]
+struct PropVaultPoint {
+    pub ray_unit: Vec3,
+    pub length: f32,
+    pub prop: WeakPropRef,
+}
+
 impl Katamari {
     /// Resets the katamari's collision rays to their initial state.
     /// This is only called at the start of a mission and after a royal warp.
     pub fn reset_collision_rays(&mut self) {
         let rad_cm = self.radius_cm;
 
-        // TODO: make this not hardcoded
+        // TODO_PARAM: make this not hardcoded
         let num_mesh_rays = 18;
         self.collision_rays.resize_with(
             1 + num_mesh_rays + self.max_prop_rays as usize,
@@ -207,9 +228,10 @@ impl Katamari {
     fn update_rays_with_attached_props(&mut self) {
         // TODO_PARAM
         let MAX_PROP_EFFECTS = 0xc;
+        let MAX_VAULT_POINTS = 0xc;
         let NERFED_DANGLING_BOY_EFFECT = 0.8;
 
-        // TODO: `kat_update_rays_with_attached_props:137-143` (actually compute this based on game state)
+        // TODO_ENDING: `kat_update_rays_with_attached_props:137-143` (actually compute this based on game state)
         let prop_rays_enabled = true;
 
         // TODO: isn't this literally just `self.transform`
@@ -280,9 +302,82 @@ impl Katamari {
                 }
             }
 
-            // TODO_VAULT: `kat_update_rays_with_attached_props:330-606`
+            // compute vault points from attached props
+            let mut remaining_vault_points = MAX_VAULT_POINTS;
+            let mut prop_vault_points = vec![];
+
             for prop_ref in self.attached_props.iter().rev() {
-                let _prop = prop_ref.borrow_mut();
+                let prop = prop_ref.borrow_mut();
+                let name_idx = prop.get_name_idx();
+                let vault_points = prop.get_mono_data().map(|md| &md.vault_points).unwrap();
+
+                // don't make a vault point if we're out of vault points
+                if remaining_vault_points == 0 {
+                    break;
+                }
+
+                // don't make a vault point if the prop is disabled, unattached, or has no vault points
+                if prop.is_disabled() || !prop.is_attached() || vault_points.is_none() {
+                    continue;
+                }
+
+                // at this point, we are committing to making a vault point for `prop`
+                remaining_vault_points -= 1;
+
+                // ignore vault points on "golf nuf", "golfer guy", and "dangling boy"
+                if name_idx == 0x210 || name_idx == 0x591 || name_idx == 0x58b {
+                    continue;
+                }
+
+                let num_vault_points = NamePropConfig::get(name_idx).num_vault_pts;
+
+                // if `vault_points` is some, then `num_vault_points` should be >0, so this
+                // check might be redundant
+                if num_vault_points == 0 {
+                    continue;
+                }
+
+                let prop_transform = prop.get_attached_transform();
+                let mut world_vault_point = vec3::create();
+                let mut kat_to_vault_point = vec3::create();
+                let mut max_vault_point_dist = 0.0;
+                let mut prop_vault_point = PropVaultPoint::default();
+                prop_vault_point.prop = Rc::<RefCell<Prop>>::downgrade(prop_ref);
+
+                // iterate over all vault points to find the one furthest from the katamari center
+                for vault_point in vault_points.as_ref().unwrap() {
+                    // compute the vault point in world space
+                    vec3::transform_mat4(&mut world_vault_point, &vault_point, &prop_transform);
+                    // compute the vector from the katamari center to the vault point
+                    vec3::subtract(&mut kat_to_vault_point, &world_vault_point, &self.center);
+
+                    let vault_point_dist = vec3::length(&kat_to_vault_point);
+                    if vault_point_dist > max_vault_point_dist {
+                        max_vault_point_dist = vault_point_dist;
+                        vec3::normalize(&mut prop_vault_point.ray_unit, &kat_to_vault_point);
+                        prop_vault_point.length = vault_point_dist;
+                    }
+                }
+
+                prop_vault_points.push(prop_vault_point);
+            }
+
+            if prop_vault_points.len() == 0 {
+                return;
+            }
+
+            for (idx, prop_vault_point) in prop_vault_points.iter().enumerate() {
+                let mut ray = &mut self.collision_rays[self.first_prop_ray_index as usize + idx];
+                vec3::scale(
+                    &mut ray.kat_to_endpoint,
+                    &prop_vault_point.ray_unit,
+                    prop_vault_point.length,
+                );
+                vec3::copy(&mut ray.ray_local, &ray.kat_to_endpoint);
+                ray.prop_ray_local_unit = prop_vault_point.ray_unit;
+                ray.ray_local_unit = prop_vault_point.ray_unit;
+                ray.prop = Some(prop_vault_point.prop.clone());
+                ray.ray_len = prop_vault_point.length;
             }
         } else {
             for prop_ref in self.attached_props.iter_mut() {

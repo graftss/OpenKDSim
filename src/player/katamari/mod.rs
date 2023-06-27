@@ -21,10 +21,10 @@ use crate::{
     },
     delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{inv_lerp, min, set_translation, temp_debug_log, vec3_from, mark_address},
+    macros::{inv_lerp, mark_address, min, set_translation, temp_debug_log, vec3_from},
     math::{
-        normalize_bounded_angle, vec3_inplace_add_scaled,
-        vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
+        normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
+        vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
     },
     mission::{config::MissionConfig, state::MissionState},
     player::katamari::collision::ray::KatCollisionRayType,
@@ -1024,6 +1024,7 @@ impl Katamari {
         mission_state: &MissionState,
         props: &mut PropsState,
     ) {
+        temp_debug_log!("tick");
         mark_address!("0x1dba8");
 
         let stage_config = &mission_state.stage_config;

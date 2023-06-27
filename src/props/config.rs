@@ -106,7 +106,7 @@ impl NamePropConfig {
         self.mono_data_offset_idx != u16::MAX
     }
 
-    pub fn get(name_idx: i32) -> &'static NamePropConfig {
+    pub fn get(name_idx: u16) -> &'static NamePropConfig {
         &NAME_PROP_CONFIGS[name_idx as usize]
     }
 

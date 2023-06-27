@@ -20,8 +20,6 @@ use crate::{
     util::scale_sim_transform,
 };
 
-
-
 const FLAG_HAS_PARENT: u8 = 0x2;
 const FLAG_INTANGIBLE_CHILD: u8 = 0x4;
 
@@ -948,6 +946,10 @@ impl Prop {
         &self.unattached_transform
     }
 
+    pub fn get_attached_transform(&self) -> &Mat4 {
+        &self.attached_transform
+    }
+
     pub fn get_has_twin(&self) -> bool {
         self.has_twin
     }
@@ -958,6 +960,10 @@ impl Prop {
 
     pub fn set_nearest_kat_ray_idx(&mut self, value: Option<u16>) {
         self.nearest_kat_ray_idx = value;
+    }
+
+    pub fn get_mono_data(&self) -> Option<&Rc<PropMonoData>> {
+        self.mono_data.as_ref()
     }
 
     pub fn get_dist_to_katamari(&self, player: i32) -> f32 {
@@ -1116,7 +1122,7 @@ impl Prop {
         self.kat_center_offset = vec3_from!(-, self.pos, kat.get_center());
 
         let mut init_attached_transform = mat4::create();
-        if !NamePropConfig::get(self.name_idx as i32).is_unhatched_egg {
+        if !NamePropConfig::get(self.name_idx).is_unhatched_egg {
             mat4::copy(&mut init_attached_transform, &self.unattached_transform);
         } else {
             // TODO: `prop_adjust_bbox_when_hatching_egg`
