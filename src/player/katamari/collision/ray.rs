@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, set_translation, temp_debug_log, temp_debug_write, vec3_from},
+    macros::{inv_lerp_clamp, lerp, set_translation, temp_debug_write, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::prop::WeakPropRef,
@@ -201,28 +201,6 @@ impl Katamari {
                 ray.prop = None;
             }
             self.set_bottom_ray_contact();
-        }
-
-        // after updating the collision rays, draw them if desired
-        if self.debug_config.draw_collision_rays {
-            if let Some(delegates) = &self.delegates {
-                if let Some(draw) = delegates.borrow().debug_draw_line {
-                    for ray in self.collision_rays.iter() {
-                        let p0 = vec3_from!(+, ray.kat_to_endpoint, self.center);
-                        draw(
-                            p0[0],
-                            p0[1],
-                            p0[2],
-                            self.center[0],
-                            self.center[1],
-                            self.center[2],
-                            1.0,
-                            0.0,
-                            0.0,
-                        );
-                    }
-                }
-            }
         }
     }
 

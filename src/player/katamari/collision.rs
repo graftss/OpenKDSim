@@ -41,6 +41,7 @@ pub enum SurfaceType {
 }
 
 /// The three possible results returned by `Katamari::try_init_vault`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TryInitVaultResult {
     /// The katamari is not vaulting.
     NoVault,
@@ -107,10 +108,13 @@ impl Katamari {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
             // TODO: `kat_update_water_contact()`
+
             // self.debug_log_clip_data("0x1302a");
             self.update_surface_contacts();
+
             // self.debug_log_clip_data("0x1303a");
             self.process_surface_contacts();
+
             // self.debug_log_clip_data("0x13042");
             self.resolve_being_stuck();
             self.update_vault_and_climb(prince, camera, global);
@@ -831,16 +835,14 @@ impl Katamari {
             let mut sum_wall_normals = vec3::create();
 
             for wall in self.hit_walls.iter() {
-                // TODO: `kat_apply_surface_contacts:145-152` (verify in cheat engine)
+                vec3_inplace_add_vec(&mut sum_wall_normals, &wall.normal_unit);
+                self.hit_flags.apply_hit_attr(wall.hit_attr);
+
                 if wall.ray_len > max_ray_len {
                     max_ray_len = wall.ray_len;
                 }
-
-                vec3_inplace_add_vec(&mut sum_wall_normals, &wall.normal_unit);
-                self.hit_flags.apply_hit_attr(wall.hit_attr);
             }
 
-            // TODO: `kat_apply_surface_contacts:163-169` (verify in cheat engine)
             vec3::normalize(&mut self.contact_wall_normal_unit, &sum_wall_normals);
             self.compute_contact_wall_clip();
             self.climb_radius_cm = max_ray_len;
@@ -857,7 +859,7 @@ impl Katamari {
             self.fc_ray_len = if min_ratio_ray_idx.is_none() {
                 self.climb_radius_cm
             } else {
-                self.collision_rays[0].ray_len
+                self.collision_rays[min_ratio_ray_idx.unwrap() as usize].ray_len
             };
         } else if min_ratio_ray_idx == self.vault_ray_idx {
             // if the primary floor contact point is from the vault ray:
@@ -1126,7 +1128,8 @@ impl Katamari {
                     &self.contact_floor_normal_unit,
                 );
 
-                match self.try_init_vault() {
+                let try_init_vault_result = self.try_init_vault();
+                match try_init_vault_result {
                     // case 1: the katamari isn't vaulting
                     TryInitVaultResult::NoVault => return self.set_bottom_ray_contact(),
 
@@ -1140,14 +1143,18 @@ impl Katamari {
                             // if the vault ray is from a prop:
                             // update `prop_vault_ray`
                             let ray = &self.collision_rays[ray_idx as usize];
-                            vec3::scale(&mut self.prop_vault_ray, &ray.ray_local_unit, ray.ray_len);
+                            vec3::scale(
+                                &mut self.prop_vault_ray_unit,
+                                &ray.ray_local_unit,
+                                ray.ray_len,
+                            );
                         }
 
                         // reset the `vault_transform` to the identity
                         mat4::identity(&mut self.vault_transform);
 
                         // save a copy of the katamari's transform when the vault started
-                        mat4::copy(&mut self.vault_init_transform, &self.transform);
+                        mat4::copy(&mut self.init_vault_transform, &self.transform);
 
                         // set the vault floor normal to the contact floor normal
                         vec3::copy(

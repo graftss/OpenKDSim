@@ -1,4 +1,4 @@
-use crate::macros::debug_log;
+use crate::macros::{debug_log, temp_debug_log, vec3_from};
 
 use super::Katamari;
 
@@ -46,6 +46,36 @@ impl Katamari {
             debug_log!("    bottom len: {}", ray.ray_len);
         } else {
             debug_log!("  NO BOTTOM RAY");
+        }
+    }
+
+    /// Use the `debug_draw_line` delegate to draw the katamari's collision rays on the screen.
+    pub fn debug_draw_collision_rays(&self) {
+        if self.debug_config.draw_collision_rays {
+            if let Some(delegates) = &self.delegates {
+                if let Some(draw) = delegates.borrow().debug_draw_line {
+                    for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
+                        let p0 = vec3_from!(+, ray.kat_to_endpoint, self.center);
+                        let (r, g, b) = if self.vault_ray_idx == Some(ray_idx as u16) {
+                            (0.0, 1.0, 0.0)
+                        } else {
+                            (1.0, 0.0, 0.0)
+                        };
+
+                        draw(
+                            p0[0],
+                            p0[1],
+                            p0[2],
+                            self.center[0],
+                            self.center[1],
+                            self.center[2],
+                            r,
+                            g,
+                            b,
+                        );
+                    }
+                }
+            }
         }
     }
 }

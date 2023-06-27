@@ -16,20 +16,24 @@ use gl_matrix::{
 use crate::{
     collision::raycast_state::RaycastState,
     constants::{
-        FRAC_4PI_3, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
+        FRAC_4PI_3, PI, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{min, set_translation, temp_debug_log, temp_debug_write, vec3_from},
-    math::{normalize_bounded_angle, vol_to_rad},
+    macros::{inv_lerp, min, set_translation, temp_debug_log, temp_debug_write, vec3_from},
+    math::{
+        self, normalize_bounded_angle, vec3_inplace_add, vec3_inplace_add_scaled,
+        vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
+    },
     mission::{config::MissionConfig, state::MissionState},
+    player::katamari::collision::ray::KatCollisionRayType,
     props::{prop::PropRef, PropsState},
 };
 
 use self::{
     collision::mesh::KatMesh,
-    collision::{history::HitHistory, hit::SurfaceHit, ray::KatCollisionRays},
+    collision::{history::HitHistory, hit::SurfaceHit, mesh::KAT_MESHES, ray::KatCollisionRays},
     flags::{KatHitFlags, KatPhysicsFlags},
     params::KatamariParams,
     scaled_params::KatScaledParams,
@@ -75,7 +79,7 @@ pub struct DebugConfig {
 impl Default for DebugConfig {
     fn default() -> Self {
         Self {
-            draw_collision_rays: false,
+            draw_collision_rays: true,
         }
     }
 }
@@ -151,10 +155,11 @@ pub struct Katamari {
     collected_props: Vec<PropRef>,
 
     attached_props: Vec<PropRef>,
+
     // END new fields
     /// A reference to the vector of katamari meshes.
     /// offset: 0x0
-    meshes: Vec<KatMesh>,
+    // meshes: Vec<KatMesh>,
 
     /// The player who owns this katamari.
     /// offset: 0x44
@@ -600,7 +605,7 @@ pub struct Katamari {
 
     /// The katamari's transform at the beginning of a vault.
     /// offset: 0x38d4
-    vault_init_transform: Mat4,
+    init_vault_transform: Mat4,
 
     /// (??) Some kind of transform for when the katamari is vaulting
     /// offset: 0x3914
@@ -655,6 +660,10 @@ pub struct Katamari {
     /// offset: 0x39b4
     larger_avg_mesh_ray_len: f32,
 
+    /// (??) The angle that the vault ray changes as the katamari moves while vaulted.
+    /// offset: 0x39b8
+    vault_rot_angle: f32,
+
     /// The number of ticks the katamari since the katamari started its current vault.
     /// offset: 0x39bc
     vault_ticks: u32,
@@ -669,7 +678,7 @@ pub struct Katamari {
 
     /// (??) The unit local unit vector of the vaulted prop collision ray, if one exists.
     /// offset: 0x39c4
-    prop_vault_ray: Vec3,
+    prop_vault_ray_unit: Vec3,
 
     /// The first prop that was attached to the katamari.
     /// offset: 0x39d8
@@ -1017,6 +1026,7 @@ impl Katamari {
         props: &mut PropsState,
     ) {
         // self.debug_log_clip_data("0x1dba8");
+        temp_debug_log!("tick");
 
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
@@ -1093,6 +1103,8 @@ impl Katamari {
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state, props);
 
+        self.debug_draw_collision_rays();
+
         // self.debug_log_clip_data("0x1e13e");
 
         // compute distance to camera
@@ -1141,6 +1153,8 @@ impl Katamari {
         self.diam_trunc_mm = (self.diam_cm * 10.0) as i32;
     }
 
+    /// Update the katamari's transform while it is not vaulted.
+    /// offset: 0x20660
     pub fn update_transform_unvaulted(&mut self) {
         // TODO_VS: `kat_update_transform_unvaulted:43-111`
 
@@ -1163,5 +1177,148 @@ impl Katamari {
         set_translation!(self.transform, self.center);
 
         // TODO_LOW: `kat_apply_pitch_when_spinning()` (this seems to be unused)
+    }
+
+    /// Update the katamari's transform while it is vaulted.
+    /// offset: 0x1b3b0
+    pub fn update_transform_vaulted(&mut self) {
+        self.add_vault_descent_speed();
+
+        let vel_accel = self.velocity.vel_accel.clone();
+        self.speed = vec3::len(&vel_accel);
+        self.update_rotation_speed(&vel_accel);
+
+        let rot_dist = if !self.physics_flags.wheel_spin {
+            self.speed
+        } else {
+            // TODO_LOW: `kat_apply_pitch_when_spinning()` (this seems to be unused)
+            0.0
+        };
+
+        let rot_angle = if let Some(ray) = self.fc_ray {
+            let fc_ray_len = vec3::len(&ray);
+            if fc_ray_len > 0.0001 {
+                normalize_bounded_angle(rot_dist / fc_ray_len)
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        self.vault_rot_angle = rot_angle;
+
+        let mut tmp = mat4::create();
+
+        let mut vault_rot_mat = mat4::create();
+        mat4::from_rotation(&mut vault_rot_mat, rot_angle, &self.rotation_axis_unit);
+
+        // compute `vault_transform`
+        mat4::multiply(&mut tmp, &vault_rot_mat, &self.vault_transform);
+        mat4::multiply(
+            &mut self.vault_transform,
+            &self.turntable_rotation_mat,
+            &tmp,
+        );
+
+        // compute `rotation_mat`
+        mat4::multiply(&mut tmp, &self.spin_rotation_mat, &self.rotation_mat);
+        mat4::multiply(&mut self.rotation_mat, &vault_rot_mat, &tmp);
+
+        let mut next_transform = mat4::create();
+        let mut next_center = vec3::create();
+
+        match self.physics_flags.grounded_ray_type {
+            Some(KatCollisionRayType::Mesh) => {
+                mat4::multiply(
+                    &mut next_transform,
+                    &self.vault_transform,
+                    &self.init_vault_transform,
+                );
+                set_translation!(next_transform, self.vault_contact_point);
+
+                let mesh_ray_idx = self.vault_ray_idx.unwrap() as usize - 1;
+                let mut mesh_ray =
+                    KAT_MESHES[self.mesh_index as usize].points[mesh_ray_idx].clone();
+
+                let x = self.fc_ray_len / -50.0;
+                vec3_inplace_scale(&mut mesh_ray, x);
+
+                vec3::transform_mat4(&mut next_center, &mesh_ray, &next_transform);
+            }
+            Some(KatCollisionRayType::Prop) => {
+                let mut tmp_vec = vec3::create();
+                vec3::scale(&mut tmp_vec, &self.prop_vault_ray_unit, -1.0);
+                vec3::transform_mat4(&mut next_center, &tmp_vec, &self.vault_transform);
+                vec3_inplace_add_vec(&mut next_center, &self.vault_contact_point);
+
+                mat4::multiply(
+                    &mut next_transform,
+                    &self.vault_transform,
+                    &self.init_vault_transform,
+                );
+            }
+            a @ _ => {
+                panic!("weird thingy: {:?}", a);
+            }
+        }
+
+        mat4::copy(&mut self.transform, &next_transform);
+        vec3::copy(&mut self.center, &next_center);
+        set_translation!(self.transform, self.center);
+
+        self.vault_ticks += 1;
+    }
+
+    /// Accelerate the katamari while descending from a vault.
+    /// In the original game, the `VAULT_DESCENT_ACCEL_FACTOR` is 0 and is a factor of the
+    /// acceleration magnitude, so this function is just a no-op.
+    /// offset: 0x1c8e0
+    fn add_vault_descent_speed(&mut self) {
+        // TODO_PARAM
+        let VAULT_DESCENT_ACCEL_FACTOR = 0.0;
+
+        // early return if spinning (in which case no need for vault-based acceleration)
+        // or if not moving
+        if self.physics_flags.wheel_spin || self.speed <= 0.0 {
+            return;
+        }
+
+        // compute the similarity between the directions of the vaulted collision
+        // ray and the katamari's velocity
+        if self.vault_ray_idx.is_none() {
+            return;
+        }
+        let vault_ray = self
+            .collision_rays
+            .get(self.vault_ray_idx.unwrap() as usize)
+            .unwrap();
+        let similarity = vec3::dot(&vault_ray.ray_local_unit, &self.velocity.vel_accel_unit);
+
+        // only apply descent speed if the similarity is negative, meaning we are moving "away"
+        // from the vault ray
+        if similarity >= 0.0 {
+            return;
+        }
+
+        let floor_similarity =
+            vec3::dot(&vault_ray.ray_local_unit, &self.contact_floor_normal_unit);
+        let mut ray_rej_floor_unit = vault_ray.ray_local_unit.clone();
+        vec3_inplace_scale(&mut ray_rej_floor_unit, -1.0);
+        vec3_inplace_add_scaled(
+            &mut ray_rej_floor_unit,
+            &self.contact_floor_normal_unit,
+            floor_similarity,
+        );
+        vec3_inplace_normalize(&mut ray_rej_floor_unit);
+
+        let angle = floor_similarity.cos();
+        let ray_scale = inv_lerp!(vault_ray.ray_len, self.radius_cm, self.max_ray_len);
+        let vault_descent_accel = (1.0 - angle / PI) * ray_scale * VAULT_DESCENT_ACCEL_FACTOR;
+        vec3_inplace_add_scaled(
+            &mut self.velocity.vel_accel,
+            &ray_rej_floor_unit,
+            vault_descent_accel,
+        );
     }
 }

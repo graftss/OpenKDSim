@@ -778,7 +778,7 @@ impl Katamari {
                         t = self.params.bottom_ray_friction * self.speed;
                     }
                     Some(_) => {
-                        let t = match prince.oujistate.dash {
+                        let t_inner = match prince.oujistate.dash {
                             true => {
                                 // TODO: could be wrong
                                 1.0 - inv_lerp!(
@@ -790,13 +790,13 @@ impl Katamari {
                             }
                             false => 1.0,
                         };
-                        panic_log!("unimplemented: {t}");
                         // TODO: remove this when `kat_try_init_vault_speed` is implemented
-                        // let max_length_ratio = 1.0;
-                        // let angle_btwn_rejs = 1.0;
-                        // let k =
-                        //     max_length_ratio * angle_btwn_rejs * self.params.nonbottom_ray_friction;
-                        // lerp!(t, bottom_friction, bottom_friction * k)
+                        let bottom_friction = self.params.bottom_ray_friction * self.speed;
+                        let max_length_ratio = 1.0;
+                        let angle_btwn_rejs = 1.0;
+                        let k =
+                            max_length_ratio * angle_btwn_rejs * self.params.nonbottom_ray_friction;
+                        t = lerp!(t_inner, bottom_friction, bottom_friction * k);
                     }
                     None => {
                         panic_log!("this should not happen");
@@ -900,7 +900,7 @@ impl Katamari {
             self.update_transform_unvaulted();
         } else {
             self.update_size_features();
-            // TODO: `kat_update_transform_vaulted()`
+            self.update_transform_vaulted();
         }
 
         vec3_inplace_zero_small(&mut self.center, 0.001);
@@ -980,7 +980,7 @@ impl Katamari {
         vec3_inplace_normalize(&mut self.shell_top_right);
     }
 
-    fn update_rotation_speed(&mut self, velocity: &Vec3) {
+    pub fn update_rotation_speed(&mut self, velocity: &Vec3) {
         if self.physics_flags.braking {
             return self.rotation_speed = 0.0;
         }
