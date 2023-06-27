@@ -21,7 +21,7 @@ use crate::{
     },
     delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{inv_lerp, min, set_translation, temp_debug_log, vec3_from},
+    macros::{inv_lerp, min, set_translation, temp_debug_log, vec3_from, mark_address},
     math::{
         normalize_bounded_angle, vec3_inplace_add_scaled,
         vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
@@ -1024,7 +1024,7 @@ impl Katamari {
         mission_state: &MissionState,
         props: &mut PropsState,
     ) {
-        // self.debug_log_clip_data("0x1dba8");
+        mark_address!("0x1dba8");
 
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;
@@ -1074,16 +1074,16 @@ impl Katamari {
             &self.camera_side_vector,
         );
 
-        // self.debug_log_clip_data("0x1df32");
+        mark_address!("0x1df32");
 
         self.update_velocity(prince, camera, mission_state);
 
-        // self.debug_log_clip_data("0x1df3a");
+        mark_address!("0x1df3a");
 
         self.update_friction_accel(prince, mission_state);
         self.apply_acceleration(mission_state);
 
-        // self.debug_log_clip_data("0x1df7f");
+        mark_address!("0x1df7f");
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;
@@ -1093,24 +1093,26 @@ impl Katamari {
             &cam_transform.lookat_yaw_rot_inv,
         );
 
-        // self.debug_log_clip_data("0x1e076");
+        mark_address!("0x1e076");
+
         self.update_collision_rays();
         // TODO_PROPS: self.attract_props_to_center();
-        // self.debug_log_clip_data("0x1e080");
+
+        mark_address!("0x1e080");
 
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state, props);
 
         self.debug_draw_collision_rays();
 
-        // self.debug_log_clip_data("0x1e13e");
+        mark_address!("0x1e13e");
 
         // compute distance to camera
         let kat_to_cam = vec3_from!(-, self.center, cam_transform.pos);
         self.dist_to_cam = vec3::len(&kat_to_cam);
         self.update_cam_relative_dir(camera);
 
-        // TODO_LOW: `kat_update:390-415` (self.update_dust_cloud_vfx())
+        // TODO_FX: `kat_update:390-415` (self.update_dust_cloud_vfx())
         // TODO_LOW: `kat_update:416-447` (self.update_prop_combo())
 
         if !camera.preclear.get_enabled() {

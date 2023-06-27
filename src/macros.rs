@@ -193,6 +193,10 @@ macro_rules! set_y {
     };
 }
 
+macro_rules! mark_address {
+    ($addr: literal) => {}
+}
+
 #[allow(unused_imports)]
 pub(crate) use {
     debug_log,
@@ -200,6 +204,7 @@ pub(crate) use {
     inv_lerp_clamp,
     lerp,
     log,
+    mark_address,
     max,
     max_to_none,
     min,
