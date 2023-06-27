@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     delegates::Delegates,
     global::GlobalState,
-    macros::{panic_log},
+    macros::{panic_log, temp_debug_log},
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
@@ -41,9 +41,12 @@ impl GameState {
     pub fn reset(&mut self) {
         self.players = PlayersState::default();
         self.global = GlobalState::default();
-        self.props = PropsState::default();
+        self.props.reset();
         self.mission_state = MissionState::default();
         self.mono_data = MonoData::default();
+
+        // TODO: find a better place to put this
+        self.props.delegates = Some(self.delegates.clone());
     }
 
     pub fn get_player(&self, player_idx: usize) -> &Player {
@@ -335,6 +338,8 @@ impl GameState {
 
         // TODO: `prince_init_animation()`
         // TODO: `Init`: 21-51, initialize ending stuff
+
+        temp_debug_log!("finished init");
     }
 
     /// Mimicks the `Tick` API function.

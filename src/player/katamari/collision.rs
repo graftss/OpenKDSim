@@ -271,9 +271,9 @@ impl Katamari {
         let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
 
         let mut kat_sphere_rad = if prop_config.easier_to_collect {
-            self.avg_mesh_ray_len
-        } else {
             self.larger_avg_mesh_ray_len
+        } else {
+            self.avg_mesh_ray_len
         };
 
         if mission_state.is_ending() {

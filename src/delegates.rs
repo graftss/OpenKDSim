@@ -66,6 +66,19 @@ pub type DebugDrawLineDelegate = extern "C" fn(
     b: f32,
 ) -> ();
 
+pub type DebugDrawBoxDelegate = extern "C" fn(
+    min_x: f32,
+    min_y: f32,
+    min_z: f32,
+    max_x: f32,
+    max_y: f32,
+    max_z: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+) -> ();
+
+
 #[derive(Default)]
 pub struct Delegates {
     pub mono_generate: Option<MonoGenerateDelegate>,
@@ -86,6 +99,7 @@ pub struct Delegates {
 
     // delegates unique to the open simulation
     pub debug_draw_line: Option<DebugDrawLineDelegate>,
+    pub debug_draw_box: Option<DebugDrawBoxDelegate>,
 }
 
 pub type DelegatesRef = Rc<RefCell<Delegates>>;

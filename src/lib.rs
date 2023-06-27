@@ -22,6 +22,7 @@ use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
 
+use macros::temp_debug_log;
 use player::prince::OujiState;
 use props::{
     config::NamePropConfig,
@@ -690,10 +691,6 @@ pub unsafe extern "C" fn MonoInitStart(
     clear_flag: i32,
     end_flag: i32,
 ) {
-    // since this is the first initialization API call made by unity (before `Init`, go figure)
-    // this seems like a reasonable place to reset the game state between attempts
-    STATE.with(|state| state.borrow_mut().reset());
-
     std::panic::set_hook(Box::new(|panic_info| {
         log!("panic: {:?}", panic_info);
         log!("trace: {:?}", Backtrace::new());
@@ -707,6 +704,11 @@ pub unsafe extern "C" fn MonoInitStart(
         clear_flag,
         end_flag
     );
+
+    // since this is the first initialization API call made by unity (before `Init`, go figure)
+    // this seems like a reasonable place to reset the game state between attempts
+    STATE.with(|state| state.borrow_mut().reset());
+
     STATE.with(|state| {
         state.borrow_mut().mono_init_start(
             mono_data,
@@ -908,6 +910,13 @@ pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission:
 pub unsafe extern "C" fn TakesCallbackDebugDrawLine(cb: DebugDrawLineDelegate) {
     STATE.with(|state| {
         state.borrow_mut().delegates.borrow_mut().debug_draw_line = Some(cb);
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn TakesCallbackDebugDrawBox(cb: DebugDrawBoxDelegate) {
+    STATE.with(|state| {
+        state.borrow_mut().delegates.borrow_mut().debug_draw_box = Some(cb);
     });
 }
 

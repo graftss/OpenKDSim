@@ -1025,7 +1025,6 @@ impl Katamari {
         props: &mut PropsState,
     ) {
         // self.debug_log_clip_data("0x1dba8");
-        temp_debug_log!("tick");
 
         let stage_config = &mission_state.stage_config;
         let mission_config = &mission_state.mission_config;

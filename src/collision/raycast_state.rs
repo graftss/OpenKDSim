@@ -9,7 +9,7 @@ use gl_matrix::{
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     delegates::Delegates,
-    macros::{panic_log, vec3_from},
+    macros::{panic_log, vec3_from, temp_debug_log},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
@@ -398,6 +398,7 @@ impl RaycastState {
             );
             hit_aabbs.push(hit_aabb);
             hit_any_aabb |= hit_aabb;
+            temp_debug_log!("hit_aabb={hit_aabb}");
         }
 
         self.num_hit_tris = 0;

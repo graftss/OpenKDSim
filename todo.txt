@@ -12,9 +12,6 @@ random things that shouldn't be forgotten:
 - when entering a pinch input from consistent non-pinch push inputs, the katamari
   will orbit around in a circle for some reason
 
-
-
-- clip is buggy (`contact_floor_clip`, `contact_wall_clip`, `clip_translation`)
-  - should be 0 when katamari is immobile
-  - should be negative on mas1 table
-  - use cheat engine to see where the original simulation writes their values in both cases
+- `Resettable` interface to reset attempt-specific bits of game state
+  - implement it on all parts of `GameState`
+  - `derive` it on structs for which all fields are `Resettable`? sounds like a good exercise

@@ -6,7 +6,7 @@ use crate::{
     constants::ZERO,
     mission::{state::MissionState},
     mono_data::PropMonoData,
-    player::Player,
+    player::Player, delegates::DelegatesRef,
 };
 
 use self::{
@@ -17,6 +17,7 @@ use self::{
 };
 
 pub mod config;
+pub mod debug;
 pub mod motion;
 pub mod params;
 pub mod prop;
@@ -28,6 +29,15 @@ pub struct PropsState {
     pub global_paths: GlobalPathState,
     pub config: Option<&'static Vec<NamePropConfig>>,
     pub params: PropParams,
+    pub delegates: Option<DelegatesRef>,
+}
+
+impl PropsState {
+    /// Reset ephemeral fields of the props state between attempts.
+    pub fn reset(&mut self) {
+        self.props.clear();
+        self.global_paths.init();
+    }
 }
 
 impl PropsState {
