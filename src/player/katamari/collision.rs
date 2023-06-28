@@ -5,11 +5,10 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y,
-        temp_debug_log, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
     },
     math::{
-        self, acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
+        acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
         vec3_inplace_subtract, vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection,
         vec3_reflection,
     },
@@ -109,7 +108,7 @@ impl Katamari {
             // TODO: `kat_update_water_contact()`
 
             // self.debug_log_clip_data("0x1302a");
-            self.update_surface_contacts();
+            self.compute_surface_contacts();
 
             // self.debug_log_clip_data("0x1303a");
             self.process_surface_contacts();
@@ -425,7 +424,11 @@ impl Katamari {
         prop.set_nearest_kat_ray_idx(nearest_ray_idx)
     }
 
-    fn update_surface_contacts(&mut self) {
+    /// Check for surface collisions along the katamari's collision rays, which include:
+    ///   - the "collision rays" pointing radially outwards from the katamari center
+    ///   - the "shell" of 5 rays along the top of the katamari which point in the direction of movement
+    /// offset: 0x13e70
+    fn compute_surface_contacts(&mut self) {
         // TODO_VS: `kat_update_surface_contacts:59` (check to not run this in vs mode)
 
         // prepare the ray starting from katamari center and cast straight down.
@@ -457,7 +460,7 @@ impl Katamari {
 
         self.physics_flags.in_water_0x8 = self.physics_flags.in_water;
         if self.physics_flags.moved_more_than_rad {
-            // TODO: `kat_update_surface_contacts:110-235` (weird crap when katamari moved a lot)
+            // TODO_FAST: `kat_update_surface_contacts:110-235` (weird edge case when katamari moved a lot)
         } else {
             // TODO_PARAM: make 0.15 a katamari param
             let SHELL_RAY_RADIUS_MULT = 0.15;
@@ -474,7 +477,6 @@ impl Katamari {
                 &self.delta_pos,
                 shell_ray_len,
             );
-            vec3_inplace_scale(&mut shell_final_base, shell_ray_len);
 
             let mut shell_initial_pts: [Vec3; 5] = Default::default();
             let mut shell_final_pts: [Vec3; 5] = Default::default();
@@ -523,6 +525,8 @@ impl Katamari {
                 &shell_final_base,
             );
 
+            self.debug_draw_shell_rays(&shell_initial_pts, &shell_final_pts);
+
             for i in 0..5 {
                 self.raycast_state
                     .load_ray(&shell_initial_pts[i], &shell_final_pts[i]);
@@ -538,33 +542,36 @@ impl Katamari {
                 let mut shell_base_pt = vec3::create();
 
                 match i {
-                    1 => {
+                    0 => {
                         vec3::copy(&mut shell_base_pt, &self.shell_top);
                         self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Top);
                     }
-                    2 => {
+                    1 => {
                         vec3::copy(&mut shell_base_pt, &self.shell_left);
                         self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Left);
                     }
-                    3 => {
+                    2 => {
                         vec3::copy(&mut shell_base_pt, &self.shell_right);
                         self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Right);
                     }
-                    4 => {
+                    3 => {
                         vec3::copy(&mut shell_base_pt, &self.shell_top_left);
                         self.physics_flags.hit_shell_ray = Some(ray::ShellRay::TopLeft);
                     }
-                    5 => {
+                    4 => {
                         vec3::copy(&mut shell_base_pt, &self.shell_top_right);
                         self.physics_flags.hit_shell_ray = Some(ray::ShellRay::TopRight);
                     }
-                    _ => (),
+                    _ => {
+                        panic!();
+                    }
                 }
 
                 if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
-                    let shell_ray_idx = -(i as i32 + 1);
+                    let shell_ray_idx = -(self.physics_flags.hit_shell_ray.unwrap() as i16);
                     vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_base_pt);
                     vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_base_pt);
+                    mark_address!("0x14b32");
                     self.record_surface_contact(shell_ray_idx, None);
                 }
             }
@@ -583,7 +590,7 @@ impl Katamari {
                     if true && !self.last_physics_flags.airborne {
                         self.physics_flags.airborne = false;
                     }
-                    self.record_surface_contact(ray_idx as i32, None);
+                    self.record_surface_contact(ray_idx as i16, None);
                 }
             }
         }
@@ -595,7 +602,7 @@ impl Katamari {
     /// offset: 0x133d0
     fn record_surface_contact(
         &mut self,
-        ray_idx: i32,
+        ray_idx: i16,
         prop: Option<WeakPropRef>,
     ) -> Option<SurfaceType> {
         let hit = self.raycast_state.get_closest_hit().unwrap_or_else(|| {
@@ -624,15 +631,9 @@ impl Katamari {
         let dot = vec3::dot(&impact_unit, &self.raycast_state.ray_unit);
         let ray_clip_len = (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant)
             * self.raycast_state.ray_len;
-        // temp_debug_log!("ray_idx={}, dot={}, impact_unit={:?}, ray_unit={:?}", ray_idx, dot, impact_unit, self.raycast_state.ray_unit);
-        // temp_debug_log!("ray_clip_len={:?}, impact_dist_ratio={:?}, clip_len_const={:?}, impact_dist={:?}", ray_clip_len, hit.impact_dist_ratio, self.params.clip_len_constant, self.raycast_state.ray_len);
 
         let mut clip_normal = vec3::clone(&impact_unit);
         vec3_inplace_scale(&mut clip_normal, dot * ray_clip_len);
-
-        // temp_debug_log!("   impact_point:{:?}, dist_ratio:{}", hit.impact_point, hit.impact_dist_ratio);
-        // temp_debug_log!("   ray={:?}, p0={:?}, p1={:?}", self.raycast_state.ray, self.raycast_state.point0, self.raycast_state.point1);
-        // temp_debug_log!("   dot:{dot}, ray_clip_len={ray_clip_len}, clip_normal: {clip_normal:?}");
 
         if impact_unit[1] < -0.1 {
             let normal_angle_y = acos_f32(impact_unit[1]);
@@ -668,7 +669,7 @@ impl Katamari {
         surface_type: SurfaceType,
         normal_unit: &Vec3,
         clip_normal: &Vec3,
-        ray_idx: i32,
+        ray_idx: i16,
         prop: Option<WeakPropRef>,
     ) {
         let num_contacts = self.get_num_surface_contacts(surface_type);
@@ -719,8 +720,6 @@ impl Katamari {
 
         let closest_hit = self.raycast_state.get_closest_hit().unwrap();
 
-        temp_debug_log!("added_surface.ray_idx: {}", ray_idx);
-
         // write the new data to the added surface
         added_surface.normal_unit = normal_unit.clone();
         added_surface.clip_normal = clip_normal.clone();
@@ -729,7 +728,7 @@ impl Katamari {
         added_surface.clip_normal_len = clip_normal_len;
         added_surface.impact_dist_ratio = closest_hit.impact_dist_ratio;
         added_surface.ray_len = self.raycast_state.ray_len;
-        added_surface.ray_idx = ray_idx as u16;
+        added_surface.ray_idx = ray_idx;
         added_surface.hit_attr = closest_hit.metadata.into();
         added_surface.prop = prop;
 
@@ -748,7 +747,6 @@ impl Katamari {
         }
 
         if !found_old {
-            // temp_debug_log!("   new surface contact: type={surface_type:?}, ray_idx={ray_idx}");
             self.inc_num_surface_contacts(surface_type);
         }
     }
@@ -806,7 +804,6 @@ impl Katamari {
                 // maintain a bunch of data about the contact floor with the minimum
                 // impact distance ratio
                 if floor.impact_dist_ratio < min_ratio {
-                    temp_debug_log!("floor ray idx: {}", floor.ray_idx);
                     min_ratio = floor.impact_dist_ratio;
                     min_ratio_contact_pt = Some(floor.contact_point);
                     min_ratio_ray = Some(floor.ray);
@@ -1133,7 +1130,6 @@ impl Katamari {
                 );
 
                 let try_init_vault_result = self.try_init_vault();
-                temp_debug_log!("  try_init_vault_result: {:?}", try_init_vault_result);
                 match try_init_vault_result {
                     // case 1: the katamari isn't vaulting
                     TryInitVaultResult::NoVault => return self.set_bottom_ray_contact(),
@@ -1143,8 +1139,6 @@ impl Katamari {
                         let ray_idx = self.vault_ray_idx.unwrap();
                         let ray_type = self.ray_type_by_idx(ray_idx);
                         self.physics_flags.grounded_ray_type = ray_type;
-
-                        temp_debug_log!("  init vault ray type: {:?}", ray_type);
 
                         if ray_type == Some(KatCollisionRayType::Prop) {
                             let ray = &self.collision_rays[ray_idx as usize];
@@ -1721,7 +1715,7 @@ impl Katamari {
     /// offset: 0x153c0
     fn try_init_vault(&mut self) -> TryInitVaultResult {
         // early returns when a vault isn't starting
-        if self.fc_ray_idx == Some(0) || self.fc_ray_idx.is_none() {
+        if self.fc_ray_idx.is_none() || self.fc_ray_idx.unwrap() < 0 {
             return TryInitVaultResult::NoVault;
         }
         if self.fc_ray_idx == self.vault_ray_idx {

@@ -21,7 +21,7 @@ use crate::{
     },
     delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{inv_lerp, mark_address, min, set_translation, temp_debug_log, vec3_from},
+    macros::{inv_lerp, mark_address, min, set_translation, vec3_from},
     math::{
         normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
@@ -356,7 +356,7 @@ pub struct Katamari {
     /// offset: 0x470
     last_center: Vec3,
 
-    /// (??) The vector moved the previous tick.
+    /// The vector that the katamari moved over the previous tick.
     /// offset: 0x480
     delta_pos: Vec3,
 
@@ -632,11 +632,11 @@ pub struct Katamari {
 
     /// (??) The index of the collision ray being used to vault, if one exists.
     /// offset: 0x3998
-    vault_ray_idx: Option<u16>,
+    vault_ray_idx: Option<i16>,
 
     /// (??) The index of the collision ray used as the primary floor contact, if one exists.
     /// offset: 0x399c
-    fc_ray_idx: Option<u16>,
+    fc_ray_idx: Option<i16>,
 
     /// (??)
     /// offset: 0x39a0
@@ -1024,7 +1024,6 @@ impl Katamari {
         mission_state: &MissionState,
         props: &mut PropsState,
     ) {
-        temp_debug_log!("tick");
         mark_address!("0x1dba8");
 
         let stage_config = &mission_state.stage_config;

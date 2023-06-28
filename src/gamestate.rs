@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     delegates::Delegates,
     global::GlobalState,
-    macros::{panic_log, temp_debug_log},
+    macros::{panic_log},
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
@@ -338,8 +338,6 @@ impl GameState {
 
         // TODO: `prince_init_animation()`
         // TODO: `Init`: 21-51, initialize ending stuff
-
-        temp_debug_log!("finished init");
     }
 
     /// Mimicks the `Tick` API function.

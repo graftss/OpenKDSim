@@ -27,6 +27,19 @@ pub enum ShellRay {
     TopRight = 6,
 }
 
+impl From<ShellRay> for i16 {
+    fn from(value: ShellRay) -> Self {
+        match value {
+            ShellRay::Top => 1,
+            ShellRay::Left => 2,
+            ShellRay::Right => 3,
+            ShellRay::Bottom => 4,
+            ShellRay::TopLeft => 5,
+            ShellRay::TopRight => 6,
+        }
+    }
+}
+
 /// The different types of rays making up the katamari's collision.
 /// `Bottom`: the single ray extending directly downwards from the katamari's center.
 ///           this ray is used to make sure the katamari moves smoothly along the ground
@@ -459,10 +472,10 @@ impl Katamari {
 
     /// Returns the type of the collision ray at index `ray_idx` if it exists.
     /// If there is no ray at that index, returns `None`.
-    pub fn ray_type_by_idx(&self, ray_idx: u16) -> Option<KatCollisionRayType> {
+    pub fn ray_type_by_idx(&self, ray_idx: i16) -> Option<KatCollisionRayType> {
         if ray_idx == 0 {
             Some(KatCollisionRayType::Bottom)
-        } else if ray_idx < self.first_prop_ray_index {
+        } else if ray_idx < self.first_prop_ray_index as i16 {
             Some(KatCollisionRayType::Mesh)
         } else {
             self.collision_rays

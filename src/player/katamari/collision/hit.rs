@@ -16,7 +16,7 @@ pub struct SurfaceHit {
 
     /// The index of the katamari collision ray making the contact.
     /// offset: 0x8
-    pub ray_idx: u16,
+    pub ray_idx: i16,
 
     /// The position along the ray where the hit occured, rescaled to be
     /// in the interval [0, 1], where 0 means the ray's initial point

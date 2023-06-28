@@ -1,3 +1,5 @@
+use gl_matrix::common::Vec3;
+
 use crate::macros::{debug_log, vec3_from};
 
 use super::Katamari;
@@ -56,7 +58,7 @@ impl Katamari {
                 if let Some(draw) = delegates.borrow().debug_draw_line {
                     for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
                         let p0 = vec3_from!(+, ray.kat_to_endpoint, self.center);
-                        let (r, g, b) = if self.vault_ray_idx == Some(ray_idx as u16) {
+                        let (r, g, b) = if self.vault_ray_idx == Some(ray_idx as i16) {
                             (0.0, 1.0, 0.0)
                         } else {
                             (1.0, 0.0, 0.0)
@@ -72,6 +74,37 @@ impl Katamari {
                             r,
                             g,
                             b,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn debug_draw_shell_rays(
+        &self,
+        shell_initial_pts: &[Vec3; 5],
+        shell_final_pts: &[Vec3; 5],
+    ) {
+        let SHELL_RAY_COLOR = [0.0, 1.0, 1.0];
+
+        if self.debug_config.draw_collision_rays {
+            if let Some(delegates) = &self.delegates {
+                if let Some(draw) = delegates.borrow().debug_draw_line {
+                    for i in 0..5 {
+                        let p0 = shell_initial_pts[i];
+                        let p1 = shell_final_pts[i];
+
+                        draw(
+                            p0[0],
+                            p0[1],
+                            p0[2],
+                            p1[0],
+                            p1[1],
+                            p1[2],
+                            SHELL_RAY_COLOR[0],
+                            SHELL_RAY_COLOR[1],
+                            SHELL_RAY_COLOR[2],
                         );
                     }
                 }
