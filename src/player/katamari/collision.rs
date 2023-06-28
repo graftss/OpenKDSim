@@ -5,8 +5,8 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y, vec3_from,
-        vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_translation, set_y,
+        temp_debug_log, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -1128,6 +1128,7 @@ impl Katamari {
                 );
 
                 let try_init_vault_result = self.try_init_vault();
+                temp_debug_log!("  try_init_vault_result: {:?}", try_init_vault_result);
                 match try_init_vault_result {
                     // case 1: the katamari isn't vaulting
                     TryInitVaultResult::NoVault => return self.set_bottom_ray_contact(),
@@ -1138,9 +1139,9 @@ impl Katamari {
                         let ray_type = self.ray_type_by_idx(ray_idx);
                         self.physics_flags.grounded_ray_type = ray_type;
 
+                        temp_debug_log!("  init vault ray type: {:?}", ray_type);
+
                         if ray_type == Some(KatCollisionRayType::Prop) {
-                            // if the vault ray is from a prop:
-                            // update `prop_vault_ray`
                             let ray = &self.collision_rays[ray_idx as usize];
                             vec3::scale(
                                 &mut self.prop_vault_ray_unit,

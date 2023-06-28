@@ -186,6 +186,15 @@ macro_rules! set_translation {
     };
 }
 
+/// Scales the translation of the matrix `$mat` to the vector `$trans`.
+macro_rules! scale_translation {
+    ($mat: expr, $scale: expr) => {
+        $mat[12] *= ($scale);
+        $mat[13] *= ($scale);
+        $mat[14] *= ($scale);
+    };
+}
+
 /// Set the `y` coordinate of the vector `$vec` to `$value`.
 macro_rules! set_y {
     ($vec: expr, $value: expr) => {
@@ -216,6 +225,7 @@ pub(crate) use {
     read_u16,
     read_u8,
     rescale,
+    scale_translation,
     set_translation,
     set_y,
     temp_debug_log,

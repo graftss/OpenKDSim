@@ -1,7 +1,5 @@
 use gl_matrix::vec3;
 
-
-
 use super::PropsState;
 
 impl PropsState {

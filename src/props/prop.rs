@@ -13,7 +13,7 @@ use gl_matrix::{
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
-    macros::{max_to_none, new_mat4_copy, set_translation, vec3_from},
+    macros::{max_to_none, new_mat4_copy, scale_translation, set_translation, vec3_from},
     mono_data::{PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
@@ -958,12 +958,20 @@ impl Prop {
         &self.twin_prop
     }
 
+    pub fn get_nearest_kat_ray_idx(&mut self) -> Option<u16> {
+        self.nearest_kat_ray_idx
+    }
+
     pub fn set_nearest_kat_ray_idx(&mut self, value: Option<u16>) {
         self.nearest_kat_ray_idx = value;
     }
 
     pub fn get_mono_data(&self) -> Option<&Rc<PropMonoData>> {
         self.mono_data.as_ref()
+    }
+
+    pub fn decay_init_attached_transform(&mut self, decay: f32) {
+        scale_translation!(self.init_attached_transform, decay);
     }
 
     pub fn get_dist_to_katamari(&self, player: i32) -> f32 {

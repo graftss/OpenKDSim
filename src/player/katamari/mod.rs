@@ -1097,7 +1097,7 @@ impl Katamari {
         mark_address!("0x1e076");
 
         self.update_collision_rays();
-        // TODO_PROPS: self.attract_props_to_center();
+        self.pull_vaulted_props_towards_center();
 
         mark_address!("0x1e080");
 

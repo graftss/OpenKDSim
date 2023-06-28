@@ -1,7 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::{Rc},
-};
+use std::{cell::RefCell, rc::Rc};
 
 use gl_matrix::{common::Vec3, mat4, vec3};
 
@@ -11,7 +8,7 @@ use crate::{
     math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::{
-        config::{NamePropConfig},
+        config::NamePropConfig,
         prop::{Prop, WeakPropRef},
     },
 };
@@ -471,6 +468,42 @@ impl Katamari {
             self.collision_rays
                 .get(ray_idx as usize)
                 .map(|_| KatCollisionRayType::Prop)
+        }
+    }
+
+    /// offset: 0x24460
+    pub fn pull_vaulted_props_towards_center(&mut self) {
+        if self.num_floor_contacts == 0 {
+            return;
+        }
+
+        let decay = self.vault_prop_decay_mult;
+
+        for prop_ref in self.attached_props.iter_mut() {
+            let mut prop = prop_ref.borrow_mut();
+            if prop.is_disabled() {
+                continue;
+            }
+
+            // decay props nearest some ray that's contacting the floor
+            for i in 0..self.num_floor_contacts {
+                if prop.get_nearest_kat_ray_idx()
+                    == Some(self.floor_contact_ray_idxs[i as usize] as u16)
+                {
+                    prop.decay_init_attached_transform(decay);
+                }
+            }
+        }
+
+        // decay vault props
+        let prop_ray_iter = self.collision_rays[self.first_prop_ray_index as usize..].iter();
+        for ray in prop_ray_iter {
+            if let Some(prop_weakref) = &ray.prop {
+                if let Some(prop_ref) = prop_weakref.upgrade() {
+                    let mut prop = prop_ref.borrow_mut();
+                    prop.decay_init_attached_transform(decay);
+                }
+            }
         }
     }
 }
