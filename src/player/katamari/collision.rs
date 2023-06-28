@@ -5,7 +5,8 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y,
+        vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -129,13 +130,13 @@ impl Katamari {
         } else {
             // TODO: `kat_update_water_contact()`
 
-            // self.debug_log_clip_data("0x1302a");
+            mark_address!("0x1302a");
             self.compute_surface_contacts();
 
-            // self.debug_log_clip_data("0x1303a");
+            mark_address!("0x1303a");
             self.process_surface_contacts();
 
-            // self.debug_log_clip_data("0x13042");
+            mark_address!("0x13042");
             self.resolve_being_stuck();
             self.update_vault_and_climb(prince, camera, global);
 
@@ -481,6 +482,8 @@ impl Katamari {
         }
 
         self.physics_flags.in_water_0x8 = self.physics_flags.in_water;
+        let mut moved_fast_hit_shell = false;
+
         if self.physics_flags.moved_fast {
             let mut shell_initial_pts: [Vec3; 5] = Default::default();
             let mut shell_final_pts: [Vec3; 5] = Default::default();
@@ -580,6 +583,7 @@ impl Katamari {
 
                     mark_address!("0x14558");
                     let record_result = self.record_surface_contact(shell_ray_idx, None);
+                    moved_fast_hit_shell = true;
 
                     if record_result != RecordSurfaceContactResult::ShellTop {
                         self.physics_flags.moved_fast_shell_hit = true;
@@ -700,23 +704,22 @@ impl Katamari {
                     self.record_surface_contact(shell_ray_idx, None);
                 }
             }
+        }
 
-            // check collision rays for surface contacts
-            let center = self.center;
-            let rays = &self.collision_rays.clone();
-            for (ray_idx, ray) in rays.iter().enumerate() {
-                self.raycast_state.load_ray(&center, &ray.endpoint);
-                let found_hit = self
-                    .raycast_state
-                    .find_nearest_unity_hit(RaycastCallType::Objects, false);
+        // check collision rays for surface contacts
+        let center = self.center;
+        let rays = &self.collision_rays.clone();
+        for (ray_idx, ray) in rays.iter().enumerate() {
+            self.raycast_state.load_ray(&center, &ray.endpoint);
+            let found_hit = self
+                .raycast_state
+                .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
-                if found_hit {
-                    // TODO: there's a flag being ignored here
-                    if true && !self.last_physics_flags.airborne {
-                        self.physics_flags.airborne = false;
-                    }
-                    self.record_surface_contact(ray_idx as i16, None);
+            if found_hit {
+                if moved_fast_hit_shell && !self.last_physics_flags.airborne {
+                    self.physics_flags.airborne = false;
                 }
+                self.record_surface_contact(ray_idx as i16, None);
             }
         }
     }
