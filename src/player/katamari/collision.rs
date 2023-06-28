@@ -855,10 +855,14 @@ impl Katamari {
             self.fc_ray = min_ratio_ray;
             self.fc_contact_point = min_ratio_contact_pt;
 
-            self.fc_ray_len = if min_ratio_ray_idx.is_none() {
-                self.climb_radius_cm
-            } else {
-                self.collision_rays[min_ratio_ray_idx.unwrap() as usize].ray_len
+            self.fc_ray_len = match min_ratio_ray_idx {
+                None => self.climb_radius_cm,
+                // this is a bug in the original sim where it reads back into the katamari struct at garbage:
+                // if `ray_idx == -2` -> `self.water_hit_point[3]`
+                // if `ray_idx == -3` -> `self.last_num_floor_contacts` and `self.last_num_wall_contacts`,
+                //                       both 2-byte ints, concatenated and coerced into a float
+                Some(ray_idx) if ray_idx < 0 => 0.0, 
+                Some(ray_idx) => self.collision_rays[ray_idx as usize].ray_len
             };
         } else if min_ratio_ray_idx == self.vault_ray_idx {
             // if the primary floor contact point is from the vault ray:
