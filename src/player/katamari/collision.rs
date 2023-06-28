@@ -5,8 +5,7 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y,
-        temp_debug_log, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
