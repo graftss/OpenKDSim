@@ -38,6 +38,28 @@ pub enum SurfaceType {
     Wall,
 }
 
+/// Encodes the three possible return values from `Katamari::record_surface_contact`.
+/// The `Floor` and `Wall` values report that a surface of that type was contacted.
+/// `ShellTop` reports that a floor was contacted by a top shell ray, and in this
+/// case a surface contact is *not* recorded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordSurfaceContactResult {
+    Floor,
+    Wall,
+    ShellTop,
+}
+
+impl TryFrom<RecordSurfaceContactResult> for SurfaceType {
+    type Error = ();
+    fn try_from(value: RecordSurfaceContactResult) -> Result<Self, Self::Error> {
+        match value {
+            RecordSurfaceContactResult::Floor => Ok(Self::Floor),
+            RecordSurfaceContactResult::Wall => Ok(Self::Wall),
+            RecordSurfaceContactResult::ShellTop => Err(()),
+        }
+    }
+}
+
 /// The three possible results returned by `Katamari::try_init_vault`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TryInitVaultResult {
@@ -95,8 +117,8 @@ impl Katamari {
         // record if the katamari moved more than its radius
         let mut moved = vec3::create();
         vec3::subtract(&mut moved, &self.last_center, &self.center);
-        self.physics_flags.moved_more_than_rad = self.radius_cm <= vec3::length(&moved);
-        self.physics_flags.moved_more_than_rad_0x14 = false;
+        self.physics_flags.moved_fast = self.radius_cm <= vec3::length(&moved);
+        self.physics_flags.moved_fast_0x14 = false;
 
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
@@ -459,8 +481,111 @@ impl Katamari {
         }
 
         self.physics_flags.in_water_0x8 = self.physics_flags.in_water;
-        if self.physics_flags.moved_more_than_rad {
-            // TODO_FAST: `kat_update_surface_contacts:110-235` (weird edge case when katamari moved a lot)
+        if self.physics_flags.moved_fast {
+            let mut shell_initial_pts: [Vec3; 5] = Default::default();
+            let mut shell_final_pts: [Vec3; 5] = Default::default();
+
+            let shell_initial_base = &self.last_center;
+            let shell_final_base = vec3_from!(+, self.center, self.shell_vec);
+
+            vec3::copy(&mut shell_initial_pts[0], shell_initial_base);
+            vec3::add(
+                &mut shell_initial_pts[1],
+                shell_initial_base,
+                &self.shell_top,
+            );
+            vec3::add(
+                &mut shell_initial_pts[2],
+                shell_initial_base,
+                &self.shell_left,
+            );
+            vec3::add(
+                &mut shell_initial_pts[3],
+                shell_initial_base,
+                &self.shell_right,
+            );
+            vec3::add(
+                &mut shell_initial_pts[4],
+                shell_initial_base,
+                &self.shell_bottom,
+            );
+
+            vec3::copy(&mut shell_final_pts[0], &shell_final_base);
+            vec3::add(&mut shell_final_pts[1], &shell_final_base, &self.shell_top);
+            vec3::add(&mut shell_final_pts[2], &shell_final_base, &self.shell_left);
+            vec3::add(
+                &mut shell_final_pts[3],
+                &shell_final_base,
+                &self.shell_right,
+            );
+            vec3::add(
+                &mut shell_final_pts[4],
+                &shell_final_base,
+                &self.shell_bottom,
+            );
+
+            self.debug_draw_shell_rays(&shell_initial_pts, &shell_final_pts);
+
+            let max_idx = match self.physics_flags.vs_attack {
+                true => 1,
+                false => 5,
+            };
+
+            for i in 0..max_idx {
+                self.raycast_state
+                    .load_ray(&shell_initial_pts[i], &shell_final_pts[i]);
+                let found_hit = self
+                    .raycast_state
+                    .find_nearest_unity_hit(RaycastCallType::Objects, false);
+
+                if !found_hit {
+                    continue;
+                }
+
+                self.physics_flags.airborne = true;
+                self.physics_flags.moved_fast_0x14 = true;
+                self.physics_flags.moved_fast_0x1d = true;
+
+                let mut shell_base_pt = vec3::create();
+                match i {
+                    0 => (),
+                    1 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_top);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Top);
+                    }
+                    2 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_left);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Left);
+                    }
+                    3 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_right);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Right);
+                    }
+                    4 => {
+                        vec3::copy(&mut shell_base_pt, &self.shell_bottom);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Bottom);
+                    }
+                    _ => {
+                        panic_log!("should never happen");
+                    }
+                }
+
+                if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                    let shell_ray_idx = match self.physics_flags.hit_shell_ray {
+                        Some(shell_ray) => -(shell_ray as i16),
+                        None => 0,
+                    };
+                    vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_base_pt);
+                    vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_base_pt);
+
+                    mark_address!("0x14558");
+                    let record_result = self.record_surface_contact(shell_ray_idx, None);
+
+                    if record_result != RecordSurfaceContactResult::ShellTop {
+                        self.physics_flags.moved_fast_shell_hit = true;
+                    }
+                }
+            }
         } else {
             // TODO_PARAM: make 0.15 a katamari param
             let SHELL_RAY_RADIUS_MULT = 0.15;
@@ -604,7 +729,7 @@ impl Katamari {
         &mut self,
         ray_idx: i16,
         prop: Option<WeakPropRef>,
-    ) -> Option<SurfaceType> {
+    ) -> RecordSurfaceContactResult {
         let hit = self.raycast_state.get_closest_hit().unwrap_or_else(|| {
             panic_log!(
                 "`Katamari::record_surface_contact`: tried to record a nonexistent surface contact"
@@ -617,15 +742,15 @@ impl Katamari {
         // use the y component of the hit surface's unit normal to decide if it's a wall or floor
         let surface_type = if self.params.surface_normal_y_threshold < impact_unit[1] {
             if ray_idx == -1 || ray_idx == -5 || ray_idx == -6 {
-                return None;
+                return RecordSurfaceContactResult::ShellTop;
             }
 
             self.floor_contact_ray_idxs[self.num_floor_contacts as usize] = ray_idx as i8;
             self.physics_flags.contacts_floor = true;
-            SurfaceType::Floor
+            RecordSurfaceContactResult::Floor
         } else {
             self.physics_flags.contacts_wall = true;
-            SurfaceType::Wall
+            RecordSurfaceContactResult::Wall
         };
 
         let dot = vec3::dot(&impact_unit, &self.raycast_state.ray_unit);
@@ -645,9 +770,15 @@ impl Katamari {
             }
         }
 
-        self.add_surface_contact(surface_type, &impact_unit, &clip_normal, ray_idx, prop);
+        self.add_surface_contact(
+            surface_type.try_into().unwrap(),
+            &impact_unit,
+            &clip_normal,
+            ray_idx,
+            prop,
+        );
 
-        Some(surface_type)
+        surface_type
     }
 
     fn get_num_surface_contacts(&self, surface_type: SurfaceType) -> u8 {
@@ -816,8 +947,6 @@ impl Katamari {
 
             self.fc_ray_idx = min_ratio_ray_idx;
             self.compute_contact_floor_clip();
-
-            // TODO: the following line is possibly wrong
             vec3::normalize(&mut self.contact_floor_normal_unit, &sum_floor_normals);
         }
 
@@ -861,8 +990,8 @@ impl Katamari {
                 // if `ray_idx == -2` -> `self.water_hit_point[3]`
                 // if `ray_idx == -3` -> `self.last_num_floor_contacts` and `self.last_num_wall_contacts`,
                 //                       both 2-byte ints, concatenated and coerced into a float
-                Some(ray_idx) if ray_idx < 0 => 0.0, 
-                Some(ray_idx) => self.collision_rays[ray_idx as usize].ray_len
+                Some(ray_idx) if ray_idx < 0 => 0.0,
+                Some(ray_idx) => self.collision_rays[ray_idx as usize].ray_len,
             };
         } else if min_ratio_ray_idx == self.vault_ray_idx {
             // if the primary floor contact point is from the vault ray:
@@ -1258,7 +1387,7 @@ impl Katamari {
         // TODO_VS: `vs_attack` check here
         let contacts_wall = self.num_wall_contacts > 0;
 
-        let can_bonk_and_lose_props = if !self.physics_flags.moved_more_than_rad_0x1d {
+        let can_bonk_and_lose_props = if !self.physics_flags.moved_fast_0x1d {
             true
         } else {
             flag_a = contacts_wall || self.falling_ticks < 10;
@@ -1279,7 +1408,7 @@ impl Katamari {
 
             // compute unit lateral wall normal (usually)
             vec3::copy(&mut surface_normal_unit, &self.contact_wall_normal_unit);
-            if !flag_d || !self.physics_flags.moved_more_than_rad_0x1d {
+            if !flag_d || !self.physics_flags.moved_fast_0x1d {
                 set_y!(surface_normal_unit, 0.0);
             }
             vec3_inplace_normalize(&mut surface_normal_unit);
@@ -1322,8 +1451,7 @@ impl Katamari {
                 return;
             }
 
-            let check_a =
-                self.physics_flags.contacts_floor && !self.physics_flags.moved_more_than_rad_0x1d;
+            let check_a = self.physics_flags.contacts_floor && !self.physics_flags.moved_fast_0x1d;
             let check_b = self.physics_flags.wheel_spin || self.airborne_ticks < 5;
             if check_a && check_b {
                 set_y!(self.velocity.vel_accel, 0.0);
@@ -1338,9 +1466,8 @@ impl Katamari {
             );
             _impact_volume = _impact_force * _impact_directness;
 
-            if self.physics_flags.moved_more_than_rad_0x14
-                && self.physics_flags.grounded_by_mesh_or_prop()
-            {}
+            if self.physics_flags.moved_fast_0x14 && self.physics_flags.grounded_by_mesh_or_prop() {
+            }
 
             let magic_num_0x7b264 = 70.0;
             let magic_num_0x71580 = 0.1;
@@ -1443,7 +1570,7 @@ impl Katamari {
             // if on a `NoReactionNoSlope` surface:
             set_y!(self.velocity.vel_accel, 0.0);
             vec3::normalize(&mut self.velocity.vel_accel_unit, &self.velocity.vel_accel);
-            if self.physics_flags.moved_more_than_rad_0x1d {
+            if self.physics_flags.moved_fast_0x1d {
                 // TODO_LOW: goto
             }
         }
@@ -1668,7 +1795,7 @@ impl Katamari {
     /// (??)
     /// offset: 0x16ed0
     fn compute_impact_force(&self) -> f32 {
-        if !self.physics_flags.moved_more_than_rad_0x1d && self.physics_flags.airborne {
+        if !self.physics_flags.moved_fast_0x1d && self.physics_flags.airborne {
             if self.physics_flags.contacts_floor {
                 // if contacting a floor, interpolate the number of ticks the katamari has been falling
                 return inv_lerp_clamp!(
