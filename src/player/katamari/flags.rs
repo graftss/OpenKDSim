@@ -29,7 +29,7 @@ pub struct KatPhysicsFlags {
 
     /// If true, the katamari is at its maximum climb height (so it can't climb higher).
     /// offset: 0x2
-    pub at_max_climb_height: bool,
+    pub wallclimb_at_max_height: bool,
 
     /// If true, the katamari is braking.
     /// offset: 0x3

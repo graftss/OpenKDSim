@@ -784,7 +784,6 @@ impl Katamari {
                             }
                             false => 1.0,
                         };
-                        // TODO: remove this when `kat_try_init_vault_speed` is implemented
                         let bottom_friction = self.params.bottom_ray_friction * self.speed;
                         let max_length_ratio = 1.0;
                         let angle_btwn_rejs = 1.0;
@@ -843,7 +842,18 @@ impl Katamari {
         if self.hit_flags.speed_check_off
             && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill
         {
-            // TODO_LOW: `kat_apply_acceleration:44-61` (speedcheckoff acceleration)
+            // while the `speedcheckoff` flag is on, the katamari constantly accelerates.
+            // this block caps max speed to a multiple of its usual value (by default, 3x).
+
+            // TODO_PARAM
+            let speed_check_off_speed_boost = 3.0;
+            let speed_cap = self.max_forwards_speed
+                * speed_check_off_speed_boost
+                * self.params.forwards_speed_mult;
+            let speed = vec3::length(&vel_accel);
+            if speed > speed_cap {
+                vec3_inplace_scale(&mut vel_accel, speed_cap / speed);
+            }
         }
 
         self.velocity.vel_accel = vel_accel;
@@ -871,14 +881,13 @@ impl Katamari {
             // TODO_VS: weird conditional here depending on vs mode, but it's always true in single player
             if !self.physics_flags.climbing_wall {
                 // if not wall climbing:
-                // TODO: some SHUFPS crap going on here, not clear what it's doing
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_grav);
             } else {
                 // if wall climbing:
-                if !self.physics_flags.at_max_climb_height {
+                if !self.physics_flags.wallclimb_at_max_height {
                     // if still gaining height from the wall climb:
-                    // TODO: SHUFPS
+                    vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
                 }
                 // TODO: `kat_update_wall_climb()`
             }

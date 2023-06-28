@@ -308,7 +308,7 @@ pub struct Katamari {
 
     /// The maximum height that the katamari can gain during a wallclimb.
     /// offset: 0x1bc
-    max_wallclimb_height: f32,
+    max_wallclimb_height_gain: f32,
 
     /// The gravity acceleration applied to props which have been knocked airborne by the
     /// katamari. This value is a piecewise linear function of the katamari's diameter, and
@@ -994,7 +994,7 @@ impl Katamari {
         }
 
         self.physics_flags.climbing_wall = false;
-        self.physics_flags.at_max_climb_height = false;
+        self.physics_flags.wallclimb_at_max_height = false;
         self.wallclimb_init_y = 0.0;
         self.wallclimb_max_height_ticks = 0;
 
@@ -1150,7 +1150,7 @@ impl Katamari {
 
         self.diam_m = self.diam_cm / 100.0;
         self.display_radius_cm = self.radius_cm * self.params.display_radius_ratio;
-        self.max_wallclimb_height = self.diam_cm * self.params.max_wallclimb_height_ratio;
+        self.max_wallclimb_height_gain = self.diam_cm * self.params.max_wallclimb_height_ratio;
         self.diam_trunc_mm = (self.diam_cm * 10.0) as i32;
     }
 
