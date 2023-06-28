@@ -71,7 +71,7 @@ pub struct KatPhysicsFlags {
 
     /// (??) If true, the katamari moved more than its own radius during the last tick.
     /// offset: 0xc
-    pub moved_more_than_rad_0xc: bool,
+    pub moved_fast_shell_hit: bool,
 
     /// If true, a katamari shell ray hit a surface.
     /// offset: 0xd
@@ -103,7 +103,7 @@ pub struct KatPhysicsFlags {
 
     /// (??)
     /// offset: 0x14
-    pub moved_more_than_rad_0x14: bool,
+    pub moved_fast_0x14: bool,
 
     /// (??)
     /// offset: 0x15
@@ -119,7 +119,7 @@ pub struct KatPhysicsFlags {
 
     /// True if the katamari moved more than its radius on the previous tick.
     /// offset: 0x19
-    pub moved_more_than_rad: bool,
+    pub moved_fast: bool,
 
     /// True if the katamari is considered stuck between walls.
     /// offset: 0x1a
@@ -136,7 +136,7 @@ pub struct KatPhysicsFlags {
 
     /// (??)
     /// offset: 0x1d
-    pub moved_more_than_rad_0x1d: bool,
+    pub moved_fast_0x1d: bool,
 
     /// (??)
     /// offset: 0x1e
@@ -159,10 +159,10 @@ impl KatPhysicsFlags {
     /// Reset some flags at the start of `Katamari::update_collision`
     pub fn reset_for_collision_update(&mut self) {
         self.contacts_down_slanted_ceiling = false;
-        self.moved_more_than_rad_0xc = false;
+        self.moved_fast_shell_hit = false;
         self.shell_ray_hit_surface = false;
         self.hit_shell_ray = None;
-        self.moved_more_than_rad_0x1d = false;
+        self.moved_fast_0x1d = false;
         self.hit_by_moving_prop = false;
         self.contacts_prop_0xa = false;
         self.stuck_between_walls = false;

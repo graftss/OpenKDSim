@@ -17,3 +17,4 @@ random things that shouldn't be forgotten:
   - `derive` it on structs for which all fields are `Resettable`? sounds like a good exercise
 
 - rename `ticks` -> `frames` everywhere
+- refactor `ray_idx` into an enum: { CollisionRay(i16), ShellRay(i16) }
