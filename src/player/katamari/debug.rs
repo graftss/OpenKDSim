@@ -5,6 +5,10 @@ use crate::macros::{debug_log, vec3_from};
 use super::Katamari;
 
 impl Katamari {
+    pub fn debug_should_log(&self) -> bool {
+        return false;
+    }
+
     /// Print information about the katamari's position and collision.
     /// `offset_note` is designed to be the offset in the original simulation corresponding
     /// to the point in the open simulation at which this function is called.

@@ -122,6 +122,7 @@ struct PropVaultPoint {
 impl Katamari {
     /// Resets the katamari's collision rays to their initial state.
     /// This is only called at the start of a mission and after a royal warp.
+    /// offset: 0x1afb0
     pub fn initialize_collision_rays(&mut self) {
         let rad_cm = self.radius_cm;
 
@@ -137,7 +138,7 @@ impl Katamari {
             ray.reset(rad_cm);
         }
 
-        self.physics_flags.grounded_ray_type = None;
+        self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
         self.avg_mesh_ray_len = rad_cm;
         self.vault_ray_idx = None;
 
@@ -146,13 +147,14 @@ impl Katamari {
     }
 
     /// Update the katamari's collision rays
+    /// offset: 0x1af00
     pub fn update_collision_rays(&mut self) {
         self.last_collision_rays = self.collision_rays.clone();
 
         mark_address!("0x1af26");
         self.reset_collision_rays();
-        mark_address!("0x1af2e");
 
+        mark_address!("0x1af2e");
         self.update_rays_with_attached_props();
         mark_address!("0x1af5b");
 
@@ -439,7 +441,19 @@ impl Katamari {
             }
         } else {
             // else if the katamari is climbing a wall:
-            // TODO_CLIMB: `kat_orient_mesh_rays:125-147`
+            let mut endpoint = vec3::create();
+            if !self.hit_flags.small_ledge_climb && !self.hit_flags.wall_climb_free {
+                vec3::copy(&mut endpoint, &self.center);
+            } else {
+                vec3::copy(&mut endpoint, &self.bottom);
+            }
+
+            vec3::scale_and_add(
+                &mut bottom_ray.endpoint,
+                &endpoint,
+                &self.wallclimb_normal_unit,
+                -self.wallclimb_init_radius,
+            );
         }
 
         bottom_ray.ray_len = radius;

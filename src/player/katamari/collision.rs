@@ -5,8 +5,8 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y,
-        temp_debug_log, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, panic_log,
+        set_translation, set_y, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -1181,6 +1181,8 @@ impl Katamari {
         camera: &Camera,
         global: &GlobalState,
     ) {
+        mark_call!("update_vault_and_climb", self.debug_should_log());
+
         if self.physics_flags.hit_shell_ray == Some(ray::ShellRay::Top)
             && self.physics_flags.contacts_floor
             && !self.physics_flags.contacts_wall
@@ -1214,9 +1216,7 @@ impl Katamari {
                 if was_climbing && self.is_climbing_0x898 >= 1 {
                     // continue wallclimb
                     self.is_climbing_0x898 -= 1;
-                    if self.physics_flags.at_max_wallclimb_height
-                        && prince.input_avg_push_len > 0.99
-                    {
+                    if self.physics_flags.at_max_climb_height && prince.input_avg_push_len > 0.99 {
                         break 'main;
                     }
                 } else {
@@ -1228,9 +1228,9 @@ impl Katamari {
                         self.wallclimb_duration = 0;
                     }
                     self.physics_flags.climbing = false;
-                    self.physics_flags.at_max_wallclimb_height = false;
+                    self.physics_flags.at_max_climb_height = false;
                     self.wallclimb_init_y = 0.0;
-                    self.wallclimb_max_height_ticks = 0;
+                    self.max_climb_height_ticks = 0;
                 }
 
                 self.fc_ray_len = self.radius_cm;
@@ -1257,7 +1257,6 @@ impl Katamari {
                         self.falling_ticks += 1;
                     }
                     self.physics_flags.airborne = false;
-                    panic_log!("??? why is this here");
                 }
             } else {
                 // if contacting at least one surface:
@@ -1366,9 +1365,9 @@ impl Katamari {
                 }
 
                 self.physics_flags.climbing = false;
-                self.physics_flags.at_max_wallclimb_height = false;
+                self.physics_flags.at_max_climb_height = false;
                 self.wallclimb_init_y = 0.0;
-                self.wallclimb_max_height_ticks = 0;
+                self.max_climb_height_ticks = 0;
             }
         }
 
@@ -1394,6 +1393,8 @@ impl Katamari {
 
     /// offset: 0x15950
     fn update_wall_contacts(&mut self, prince: &mut Prince, camera: &Camera, global: &GlobalState) {
+        mark_call!("update_wall_contacts", self.debug_should_log());
+
         if self.physics_flags.climbing {
             if self.can_climb_wall_contact(prince) {
                 return self.maintain_wallclimb();
@@ -1639,26 +1640,34 @@ impl Katamari {
     /// when the current wallclimb should continue.
     /// offset: 0x16540
     fn can_climb_wall_contact(&mut self, prince: &Prince) -> bool {
+        mark_call!("can_climb_wall_contact", self.debug_should_log());
         let mut perform_checks = true;
         let mut check_multiple_walls = true;
 
-        if self.num_wall_contacts == 1 && self.num_floor_contacts == 0 && self.contact_prop.is_some() {
+        if self.num_wall_contacts == 1
+            && self.num_floor_contacts == 0
+            && self.contact_prop.is_some()
+        {
             // if all of the following hold:
             //   - the katamari is colliding with a prop
             //   - the katamari's is colliding with exactly one wall
-            //   - the katamari isn't colliding with a floor                
+            //   - the katamari isn't colliding with a floor
             let prop_ref = self.contact_prop.as_ref().unwrap();
             let prop = prop_ref.borrow();
 
             let mut aabb_min_world = vec3::create();
-            vec3::transform_mat4(&mut aabb_min_world, prop.get_aabb_min_point(), prop.get_unattached_transform());
+            vec3::transform_mat4(
+                &mut aabb_min_world,
+                prop.get_aabb_min_point(),
+                prop.get_unattached_transform(),
+            );
 
             // TODO_DOC: what does this condition mean
             if aabb_min_world[1] > self.bottom[1] - self.max_wallclimb_height_gain {
                 self.hit_flags.wall_climb_free = true;
                 perform_checks = false;
             }
-        } 
+        }
 
         if perform_checks {
             if self.hit_flags.wall_climb_disabled {
@@ -1716,7 +1725,7 @@ impl Katamari {
             // start a new wallclimb
             self.wallclimb_normal_unit = self.contact_wall_normal_unit;
             self.wallclimb_speed = 0.0;
-            self.physics_flags.at_max_wallclimb_height = false;
+            self.physics_flags.at_max_climb_height = false;
 
             // TODO_DOC
             // TODO_PARAM: factor out magic number as param
@@ -1744,7 +1753,9 @@ impl Katamari {
     /// really clear what this is for.
     /// offset: 0x16930
     fn maintain_wallclimb(&mut self) {
-        if !self.physics_flags.at_max_wallclimb_height {
+        mark_call!("maintain_wallclimb", self.debug_should_log());
+
+        if !self.physics_flags.at_max_climb_height {
             self.is_climbing_0x898 = 1;
         }
 
@@ -1763,7 +1774,9 @@ impl Katamari {
     }
 
     /// offset: 0x21e50
-    pub fn update_wallclimb(&mut self) {
+    pub fn update_climb_position(&mut self) {
+        mark_call!("update_climb_position", self.debug_should_log());
+
         // TODO_PARAM
         let MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT = 10;
         let WALLCLIMB_VFX_DELAY_FRAMES = 0x1e;
@@ -1771,23 +1784,23 @@ impl Katamari {
         // the max wallclimb speed is this value times katamari diameter
         let MAX_WALLCLIMB_SPEED_DIAMS = 0.15;
 
-        if self.physics_flags.at_max_wallclimb_height {
-            self.wallclimb_max_height_ticks += 1;
-            if self.wallclimb_max_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
+        if self.physics_flags.at_max_climb_height {
+            self.max_climb_height_ticks += 1;
+            if self.max_climb_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
                 self.end_wall_climb();
             }
-            self.physics_flags.at_max_wallclimb_height = true;
+            self.physics_flags.at_max_climb_height = true;
             return;
         }
 
         let height_gain = max!(0.0, self.center[1] - self.wallclimb_init_y);
 
         if !self.hit_flags.small_ledge_climb && self.max_wallclimb_height_gain <= height_gain {
-            self.wallclimb_max_height_ticks += 1;
-            if self.wallclimb_max_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
+            self.max_climb_height_ticks += 1;
+            if self.max_climb_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
                 self.end_wall_climb();
             }
-            self.physics_flags.at_max_wallclimb_height = true;
+            self.physics_flags.at_max_climb_height = true;
             return;
         }
 
@@ -1804,8 +1817,8 @@ impl Katamari {
         let delta_y = if !self.hit_flags.small_ledge_climb
             && self.max_wallclimb_height_gain < height_gain + self.wallclimb_speed
         {
-            self.wallclimb_max_height_ticks = 0;
-            self.physics_flags.at_max_wallclimb_height = true;
+            self.max_climb_height_ticks = 0;
+            self.physics_flags.at_max_climb_height = true;
             self.max_wallclimb_height_gain - height_gain
         } else {
             self.wallclimb_speed
@@ -1826,9 +1839,9 @@ impl Katamari {
         }
 
         self.physics_flags.climbing = false;
-        self.physics_flags.at_max_wallclimb_height = false;
+        self.physics_flags.at_max_climb_height = false;
         self.wallclimb_init_y = 0.0;
-        self.wallclimb_max_height_ticks = 0;
+        self.max_climb_height_ticks = 0;
     }
 
     /// (??)
@@ -1961,9 +1974,9 @@ impl Katamari {
 
     fn another_end_wallclimb(&mut self) {
         self.physics_flags.climbing = false;
-        self.physics_flags.at_max_wallclimb_height = false;
+        self.physics_flags.at_max_climb_height = false;
         self.wallclimb_init_y = 0.0;
-        self.wallclimb_max_height_ticks = 0;
+        self.max_climb_height_ticks = 0;
     }
 
     /// offset: 0x169a0

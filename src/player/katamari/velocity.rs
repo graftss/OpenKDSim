@@ -5,7 +5,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, max, panic_log, set_y, vec3_from},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, vec3_from},
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small, vec3_projection,
@@ -903,11 +903,11 @@ impl Katamari {
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_grav);
             } else {
                 // if wall climbing:
-                if !self.physics_flags.at_max_wallclimb_height {
+                if !self.physics_flags.at_max_climb_height {
                     // if still gaining height from the wall climb:
                     vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
                 }
-                self.update_wallclimb();
+                self.update_climb_position();
             }
 
             if self.physics_flags.airborne {
@@ -1003,6 +1003,8 @@ impl Katamari {
     }
 
     pub fn update_rotation_speed(&mut self, velocity: &Vec3) {
+        mark_call!("update_rotation_speed", self.debug_should_log());
+
         if self.physics_flags.braking {
             return self.rotation_speed = 0.0;
         }
@@ -1023,8 +1025,7 @@ impl Katamari {
                 );
                 vec3_inplace_normalize(&mut net_normal_unit);
                 if vec3::len(&net_normal_unit) < 0.9 {
-                    // `kat_update_rotation_speed:76-87` (this seems like it's just a no-op)
-                    panic_log!("should never happen");
+                    vec3::copy(&mut net_normal_unit, &VEC3_Y_NEG);
                 }
             } else {
                 // if not airborne and climbing a wall, set net normal to `<0,1,0>`

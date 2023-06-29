@@ -462,7 +462,7 @@ pub struct Katamari {
 
     /// The number of ticks the katamari can gain height while climbing a wall
     /// offset: 0x786
-    wallclimb_max_height_ticks: u16,
+    max_climb_height_ticks: u16,
 
     /// The number of ticks since the katamari started moving downhill.
     /// offset: 0x788
@@ -990,9 +990,9 @@ impl Katamari {
         }
 
         self.physics_flags.climbing = false;
-        self.physics_flags.at_max_wallclimb_height = false;
+        self.physics_flags.at_max_climb_height = false;
         self.wallclimb_init_y = 0.0;
-        self.wallclimb_max_height_ticks = 0;
+        self.max_climb_height_ticks = 0;
 
         // TODO: `kat_init:284-285` (not sure what this is about)
         self.airborne_prop_gravity = mission_state

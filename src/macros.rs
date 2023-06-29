@@ -206,6 +206,14 @@ macro_rules! mark_address {
     ($addr: literal) => {};
 }
 
+macro_rules! mark_call {
+    ($func_name: literal, $should_log: expr) => {
+        if ($should_log) {
+            crate::macros::temp_debug_log!("  call {}", $func_name);
+        }
+    };
+}
+
 #[allow(unused_imports)]
 pub(crate) use {
     debug_log,
@@ -214,6 +222,7 @@ pub(crate) use {
     lerp,
     log,
     mark_address,
+    mark_call,
     max,
     max_to_none,
     min,
