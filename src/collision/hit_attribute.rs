@@ -43,6 +43,41 @@ impl Default for HitAttribute {
     }
 }
 
+impl From<HitAttribute> for i32 {
+    fn from(value: HitAttribute) -> Self {
+        match value {
+            HitAttribute::None => 0,
+            HitAttribute::WaterSurface => 1,
+            HitAttribute::BottomOfSea => 2,
+            HitAttribute::NoReactionNoSlope => 3,
+            HitAttribute::WallClimbFree => 4,
+            HitAttribute::WallClimbDisabled => 5,
+            HitAttribute::Turntable => 6,
+            HitAttribute::Attr0x7 => 7,
+            HitAttribute::SmallLedgeClimb0x8 => 8,
+            HitAttribute::Attr0x9 => 9,
+            HitAttribute::Attr0xA => 10,
+            HitAttribute::Attr0xB => 11,
+            HitAttribute::Attr0xC => 12,
+            HitAttribute::Attr0xD => 13,
+            HitAttribute::Attr0xE => 14,
+            HitAttribute::Attr0xF => 15,
+            HitAttribute::SpeedCheckOff => 16,
+            HitAttribute::MapLoop => 17,
+            HitAttribute::MapLoopFog => 18,
+            HitAttribute::Attr0x13 => 19,
+            HitAttribute::Attr0x14 => 20,
+            HitAttribute::Attr0x15 => 21,
+            HitAttribute::Attr0x16 => 22,
+            HitAttribute::MapSemiTranslucent => 23,
+            HitAttribute::SpecialCamera => 24,
+            HitAttribute::KingWarp => 25,
+            HitAttribute::CameraHit => 26,
+            HitAttribute::Jump => 27,
+        }
+    }
+}
+
 impl From<i32> for HitAttribute {
     fn from(value: i32) -> Self {
         match value {

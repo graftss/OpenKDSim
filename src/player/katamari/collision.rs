@@ -1,7 +1,9 @@
+
+
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
-    collision::raycast_state::RaycastCallType,
+    collision::{raycast_state::RaycastCallType, hit_attribute::HitAttribute},
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
@@ -141,11 +143,41 @@ impl Katamari {
             self.update_vault_and_climb(prince, camera, global);
 
             if self.physics_flags.airborne && self.raycast_state.closest_hit_idx.is_some() {
-                // TODO: `kat_update_collision:159-220` (update active hit before airborne?)
+                let mut top = [0.0, self.radius_cm + self.radius_cm, 0.0];
+                vec3_inplace_add_vec(&mut top, &self.center);
+                self.raycast_state.load_ray(&self.center, &top);
+                let found_hit = self.raycast_state.find_nearest_unity_hit(RaycastCallType::Objects, false);
+
+                if let Some(hit) = self.raycast_state.get_closest_hit() {
+                    if found_hit && hit.metadata == HitAttribute::SpecialCamera.into() {
+                        self.hit_flags.special_camera = true;
+                    }
+
+                    // TODO_LOW: original sim updates `self.active_hit_before_airborne` here, but
+                    // that field seems to be otherwise unused
+                }
             }
         }
 
-        // TODO: `kat_update_collision:222-266` (destroy collected props that are sucked inside the ball)
+        // TODO_PARAM
+        let MIN_ATTACHED_PROPS_FOR_SOMETHING = 100.0;
+        let MAX_ATTACHED_PROPS_FOR_SOMETHING = 190.0;
+    
+        let attached_props = self.num_attached_props as f32;
+        let t = inv_lerp_clamp!(attached_props, MIN_ATTACHED_PROPS_FOR_SOMETHING, MAX_ATTACHED_PROPS_FOR_SOMETHING);
+        let destroy_props_radius = self.display_radius_cm + t * (self.radius_cm - self.display_radius_cm) * 0.75;
+
+        for prop_ref in self.attached_props.iter_mut() {
+            let mut prop = prop_ref.borrow_mut();
+            prop.do_unattached_translation(&self.clip_translation);
+
+            let in_destroy_range = prop.get_dist_to_katamari(self.player as i32) + prop.get_radius() < destroy_props_radius;
+
+            if !prop.is_disabled() && in_destroy_range {
+                prop.destroy();
+            }
+        }
+
         self.process_nearby_collectible_props(mission_state);
         self.process_collected_props(mission_state, global);
         // TODO: `kat_update_world_size_threshold??()`
@@ -1443,7 +1475,7 @@ impl Katamari {
 
             _impact_force = self.compute_impact_force();
             _impact_similarity =
-                self.compute_impact_similarity(&lateral_vel_unit, &surface_normal_unit);
+                self.compute_impact_angle(&lateral_vel_unit, &surface_normal_unit);
             _impact_volume = _impact_force * _impact_similarity;
 
             // TODO_VIBRATION: `kat_update_wall_contacts:169-171` (call vibration callback)
@@ -1486,7 +1518,7 @@ impl Katamari {
             }
 
             _impact_force = self.compute_impact_force();
-            _impact_similarity = self.compute_impact_similarity(
+            _impact_similarity = self.compute_impact_angle(
                 &self.velocity.vel_accel_grav_unit,
                 &surface_normal_unit,
             );
@@ -1867,11 +1899,14 @@ impl Katamari {
 
     /// (??)
     /// offset: 0x16df0
-    fn compute_impact_similarity(&self, kat_vel: &Vec3, surface_normal: &Vec3) -> f32 {
+    fn compute_impact_angle(&self, kat_vel: &Vec3, surface_normal: &Vec3) -> f32 {
         if self.last_physics_flags.climbing {
             return 0.0;
         }
-        // TODO_VS: `kat_compute_impact_angle:12-14`
+
+        if self.physics_flags.vs_attack && self.physics_flags.contacts_wall {
+            return 1.0;
+        }
 
         let similarity = if !self.physics_flags.airborne || !self.physics_flags.contacts_floor {
             vec3::dot(&kat_vel, &surface_normal)

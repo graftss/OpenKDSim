@@ -177,6 +177,14 @@ macro_rules! vec3_unit_xz {
     }};
 }
 
+macro_rules! modify_translation {
+    ($mat: expr, $op: tt, $trans: expr) => {
+        $mat[12] $op $trans[0];
+        $mat[13] $op $trans[1];
+        $mat[14] $op $trans[2];
+    }
+}
+
 /// Sets the translation of the matrix `$mat` to the vector `$trans`.
 macro_rules! set_translation {
     ($mat: expr, $trans: expr) => {
@@ -239,6 +247,7 @@ pub(crate) use {
     set_y,
     temp_debug_log,
     temp_debug_write,
+    modify_translation,
     vec3_from,
     vec3_unit_xz,
 };

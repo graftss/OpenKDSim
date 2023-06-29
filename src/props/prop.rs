@@ -13,7 +13,7 @@ use gl_matrix::{
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
-    macros::{max_to_none, new_mat4_copy, scale_translation, set_translation, vec3_from},
+    macros::{max_to_none, new_mat4_copy, scale_translation, set_translation, vec3_from, modify_translation},
     mono_data::{PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
@@ -951,6 +951,10 @@ impl Prop {
         &self.unattached_transform
     }
 
+    pub fn do_unattached_translation(&mut self, translation: &Vec3) {
+        modify_translation!(self.unattached_transform, +=, translation);
+    }
+
     pub fn get_attached_transform(&self) -> &Mat4 {
         &self.attached_transform
     }
@@ -1115,9 +1119,22 @@ impl Prop {
             .map_or(false, |destroy_area| destroy_area == area)
             && self.global_state != PropGlobalState::Attached;
 
-        // TODO: if `should_destroy` is true, call `prop_destroy`
+        // TODO_DESTROY: destroy the prop here
+        // if (should_destroy) {
+        //     self.destroy();
+        // }
 
         should_destroy
+    }
+
+    /// offset: 0x4f8e0
+    pub fn destroy(&mut self) {
+        self.disabled = true;
+        self.display_on = false;
+        // TODO: remove this from the list `Katamari::attached_props`
+        // TODO_LIKS: `prop_remove_refs_from_props()`
+        // TODO_SUBOBJ: `prop_destroy:14-25`
+        self.first_subobject = None;
     }
 
     /// Contains most the behavior of `Katamari::attach_prop` that writes to the attached prop.
