@@ -793,10 +793,6 @@ impl Katamari {
         &self.bottom
     }
 
-    pub fn set_center(&mut self, center: &Vec3) {
-        vec3::copy(&mut self.center, center);
-    }
-
     pub fn get_speed(&self) -> f32 {
         self.speed
     }
@@ -892,8 +888,8 @@ impl Katamari {
     }
 
     pub fn update_royal_warp(&mut self, dest_pos: &Vec3, mission_state: &MissionState) {
-        self.set_center(dest_pos);
-        self.reset_collision_rays();
+        vec3::copy(&mut self.center, dest_pos);
+        self.initialize_collision_rays();
         self.set_immobile(mission_state);
         self.airborne_ticks = 0;
         self.falling_ticks = 0;
@@ -973,7 +969,7 @@ impl Katamari {
         self.enable_prop_rays = true;
         self.last_attached_prop_name_idx = 0;
 
-        self.reset_collision_rays();
+        self.initialize_collision_rays();
 
         self.ignore_prop_collision_timer = 0;
 

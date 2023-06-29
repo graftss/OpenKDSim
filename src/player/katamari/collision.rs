@@ -5,8 +5,7 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y,
-        vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -310,16 +309,15 @@ impl Katamari {
         vec3_inplace_normalize(&mut prop_to_kat_unit);
 
         // compute the ray from the katamari's center towards the prop, with length `kat_sphere_rad`.
-        let kat_center = self.center.clone();
         let mut ray_endpoint = vec3::create();
         vec3::scale_and_add(
             &mut ray_endpoint,
-            &kat_center,
+            &self.center,
             &prop_to_kat_unit,
             -kat_sphere_rad,
         );
 
-        self.raycast_state.load_ray(&kat_center, &ray_endpoint);
+        self.raycast_state.load_ray(&self.center, &ray_endpoint);
         let num_hit_tris = self.raycast_state.ray_hits_mesh(
             prop.get_aabb_mesh(),
             prop.get_unattached_transform(),
@@ -798,6 +796,10 @@ impl Katamari {
         }
     }
 
+    /// Attempt to add a contact surface with the parameters given in the arguments.
+    /// The surface won't be added if it is highly similar to an already contacted
+    /// surface.
+    /// offset: 0x136e0
     fn add_surface_contact(
         &mut self,
         surface_type: SurfaceType,

@@ -4,7 +4,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, set_translation, vec3_from},
+    macros::{inv_lerp_clamp, lerp, mark_address, set_translation, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::{
@@ -122,7 +122,7 @@ struct PropVaultPoint {
 impl Katamari {
     /// Resets the katamari's collision rays to their initial state.
     /// This is only called at the start of a mission and after a royal warp.
-    pub fn reset_collision_rays(&mut self) {
+    pub fn initialize_collision_rays(&mut self) {
         let rad_cm = self.radius_cm;
 
         // TODO_PARAM: make this not hardcoded
@@ -148,91 +148,93 @@ impl Katamari {
     /// Update the katamari's collision rays
     pub fn update_collision_rays(&mut self) {
         self.last_collision_rays = self.collision_rays.clone();
-        // self.debug_log_clip_data("0x1af26");
-        self.orient_mesh_rays();
-        // self.debug_log_clip_data("0x1af2e");
+
+        mark_address!("0x1af26");
+        self.reset_collision_rays();
+        mark_address!("0x1af2e");
 
         self.update_rays_with_attached_props();
+        mark_address!("0x1af5b");
 
-        if !self.physics_flags.wheel_spin {
-            // if not spinning:
-            let base_max_spd = self.scaled_params.base_max_speed;
-            let speed = self.speed;
-
-            let max_boost_spd =
-                base_max_spd * self.scaled_params.max_boost_speed * self.params.boost_speed_mult;
-            let max_fwd_spd = base_max_spd
-                * self.scaled_params.max_forwards_speed
-                * self.params.forwards_speed_mult;
-
-            // map speed to [0.0, 1.0], where
-            //   - [0, max_fwd_spd] -> 1.0
-            //   - [max_fwd_spd, max_boost_spd] -> [1.0, 0.0] via an inv lerp
-            //   - [max_boost_spd, +inf] -> 0.0.
-            // this value is used to smoothly rescale the katamari's collision ray lengths
-            // from the katamari radius (when boosting) to the rays' true lengths (when moving slowly)
-            let ray_rescale_t = 1.0 - inv_lerp_clamp!(speed, max_fwd_spd, max_boost_spd);
-
-            self.max_ray_len = self.radius_cm * self.params.max_ray_len_radii;
-
-            // keep a running sum of the total ray length as we iterate over all rays, which
-            // will be used to find the average length of mesh rays.
-            let mut total_mesh_ray_len = 0.0;
-
-            for (ray_idx, ray) in self.collision_rays.iter_mut().enumerate() {
-                if ray_idx == 0 {
-                    continue;
-                }
-                let adjusted_ray_len = lerp!(ray_rescale_t, self.radius_cm, ray.ray_len);
-                if adjusted_ray_len > self.max_ray_len {
-                    ray.ray_len = self.max_ray_len;
-                }
-
-                vec3::scale_and_add(
-                    &mut ray.endpoint,
-                    &self.center,
-                    &ray.ray_local_unit,
-                    adjusted_ray_len,
-                );
-                vec3_inplace_zero_small(&mut ray.endpoint, 0.0001);
-                vec3::subtract(&mut ray.kat_to_endpoint, &ray.endpoint, &self.center);
-
-                if ray_idx < self.num_mesh_rays as usize {
-                    total_mesh_ray_len += adjusted_ray_len;
-                }
-            }
-
-            let ground_type = self.physics_flags.grounded_ray_type;
-            if ground_type != Some(KatCollisionRayType::Bottom) && ground_type.is_some() {
-                // if the ground contact isn't the bottom ray:
-                if let Some(ray_idx) = self.vault_ray_idx {
-                    // update the vault ray's endpoint to be the place that ray contacts the ground,
-                    // rather than its actual endpoint.
-                    // (i think this is because the ray will generally be slightly clipped through
-                    // the floor, and we want the player to pivot exactly on the floor).
-                    let vault_ray = &mut self.collision_rays[ray_idx as usize];
-
-                    vault_ray.endpoint = self.vault_contact_point;
-                    vec3::subtract(
-                        &mut vault_ray.kat_to_endpoint,
-                        &self.vault_contact_point,
-                        &self.center,
-                    );
-                    vec3::normalize(&mut vault_ray.ray_local_unit, &vault_ray.kat_to_endpoint);
-                }
-            }
-
-            self.avg_mesh_ray_len = total_mesh_ray_len / self.num_mesh_rays as f32;
-            self.larger_avg_mesh_ray_len =
-                self.avg_mesh_ray_len * self.params.increased_collision_radius_mult;
-        } else {
+        if self.physics_flags.wheel_spin {
             // if spinning, set the length of each ray to the katamari's radius
-            for ray in self.collision_rays.iter_mut() {
-                ray.ray_len = self.radius_cm;
-                ray.prop = None;
-            }
             self.set_bottom_ray_contact();
         }
+
+        self.update_mesh_ray_length();
+    }
+
+    /// Adjust the length of collision rays
+    /// offset: 0x1c530
+    fn update_mesh_ray_length(&mut self) {
+        let base_max_spd = self.scaled_params.base_max_speed;
+        let speed = self.speed;
+
+        let max_boost_spd =
+            base_max_spd * self.scaled_params.max_boost_speed * self.params.boost_speed_mult;
+        let max_fwd_spd =
+            base_max_spd * self.scaled_params.max_forwards_speed * self.params.forwards_speed_mult;
+
+        // map speed to [0.0, 1.0], where
+        //   - [0, max_fwd_spd] -> 1.0
+        //   - [max_fwd_spd, max_boost_spd] -> [1.0, 0.0] via an inv lerp
+        //   - [max_boost_spd, +inf] -> 0.0.
+        // this value is used to smoothly rescale the katamari's collision ray lengths
+        // from the katamari radius (when boosting) to the rays' true lengths (when moving slowly)
+        let ray_rescale_t = 1.0 - inv_lerp_clamp!(speed, max_fwd_spd, max_boost_spd);
+
+        self.max_ray_len = self.radius_cm * self.params.max_ray_len_radii;
+
+        // keep a running sum of the total ray length as we iterate over all rays, which
+        // will be used to find the average length of mesh rays.
+        let mut total_mesh_ray_len = 0.0;
+
+        for (ray_idx, ray) in self.collision_rays.iter_mut().enumerate() {
+            if ray_idx == 0 {
+                continue;
+            }
+            let adjusted_ray_len = lerp!(ray_rescale_t, self.radius_cm, ray.ray_len);
+            if adjusted_ray_len > self.max_ray_len {
+                ray.ray_len = self.max_ray_len;
+            }
+
+            vec3::scale_and_add(
+                &mut ray.endpoint,
+                &self.center,
+                &ray.ray_local_unit,
+                adjusted_ray_len,
+            );
+            vec3_inplace_zero_small(&mut ray.endpoint, 0.0001);
+            vec3::subtract(&mut ray.kat_to_endpoint, &ray.endpoint, &self.center);
+
+            if ray_idx < self.num_mesh_rays as usize {
+                total_mesh_ray_len += adjusted_ray_len;
+            }
+        }
+
+        let ground_type = self.physics_flags.grounded_ray_type;
+        if ground_type != Some(KatCollisionRayType::Bottom) && ground_type.is_some() {
+            // if the ground contact isn't the bottom ray:
+            if let Some(ray_idx) = self.vault_ray_idx {
+                // update the vault ray's endpoint to be the place that ray contacts the ground,
+                // rather than its actual endpoint.
+                // (i think this is because the ray will generally be slightly clipped through
+                // the floor, and we want the player to pivot exactly on the floor).
+                let vault_ray = &mut self.collision_rays[ray_idx as usize];
+
+                vault_ray.endpoint = self.vault_contact_point;
+                vec3::subtract(
+                    &mut vault_ray.kat_to_endpoint,
+                    &self.vault_contact_point,
+                    &self.center,
+                );
+                vec3::normalize(&mut vault_ray.ray_local_unit, &vault_ray.kat_to_endpoint);
+            }
+        }
+
+        self.avg_mesh_ray_len = total_mesh_ray_len / self.num_mesh_rays as f32;
+        self.larger_avg_mesh_ray_len =
+            self.avg_mesh_ray_len * self.params.increased_collision_radius_mult;
     }
 
     fn update_rays_with_attached_props(&mut self) {
@@ -410,8 +412,12 @@ impl Katamari {
         self.vault_ticks = 0;
     }
 
-    /// Orient the bottom and mesh collision rays.
-    pub fn orient_mesh_rays(&mut self) {
+    /// Resets the bottom collision ray to straight below the katamari center.
+    /// Resets the mesh collision rays to their "baseline" values depending only on
+    /// the katamari's transform, and sets their lengths to the katamari radius.
+    /// Removes all prop collision rays.
+    /// offset: 0x1bc90
+    pub fn reset_collision_rays(&mut self) {
         let mesh_points = &KAT_MESHES[self.mesh_index as usize];
         let mut tmp = VEC3_ZERO;
         let radius = self.radius_cm;

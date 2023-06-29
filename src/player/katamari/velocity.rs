@@ -332,7 +332,7 @@ impl Katamari {
         }
 
         if prince.oujistate.dash_start {
-            // TODO: self.init_boost();
+            self.init_boost(&prince);
             self.boost_effect_state = Some(super::KatBoostEffectState::Build);
             self.boost_effect_timer = 0;
         }
@@ -613,6 +613,24 @@ impl Katamari {
         vec3::normalize(&mut self.velocity.vel_unit, &self.velocity.vel);
     }
 
+    /// Initialize boost speed and play the sfx/vfx.
+    /// offset: 0x237c0
+    fn init_boost(&mut self, prince: &Prince) {
+        // TODO_PARAM
+        let SW_SPEED_DISP_DURATION = 0xf;
+
+        let prince_to_kat = vec3_from!(-, self.bottom, prince.get_pos());
+        vec3::normalize(&mut self.velocity.vel_accel_unit, &prince_to_kat);
+        vec3::scale(
+            &mut self.velocity.vel_accel,
+            &self.velocity.vel_accel_unit,
+            self.speed,
+        );
+        self.sw_speed_disp_timer = SW_SPEED_DISP_DURATION;
+
+        // TODO_FX: `kat_init_boost:28-33` (play boost sfx/vfx)
+    }
+
     fn compute_brake_state(&mut self, prince: &mut Prince, camera: &Camera) -> BrakeState {
         // early exit when the camera is in the "shoot" mode
         if camera.get_mode() == CameraMode::Shoot {
@@ -690,7 +708,7 @@ impl Katamari {
                         // if we aren't already braking:
                         // begin a new brake
                         if !prince.oujistate.wheel_spin {
-                            // TODO: compute a VFX id in the above `(max_speed, brake_accel)`
+                            // TODO_FX: compute a VFX id in the above `(max_speed, brake_accel)`
                             // computation, and play that VFX here with the vfx delegate
                         }
 
@@ -703,9 +721,9 @@ impl Katamari {
                             Some(PushDir::Forwards) => 0.5,
                             _ => 0.7,
                         };
-                        // TODO: play the brake SFX here with volume `brake_volume`
+                        // TODO_FX: play the brake SFX here with volume `brake_volume`
 
-                        // TODO: the simulation sets this timer to 0 here, but does that just mean the brake
+                        // TODO_FX: the simulation sets this timer to 0 here, but does that just mean the brake
                         // vfx plays twice in a row? should this be the regular cooldown?
                         self.brake_vfx_timer = 1;
                     } else {
@@ -953,7 +971,8 @@ impl Katamari {
         let mut left_lateral_unit = [0.0; 3];
         if self.physics_flags.immobile {
             // if the katamari isn't moving:
-            // TODO: `kat_update_shell_points:193-233`
+            // the original simulation does a bunch of stuff here, but it seems to
+            // ultimately just set `left_lateral_unit` to 0 (which it already is)
         } else {
             // if the katamari is moving:
             let mut move_lateral_unit = self.delta_pos;
@@ -1003,7 +1022,10 @@ impl Katamari {
                     &self.contact_wall_normal_unit,
                 );
                 vec3_inplace_normalize(&mut net_normal_unit);
-                // TODO_LOW: `kat_update_rotation_speed:76-87` (this seems like it's just a no-op)
+                if vec3::len(&net_normal_unit) < 0.9 {
+                    // `kat_update_rotation_speed:76-87` (this seems like it's just a no-op)
+                    panic_log!("should never happen");
+                }
             } else {
                 // if not airborne and climbing a wall, set net normal to `<0,1,0>`
                 set_y!(net_normal_unit, 1.0);
