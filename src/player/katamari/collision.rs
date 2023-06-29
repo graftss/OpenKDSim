@@ -1481,7 +1481,8 @@ impl Katamari {
             }
 
             _impact_force = self.compute_impact_force();
-            _impact_similarity = self.compute_impact_angle(&lateral_vel_unit, &surface_normal_unit);
+            _impact_similarity =
+                self.compute_impact_similarity(&lateral_vel_unit, &surface_normal_unit);
             _impact_volume = _impact_force * _impact_similarity;
 
             // TODO_VIBRATION: `kat_update_wall_contacts:169-171` (call vibration callback)
@@ -1524,8 +1525,10 @@ impl Katamari {
             }
 
             _impact_force = self.compute_impact_force();
-            _impact_similarity =
-                self.compute_impact_angle(&self.velocity.vel_accel_grav_unit, &surface_normal_unit);
+            _impact_similarity = self.compute_impact_similarity(
+                &self.velocity.vel_accel_grav_unit,
+                &surface_normal_unit,
+            );
             _impact_volume = _impact_force * _impact_similarity;
 
             if self.physics_flags.moved_fast_shell_hit_0x14
@@ -1903,7 +1906,7 @@ impl Katamari {
 
     /// (??)
     /// offset: 0x16df0
-    fn compute_impact_angle(&self, kat_vel: &Vec3, surface_normal: &Vec3) -> f32 {
+    fn compute_impact_similarity(&self, kat_vel: &Vec3, surface_normal: &Vec3) -> f32 {
         if self.last_physics_flags.climbing {
             return 0.0;
         }
@@ -1918,7 +1921,7 @@ impl Katamari {
             vec3::dot(&VEC3_Y_NEG, &surface_normal)
         };
 
-        if similarity < 0.0 {
+        if similarity >= 0.0 {
             return 0.0;
         }
 

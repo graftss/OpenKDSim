@@ -817,6 +817,7 @@ impl Katamari {
                 // apply significantly less friction when the prince is either quick shifting
                 // or pinching
                 if prince.get_flags() & 0x40000 != 0 {
+                    // TODO_PARAM
                     t *= 0.1234
                 }
 

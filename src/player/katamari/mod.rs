@@ -1099,8 +1099,6 @@ impl Katamari {
         self.attach_vol_penalty = mission_config.get_vol_penalty(self.diam_cm);
         self.update_collision(prince, camera, global, &mission_state, props);
 
-        self.debug_draw_collision_rays();
-
         mark_address!("0x1e13e");
 
         // compute distance to camera
@@ -1110,6 +1108,8 @@ impl Katamari {
 
         // TODO_FX: `kat_update:390-415` (self.update_dust_cloud_vfx())
         // TODO_LOW: `kat_update:416-447` (self.update_prop_combo())
+
+        self.debug_draw_collision_rays();
 
         if !camera.preclear.get_enabled() {
             // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
