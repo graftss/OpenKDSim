@@ -1,6 +1,6 @@
 use gl_matrix::common::Vec3;
 
-use crate::macros::{debug_log, vec3_from};
+use crate::macros::{debug_log, temp_debug_log, vec3_from};
 
 use super::Katamari;
 
@@ -114,5 +114,14 @@ impl Katamari {
                 }
             }
         }
+    }
+
+    pub fn debug_log_climb_state(&self) {
+        temp_debug_log!(
+            "    climb: speed={}, ticks={}",
+            self.climb_speed,
+            self.climb_ticks
+        );
+        temp_debug_log!("           pos={:?}", self.center);
     }
 }

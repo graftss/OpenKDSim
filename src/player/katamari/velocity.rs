@@ -569,7 +569,7 @@ impl Katamari {
             vec3_inplace_scale(&mut accel, accel_magnitude)
         } else {
             // if climbing wall, accelerate in the opposite direction of the wall normal (??)
-            vec3::copy(&mut accel, &self.wallclimb_normal_unit);
+            vec3::copy(&mut accel, &self.climb_normal_unit);
             vec3_inplace_scale(&mut accel, -1.0);
         }
 

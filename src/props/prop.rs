@@ -13,7 +13,10 @@ use gl_matrix::{
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
-    macros::{max_to_none, new_mat4_copy, scale_translation, set_translation, vec3_from, modify_translation},
+    macros::{
+        max_to_none, modify_translation, new_mat4_copy, scale_translation, set_translation,
+        vec3_from,
+    },
     mono_data::{PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,

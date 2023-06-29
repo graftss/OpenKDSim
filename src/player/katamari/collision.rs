@@ -1,9 +1,7 @@
-
-
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
-    collision::{raycast_state::RaycastCallType, hit_attribute::HitAttribute},
+    collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
@@ -146,7 +144,9 @@ impl Katamari {
                 let mut top = [0.0, self.radius_cm + self.radius_cm, 0.0];
                 vec3_inplace_add_vec(&mut top, &self.center);
                 self.raycast_state.load_ray(&self.center, &top);
-                let found_hit = self.raycast_state.find_nearest_unity_hit(RaycastCallType::Objects, false);
+                let found_hit = self
+                    .raycast_state
+                    .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
                 if let Some(hit) = self.raycast_state.get_closest_hit() {
                     if found_hit && hit.metadata == HitAttribute::SpecialCamera.into() {
@@ -162,16 +162,23 @@ impl Katamari {
         // TODO_PARAM
         let MIN_ATTACHED_PROPS_FOR_SOMETHING = 100.0;
         let MAX_ATTACHED_PROPS_FOR_SOMETHING = 190.0;
-    
+
         let attached_props = self.num_attached_props as f32;
-        let t = inv_lerp_clamp!(attached_props, MIN_ATTACHED_PROPS_FOR_SOMETHING, MAX_ATTACHED_PROPS_FOR_SOMETHING);
-        let destroy_props_radius = self.display_radius_cm + t * (self.radius_cm - self.display_radius_cm) * 0.75;
+        let t = inv_lerp_clamp!(
+            attached_props,
+            MIN_ATTACHED_PROPS_FOR_SOMETHING,
+            MAX_ATTACHED_PROPS_FOR_SOMETHING
+        );
+        let destroy_props_radius =
+            self.display_radius_cm + t * (self.radius_cm - self.display_radius_cm) * 0.75;
 
         for prop_ref in self.attached_props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
             prop.do_unattached_translation(&self.clip_translation);
 
-            let in_destroy_range = prop.get_dist_to_katamari(self.player as i32) + prop.get_radius() < destroy_props_radius;
+            let in_destroy_range = prop.get_dist_to_katamari(self.player as i32)
+                + prop.get_radius()
+                < destroy_props_radius;
 
             if !prop.is_disabled() && in_destroy_range {
                 prop.destroy();
@@ -1238,14 +1245,14 @@ impl Katamari {
             vec3_inplace_subtract_vec(&mut self.vault_contact_point, &self.contact_wall_clip);
         }
 
-        let mut was_climbing = false;
+        let mut _was_climbing = false;
         self.physics_flags.hit_ground_fast = false;
         'main: {
             if self.num_wall_contacts + self.num_floor_contacts == 0 {
                 // if the katamari isn't contacting any surfaces
-                was_climbing = self.physics_flags.climbing;
+                _was_climbing = self.physics_flags.climbing;
 
-                if was_climbing && self.is_climbing_0x898 >= 1 {
+                if _was_climbing && self.is_climbing_0x898 >= 1 {
                     // continue wallclimb
                     self.is_climbing_0x898 -= 1;
                     if self.physics_flags.at_max_climb_height && prince.input_avg_push_len > 0.99 {
@@ -1253,16 +1260,16 @@ impl Katamari {
                     }
                 } else {
                     // end wallclimb
-                    if was_climbing {
+                    if _was_climbing {
                         // if a wallclimb was ongoing, initiate a cooldown for the next one
                         // and reset the wallclimb duration
                         self.wallclimb_cooldown_timer = 10;
-                        self.wallclimb_duration = 0;
+                        self.climb_ticks = 0;
                     }
                     self.physics_flags.climbing = false;
                     self.physics_flags.at_max_climb_height = false;
-                    self.wallclimb_init_y = 0.0;
-                    self.max_climb_height_ticks = 0;
+                    self.climb_init_y = 0.0;
+                    self.climb_max_height_duration = 0;
                 }
 
                 self.fc_ray_len = self.radius_cm;
@@ -1283,7 +1290,7 @@ impl Katamari {
                 // since we're not contacting any surfaces, we're airborne
                 self.physics_flags.airborne = true;
 
-                if was_climbing {
+                if _was_climbing {
                     self.airborne_ticks += 1;
                     if self.is_falling() {
                         self.falling_ticks += 1;
@@ -1380,26 +1387,26 @@ impl Katamari {
                     }
                 }
 
-                was_climbing = self.physics_flags.climbing;
-                if was_climbing {
+                _was_climbing = self.physics_flags.climbing;
+                if _was_climbing {
                     self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
                 }
             }
         }
 
         if self.physics_flags.airborne {
-            if was_climbing && self.is_climbing_0x898 > 0 {
+            if _was_climbing && self.is_climbing_0x898 > 0 {
                 self.is_climbing_0x898 -= 1;
             } else {
-                if was_climbing {
+                if _was_climbing {
                     self.wallclimb_cooldown_timer = 10;
-                    self.wallclimb_duration = 0;
+                    self.climb_ticks = 0;
                 }
 
                 self.physics_flags.climbing = false;
                 self.physics_flags.at_max_climb_height = false;
-                self.wallclimb_init_y = 0.0;
-                self.max_climb_height_ticks = 0;
+                self.climb_init_y = 0.0;
+                self.climb_max_height_duration = 0;
             }
         }
 
@@ -1474,8 +1481,7 @@ impl Katamari {
             }
 
             _impact_force = self.compute_impact_force();
-            _impact_similarity =
-                self.compute_impact_angle(&lateral_vel_unit, &surface_normal_unit);
+            _impact_similarity = self.compute_impact_angle(&lateral_vel_unit, &surface_normal_unit);
             _impact_volume = _impact_force * _impact_similarity;
 
             // TODO_VIBRATION: `kat_update_wall_contacts:169-171` (call vibration callback)
@@ -1518,10 +1524,8 @@ impl Katamari {
             }
 
             _impact_force = self.compute_impact_force();
-            _impact_similarity = self.compute_impact_angle(
-                &self.velocity.vel_accel_grav_unit,
-                &surface_normal_unit,
-            );
+            _impact_similarity =
+                self.compute_impact_angle(&self.velocity.vel_accel_grav_unit, &surface_normal_unit);
             _impact_volume = _impact_force * _impact_similarity;
 
             if self.physics_flags.moved_fast_shell_hit_0x14
@@ -1755,8 +1759,8 @@ impl Katamari {
         if !self.physics_flags.climbing {
             // if the katamari isn't already wallclimbing:
             // start a new wallclimb
-            self.wallclimb_normal_unit = self.contact_wall_normal_unit;
-            self.wallclimb_speed = 0.0;
+            self.climb_normal_unit = self.contact_wall_normal_unit;
+            self.climb_speed = 0.0;
             self.physics_flags.at_max_climb_height = false;
 
             // TODO_DOC
@@ -1773,7 +1777,7 @@ impl Katamari {
         vec3_inplace_scale(&mut lateral_push_vel, -1.0);
         vec3_inplace_normalize(&mut lateral_push_vel);
 
-        let mut lateral_wallclimb_normal = self.wallclimb_normal_unit;
+        let mut lateral_wallclimb_normal = self.climb_normal_unit;
         set_y!(lateral_wallclimb_normal, 0.0);
         vec3_inplace_normalize(&mut lateral_wallclimb_normal);
 
@@ -1794,8 +1798,8 @@ impl Katamari {
         self.wallclimb_cooldown_timer = 0;
 
         if !self.physics_flags.climbing {
-            self.wallclimb_init_y = self.center[1];
-            self.wallclimb_init_radius = self.climb_radius_cm;
+            self.climb_init_y = self.center[1];
+            self.climb_init_radius = self.climb_radius_cm;
         }
 
         self.physics_flags.climbing = true;
@@ -1814,46 +1818,46 @@ impl Katamari {
         let WALLCLIMB_VFX_DELAY_FRAMES = 0x1e;
         let WALLCLIMB_ACCEL = 0.1;
         // the max wallclimb speed is this value times katamari diameter
-        let MAX_WALLCLIMB_SPEED_DIAMS = 0.15;
+        let MAX_WALLCLIMB_SPEED_DIAMS = 0.015;
 
         if self.physics_flags.at_max_climb_height {
-            self.max_climb_height_ticks += 1;
-            if self.max_climb_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
+            self.climb_max_height_duration += 1;
+            if self.climb_max_height_duration > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
                 self.end_wall_climb();
             }
             self.physics_flags.at_max_climb_height = true;
             return;
         }
 
-        let height_gain = max!(0.0, self.center[1] - self.wallclimb_init_y);
+        let height_gain = max!(0.0, self.center[1] - self.climb_init_y);
 
         if !self.hit_flags.small_ledge_climb && self.max_wallclimb_height_gain <= height_gain {
-            self.max_climb_height_ticks += 1;
-            if self.max_climb_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
+            self.climb_max_height_duration += 1;
+            if self.climb_max_height_duration > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
                 self.end_wall_climb();
             }
             self.physics_flags.at_max_climb_height = true;
             return;
         }
 
-        self.wallclimb_duration += 1;
+        self.climb_ticks += 1;
 
-        if self.wallclimb_duration == WALLCLIMB_VFX_DELAY_FRAMES {
+        if self.climb_ticks == WALLCLIMB_VFX_DELAY_FRAMES {
             // TODO_FX: play lightning vfx below prince while climbing for >1 second
         }
 
         let max_wallclimb_speed = self.diam_cm * MAX_WALLCLIMB_SPEED_DIAMS;
-        self.wallclimb_speed += WALLCLIMB_ACCEL;
-        self.wallclimb_speed = min!(self.wallclimb_speed, max_wallclimb_speed);
+        self.climb_speed += WALLCLIMB_ACCEL;
+        self.climb_speed = min!(self.climb_speed, max_wallclimb_speed);
 
         let delta_y = if !self.hit_flags.small_ledge_climb
-            && self.max_wallclimb_height_gain < height_gain + self.wallclimb_speed
+            && self.max_wallclimb_height_gain < height_gain + self.climb_speed
         {
-            self.max_climb_height_ticks = 0;
+            self.climb_max_height_duration = 0;
             self.physics_flags.at_max_climb_height = true;
             self.max_wallclimb_height_gain - height_gain
         } else {
-            self.wallclimb_speed
+            self.climb_speed
         };
 
         self.center[1] += delta_y;
@@ -1866,14 +1870,14 @@ impl Katamari {
             if self.is_climbing_0x898 > 0 {
                 return self.is_climbing_0x898 -= 1;
             }
-            self.wallclimb_duration = 0;
+            self.climb_ticks = 0;
             self.wallclimb_cooldown_timer = 10;
         }
 
         self.physics_flags.climbing = false;
         self.physics_flags.at_max_climb_height = false;
-        self.wallclimb_init_y = 0.0;
-        self.max_climb_height_ticks = 0;
+        self.climb_init_y = 0.0;
+        self.climb_max_height_duration = 0;
     }
 
     /// (??)
@@ -2010,8 +2014,8 @@ impl Katamari {
     fn another_end_wallclimb(&mut self) {
         self.physics_flags.climbing = false;
         self.physics_flags.at_max_climb_height = false;
-        self.wallclimb_init_y = 0.0;
-        self.max_climb_height_ticks = 0;
+        self.climb_init_y = 0.0;
+        self.climb_max_height_duration = 0;
     }
 
     /// offset: 0x169a0

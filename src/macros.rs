@@ -234,6 +234,7 @@ pub(crate) use {
     max,
     max_to_none,
     min,
+    modify_translation,
     new_mat4_copy,
     panic_log,
     read_bool,
@@ -247,7 +248,6 @@ pub(crate) use {
     set_y,
     temp_debug_log,
     temp_debug_write,
-    modify_translation,
     vec3_from,
     vec3_unit_xz,
 };

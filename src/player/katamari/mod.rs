@@ -442,27 +442,27 @@ pub struct Katamari {
 
     /// The katamari's radius when it started climbing.
     /// offset: 0x768
-    wallclimb_init_radius: f32,
+    climb_init_radius: f32,
 
     /// The distance moved upward each tick during a wall climb.
     /// offset: 0x76c
-    wallclimb_speed: f32,
+    climb_speed: f32,
 
     /// The initial y position of the katamari when it started a wall climb.
     /// offset: 0x770
-    wallclimb_init_y: f32,
+    climb_init_y: f32,
 
     /// The unit normal of the wall being climbed.
     /// offset: 0x774
-    wallclimb_normal_unit: Vec3,
+    climb_normal_unit: Vec3,
 
     /// The number of ticks since the katamari started climbing a wall.
     /// offset: 0x784
-    wallclimb_duration: u16,
+    climb_ticks: u16,
 
     /// The number of ticks the katamari can gain height while climbing a wall
     /// offset: 0x786
-    max_climb_height_ticks: u16,
+    climb_max_height_duration: u16,
 
     /// The number of ticks since the katamari started moving downhill.
     /// offset: 0x788
@@ -985,14 +985,14 @@ impl Katamari {
 
         self.is_climbing_0x898 = 0;
         if self.physics_flags.climbing {
-            self.wallclimb_duration = 0;
+            self.climb_ticks = 0;
             self.wallclimb_cooldown_timer = self.params.init_wallclimb_cooldown_timer;
         }
 
         self.physics_flags.climbing = false;
         self.physics_flags.at_max_climb_height = false;
-        self.wallclimb_init_y = 0.0;
-        self.max_climb_height_ticks = 0;
+        self.climb_init_y = 0.0;
+        self.climb_max_height_duration = 0;
 
         // TODO: `kat_init:284-285` (not sure what this is about)
         self.airborne_prop_gravity = mission_state

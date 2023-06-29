@@ -451,8 +451,8 @@ impl Katamari {
             vec3::scale_and_add(
                 &mut bottom_ray.endpoint,
                 &endpoint,
-                &self.wallclimb_normal_unit,
-                -self.wallclimb_init_radius,
+                &self.climb_normal_unit,
+                -self.climb_init_radius,
             );
         }
 
