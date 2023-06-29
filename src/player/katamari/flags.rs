@@ -25,11 +25,11 @@ pub struct KatPhysicsFlags {
 
     /// If true, the katamari is climbing a wall.
     /// offset: 0x1
-    pub climbing_wall: bool,
+    pub climbing: bool,
 
     /// If true, the katamari is at its maximum climb height (so it can't climb higher).
     /// offset: 0x2
-    pub wallclimb_at_max_height: bool,
+    pub at_max_wallclimb_height: bool,
 
     /// If true, the katamari is braking.
     /// offset: 0x3
@@ -101,9 +101,10 @@ pub struct KatPhysicsFlags {
     /// offset: 0x13
     pub on_flat_floor: bool,
 
-    /// (??)
+    /// True if the katamari moved a lot (more than its radius) on a frame where
+    /// its shell rays collided with something.
     /// offset: 0x14
-    pub moved_fast_0x14: bool,
+    pub moved_fast_shell_hit_0x14: bool,
 
     /// (??)
     /// offset: 0x15
@@ -134,9 +135,10 @@ pub struct KatPhysicsFlags {
     /// offset: 0x1c
     pub can_emit_smoke: bool,
 
-    /// (??)
+    /// True if the katamari moved a lot (more than its radius) on a frame where
+    /// its shell rays collided with something.
     /// offset: 0x1d
-    pub moved_fast_0x1d: bool,
+    pub moved_fast_shell_hit_0x1d: bool,
 
     /// (??)
     /// offset: 0x1e
@@ -152,7 +154,7 @@ pub struct KatPhysicsFlags {
 
     /// Set to true on the frame when the katamari hits the ground after a long enough fall.
     /// offset: 0x22
-    pub just_hit_ground_hard: bool,
+    pub hit_ground_fast: bool,
 }
 
 impl KatPhysicsFlags {
@@ -162,7 +164,7 @@ impl KatPhysicsFlags {
         self.moved_fast_shell_hit = false;
         self.shell_ray_hit_surface = false;
         self.hit_shell_ray = None;
-        self.moved_fast_0x1d = false;
+        self.moved_fast_shell_hit_0x1d = false;
         self.hit_by_moving_prop = false;
         self.contacts_prop_0xa = false;
         self.stuck_between_walls = false;

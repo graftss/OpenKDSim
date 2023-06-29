@@ -424,7 +424,7 @@ impl Katamari {
 
         // orient the bottom collision ray
         let bottom_ray = &mut self.collision_rays[0];
-        if !self.physics_flags.climbing_wall {
+        if !self.physics_flags.climbing {
             // if the katamari isn't climbing a wall:
             if !self.physics_flags.airborne {
                 // if the katamari is grounded, the bottom ray is in the direction of the

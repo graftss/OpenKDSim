@@ -150,7 +150,7 @@ impl Katamari {
             .get_airborne_prop_gravity(self.diam_cm);
 
         vec3::zero(&mut self.velocity.accel_incline);
-        if !self.physics_flags.climbing_wall {
+        if !self.physics_flags.climbing {
             if !self.physics_flags.airborne {
                 // if not climbing a wall and grounded (i.e. not airborne):
                 vec3::zero(&mut self.velocity.vel_grav);
@@ -392,7 +392,7 @@ impl Katamari {
         }
 
         prince.oujistate.camera_mode = camera.get_mode().into();
-        prince.oujistate.climb_wall = self.physics_flags.climbing_wall;
+        prince.oujistate.climb_wall = self.physics_flags.climbing;
         prince.oujistate.hit_water = self.physics_flags.in_water;
         prince.oujistate.submerge = self.physics_flags.under_water;
         prince.oujistate.camera_state = camera.get_r1_jump_state().map_or(0, |s| s.into());
@@ -462,7 +462,7 @@ impl Katamari {
             base_speed_mult = 1.0;
         }
 
-        let climb_mult = match self.physics_flags.climbing_wall {
+        let climb_mult = match self.physics_flags.climbing {
             true => self.params.wallclimb_speed_penalty,
             false => 1.0,
         };
@@ -563,7 +563,7 @@ impl Katamari {
             vec3::zero(&mut accel);
         }
 
-        if !self.physics_flags.climbing_wall {
+        if !self.physics_flags.climbing {
             // if not climbing wall, use the acceleration computed above, scaled by the
             // acceleration magnitude also computed above.
             vec3_inplace_scale(&mut accel, accel_magnitude)
@@ -589,7 +589,7 @@ impl Katamari {
                 // apply the speed cap by rescaling the next velocity to `max_speed`
                 // TODO: ghidra has two cases here but they seem equivalent? (line ~630)
                 let capped_next_speed = if max_speed <= init_vel_accel_len {
-                    match self.physics_flags.climbing_wall {
+                    match self.physics_flags.climbing {
                         true => max_speed,
                         false => init_vel_accel_len,
                     }
@@ -852,7 +852,7 @@ impl Katamari {
         let mut vel_accel = vec3_from!(+, self.velocity.vel, self.velocity.accel_incline);
 
         let speed0 = vec3::length(&vel_accel);
-        if speed0 > 0.0 && !self.physics_flags.climbing_wall {
+        if speed0 > 0.0 && !self.physics_flags.climbing {
             // if moving and not climbing a wall, apply ground friction
             vec3_inplace_add_vec(&mut vel_accel, &self.velocity.accel_ground_friction);
         }
@@ -897,17 +897,17 @@ impl Katamari {
             // TODO_VS: `kat_apply_acceleration:79-90`
             // TODO_ENDING: `kat_apply_acceleration:91-96`
             // TODO_VS: weird conditional here depending on vs mode, but it's always true in single player
-            if !self.physics_flags.climbing_wall {
+            if !self.physics_flags.climbing {
                 // if not wall climbing:
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
                 vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_grav);
             } else {
                 // if wall climbing:
-                if !self.physics_flags.wallclimb_at_max_height {
+                if !self.physics_flags.at_max_wallclimb_height {
                     // if still gaining height from the wall climb:
                     vec3_inplace_add_vec(&mut self.center, &self.velocity.vel_accel);
                 }
-                // TODO: `kat_update_wall_climb()`
+                self.update_wallclimb();
             }
 
             if self.physics_flags.airborne {
@@ -1014,7 +1014,7 @@ impl Katamari {
             // 0x200ba
             let mut net_normal_unit = [0.0, 0.0, 0.0];
 
-            if !self.physics_flags.climbing_wall {
+            if !self.physics_flags.climbing {
                 // if not airborne and not climbing a wall:
                 vec3::add(
                     &mut net_normal_unit,

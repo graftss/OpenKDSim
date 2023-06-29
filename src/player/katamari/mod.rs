@@ -458,7 +458,7 @@ pub struct Katamari {
 
     /// The number of ticks since the katamari started climbing a wall.
     /// offset: 0x784
-    wallclimb_ticks: u16,
+    wallclimb_duration: u16,
 
     /// The number of ticks the katamari can gain height while climbing a wall
     /// offset: 0x786
@@ -549,7 +549,7 @@ pub struct Katamari {
 
     /// The (real-time) game time when the last collision occurred.
     /// offset: 0x884
-    last_collision_game_time_ms: i32,
+    last_bonk_game_time_ms: i32,
 
     /// (??) The prop which is colliding with the katamari. (why are there two such props in ghidra)
     /// offset: 0x888
@@ -979,18 +979,18 @@ impl Katamari {
 
         self.prop_combo_count = 0;
         self.physics_flags.wheel_spin = false;
-        self.last_collision_game_time_ms = 0;
+        self.last_bonk_game_time_ms = 0;
 
         // TODO_PROPS: `kat_init:270-275` (prop combo initialization)
 
         self.is_climbing_0x898 = 0;
-        if self.physics_flags.climbing_wall {
-            self.wallclimb_ticks = 0;
+        if self.physics_flags.climbing {
+            self.wallclimb_duration = 0;
             self.wallclimb_cooldown_timer = self.params.init_wallclimb_cooldown_timer;
         }
 
-        self.physics_flags.climbing_wall = false;
-        self.physics_flags.wallclimb_at_max_height = false;
+        self.physics_flags.climbing = false;
+        self.physics_flags.at_max_wallclimb_height = false;
         self.wallclimb_init_y = 0.0;
         self.wallclimb_max_height_ticks = 0;
 

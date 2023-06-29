@@ -269,7 +269,7 @@ impl Animation {
                         } else if self.try_play_idle_animation(prince, katamari, rng) {
                             // case 3.7.4: moving slow enough to play the idle animation
                             return;
-                        } else if katamari.physics_flags.climbing_wall {
+                        } else if katamari.physics_flags.climbing {
                             // case 3.7.5: climbing wall
                             (AnimationId::Climb, 1.0, None)
                         } else if !katamari.physics_flags.braking {

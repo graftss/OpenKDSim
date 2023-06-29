@@ -5,7 +5,8 @@ use crate::{
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_translation, set_y,
+        temp_debug_log, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -118,7 +119,7 @@ impl Katamari {
         let mut moved = vec3::create();
         vec3::subtract(&mut moved, &self.last_center, &self.center);
         self.physics_flags.moved_fast = self.radius_cm <= vec3::length(&moved);
-        self.physics_flags.moved_fast_0x14 = false;
+        self.physics_flags.moved_fast_shell_hit = false;
 
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
@@ -544,8 +545,8 @@ impl Katamari {
                 }
 
                 self.physics_flags.airborne = true;
-                self.physics_flags.moved_fast_0x14 = true;
-                self.physics_flags.moved_fast_0x1d = true;
+                self.physics_flags.moved_fast_shell_hit = true;
+                self.physics_flags.moved_fast_shell_hit_0x1d = true;
 
                 let mut shell_base_pt = vec3::create();
                 match i {
@@ -1189,7 +1190,7 @@ impl Katamari {
             vec3::zero(&mut self.contact_floor_clip);
         }
 
-        // TODO: `kat_apply_turntable_contact()`
+        // TODO_TURNTABLE: `kat_apply_turntable_contact()`
         self.apply_clip_translation();
 
         if self.physics_flags.in_water
@@ -1203,30 +1204,40 @@ impl Katamari {
             vec3_inplace_subtract_vec(&mut self.vault_contact_point, &self.contact_wall_clip);
         }
 
-        self.physics_flags.just_hit_ground_hard = false;
+        let mut was_climbing = false;
+        self.physics_flags.hit_ground_fast = false;
         'main: {
             if self.num_wall_contacts + self.num_floor_contacts == 0 {
                 // if the katamari isn't contacting any surfaces
-                if !self.physics_flags.climbing_wall {
-                    // if not climbing a wall, reset wallclimb state
-                    self.end_wall_climb();
-                } else if self.is_climbing_0x898 < 1 {
-                    self.wallclimb_cooldown_timer = 10;
-                    self.wallclimb_ticks = 0;
-                    self.end_wall_climb();
-                } else {
+                was_climbing = self.physics_flags.climbing;
+
+                if was_climbing && self.is_climbing_0x898 >= 1 {
+                    // continue wallclimb
                     self.is_climbing_0x898 -= 1;
-                    if self.physics_flags.wallclimb_at_max_height
+                    if self.physics_flags.at_max_wallclimb_height
                         && prince.input_avg_push_len > 0.99
                     {
                         break 'main;
                     }
+                } else {
+                    // end wallclimb
+                    if was_climbing {
+                        // if a wallclimb was ongoing, initiate a cooldown for the next one
+                        // and reset the wallclimb duration
+                        self.wallclimb_cooldown_timer = 10;
+                        self.wallclimb_duration = 0;
+                    }
+                    self.physics_flags.climbing = false;
+                    self.physics_flags.at_max_wallclimb_height = false;
+                    self.wallclimb_init_y = 0.0;
+                    self.wallclimb_max_height_ticks = 0;
                 }
 
                 self.fc_ray_len = self.radius_cm;
                 self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
                 self.vault_ray_idx = None;
 
+                // update durations of falling and being airborne
                 if !self.physics_flags.airborne {
                     self.airborne_ticks = 0;
                     self.falling_ticks = 0;
@@ -1237,8 +1248,10 @@ impl Katamari {
                     }
                 }
 
+                // since we're not contacting any surfaces, we're airborne
                 self.physics_flags.airborne = true;
-                if self.physics_flags.climbing_wall {
+
+                if was_climbing {
                     self.airborne_ticks += 1;
                     if self.is_falling() {
                         self.falling_ticks += 1;
@@ -1247,12 +1260,13 @@ impl Katamari {
                     panic_log!("??? why is this here");
                 }
             } else {
-                // if contacting a surface:
+                // if contacting at least one surface:
                 self.physics_flags.unknown_0x20 = false;
                 self.update_wall_contacts(prince, camera, global);
+
                 if !self.physics_flags.contacts_floor
                     && self.physics_flags.contacts_wall
-                    && !self.physics_flags.climbing_wall
+                    && !self.physics_flags.climbing
                 {
                     self.update_airborne_timers(true);
                 } else {
@@ -1334,23 +1348,31 @@ impl Katamari {
                         }
                     }
                 }
+
+                was_climbing = self.physics_flags.climbing;
+                if was_climbing {
+                    self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
+                }
             }
         }
 
         if self.physics_flags.airborne {
-            if self.physics_flags.climbing_wall && self.is_climbing_0x898 > 0 {
+            if was_climbing && self.is_climbing_0x898 > 0 {
                 self.is_climbing_0x898 -= 1;
             } else {
-                if self.physics_flags.climbing_wall {
+                if was_climbing {
                     self.wallclimb_cooldown_timer = 10;
-                    self.wallclimb_ticks = 0;
+                    self.wallclimb_duration = 0;
                 }
 
-                self.end_wall_climb();
+                self.physics_flags.climbing = false;
+                self.physics_flags.at_max_wallclimb_height = false;
+                self.wallclimb_init_y = 0.0;
+                self.wallclimb_max_height_ticks = 0;
             }
         }
 
-        if self.physics_flags.just_hit_ground_hard {
+        if self.physics_flags.hit_ground_fast {
             if !self.physics_flags.in_water {
                 let play_hit_ground_sfx = match self.physics_flags.grounded_ray_type {
                     Some(KatCollisionRayType::Bottom) => true,
@@ -1372,36 +1394,29 @@ impl Katamari {
 
     /// offset: 0x15950
     fn update_wall_contacts(&mut self, prince: &mut Prince, camera: &Camera, global: &GlobalState) {
-        if self.physics_flags.climbing_wall {
-            // TODO_CLIMB: `kat_update_wall_contacts:47-58`
+        if self.physics_flags.climbing {
             if self.can_climb_wall_contact(prince) {
                 return self.maintain_wallclimb();
+            } else {
+                return self.end_wall_climb();
             }
-
-            return self.end_wall_climb();
         }
 
         if self.speed <= 0.0 {
             return self.play_bonk_fx(false);
         }
 
-        let mut flag_a = true;
-        let mut should_halve_speed = false;
-        let flag_d = false;
+        let fast_collision = self.physics_flags.moved_fast_shell_hit_0x1d;
 
         // TODO_VS: `vs_attack` check here
         let contacts_wall = self.num_wall_contacts > 0;
-
-        let can_bonk_and_lose_props = if !self.physics_flags.moved_fast_0x1d {
-            true
-        } else {
-            flag_a = contacts_wall || self.falling_ticks < 10;
-            should_halve_speed = contacts_wall;
-            contacts_wall
-        };
+        let should_halve_speed = fast_collision && contacts_wall;
+        let can_bonk_and_lose_props = fast_collision && should_halve_speed;
+        let landed_from_fast_fall = !(fast_collision && !contacts_wall && self.falling_ticks < 10);
+        let flag_d_false_in_1p = false;
 
         let mut surface_normal_unit = [0.0; 3];
-        let mut _impact_directness = 0.0;
+        let mut _impact_similarity = 0.0;
         let mut _impact_force = 0.0;
         let mut _impact_volume = 0.0;
 
@@ -1411,10 +1426,13 @@ impl Katamari {
             // compute unit lateral velocity
             let lateral_vel_unit = vec3_unit_xz!(self.velocity.vel_accel);
 
-            // compute unit lateral wall normal (usually)
-            vec3::copy(&mut surface_normal_unit, &self.contact_wall_normal_unit);
-            if !flag_d || !self.physics_flags.moved_fast_0x1d {
+            // `surface_normal_unit` is the *lateral* contact wall normal if not a fast collision,
+            // and the contact floor normal otherwise.
+            if !flag_d_false_in_1p || !fast_collision {
+                vec3::copy(&mut surface_normal_unit, &self.contact_wall_normal_unit);
                 set_y!(surface_normal_unit, 0.0);
+            } else {
+                vec3::copy(&mut surface_normal_unit, &self.contact_floor_normal_unit);
             }
             vec3_inplace_normalize(&mut surface_normal_unit);
 
@@ -1423,9 +1441,11 @@ impl Katamari {
             }
 
             _impact_force = self.compute_impact_force();
-            _impact_directness =
-                self.compute_impact_directness(&lateral_vel_unit, &surface_normal_unit);
-            _impact_volume = _impact_force * _impact_directness;
+            _impact_similarity =
+                self.compute_impact_similarity(&lateral_vel_unit, &surface_normal_unit);
+            _impact_volume = _impact_force * _impact_similarity;
+
+            // TODO_VIBRATION: `kat_update_wall_contacts:169-171` (call vibration callback)
 
             if self.can_climb_wall_contact(prince) {
                 return self.maintain_wallclimb();
@@ -1444,19 +1464,19 @@ impl Katamari {
                     &self.contact_floor_normal_unit,
                     &self.contact_wall_normal_unit,
                 );
-            } else if self.num_wall_contacts == 0 {
+            } else if !contacts_wall {
                 vec3::copy(&mut surface_normal_unit, &self.contact_floor_normal_unit);
             } else {
                 vec3::copy(&mut surface_normal_unit, &self.contact_wall_normal_unit);
             }
             vec3_inplace_normalize(&mut surface_normal_unit);
 
-            // if the katamari's "velocity + gravity" is similar to the `surface_normal_unit`, do nothing.
+            // if the katamari's falling velocity is within 90 degrees of to the `surface_normal_unit`, do nothing.
             if vec3::dot(&self.velocity.vel_accel_grav_unit, &surface_normal_unit) > 0.0 {
                 return;
             }
 
-            let check_a = self.physics_flags.contacts_floor && !self.physics_flags.moved_fast_0x1d;
+            let check_a = self.physics_flags.contacts_floor && !fast_collision;
             let check_b = self.physics_flags.wheel_spin || self.airborne_ticks < 5;
             if check_a && check_b {
                 set_y!(self.velocity.vel_accel, 0.0);
@@ -1465,28 +1485,32 @@ impl Katamari {
             }
 
             _impact_force = self.compute_impact_force();
-            _impact_directness = self.compute_impact_directness(
+            _impact_similarity = self.compute_impact_similarity(
                 &self.velocity.vel_accel_grav_unit,
                 &surface_normal_unit,
             );
-            _impact_volume = _impact_force * _impact_directness;
+            _impact_volume = _impact_force * _impact_similarity;
 
-            if self.physics_flags.moved_fast_0x14 && self.physics_flags.grounded_by_mesh_or_prop() {
+            if self.physics_flags.moved_fast_shell_hit_0x14
+                && self.physics_flags.grounded_ray_type != Some(KatCollisionRayType::Bottom)
+            {
+                _impact_volume = 0.0;
             }
 
+            // TODO_PARAM
             let magic_num_0x7b264 = 70.0;
             let magic_num_0x71580 = 0.1;
             let falling_tick_ratio = self.falling_ticks as f32 / magic_num_0x7b264;
-            if flag_a {
-                // TODO_FX: `kat_update_wall_contacts:218-220` (vibration)
+            if landed_from_fast_fall {
+                // TODO_VIBRATION: `kat_update_wall_contacts:218-220` (vibration)
                 if !self.physics_flags.contacts_wall
                     && self.physics_flags.airborne
                     && falling_tick_ratio >= magic_num_0x71580
                 {
                     if !self.physics_flags.in_water {
-                        // TODO_FX: `kat_update_wall_contacts:224-246`
+                        // TODO_FX: `kat_update_wall_contacts:224-246` (emit smoke)
                     }
-                    self.physics_flags.just_hit_ground_hard = true;
+                    self.physics_flags.hit_ground_fast = true;
                 }
             }
 
@@ -1517,8 +1541,8 @@ impl Katamari {
             self.falling_ticks = 0;
         }
 
-        if _impact_directness <= 0.0 {
-            if _impact_force > 0.0 {
+        if _impact_similarity <= 0.0 {
+            if _impact_volume > 0.0 {
                 return;
             }
             if self.physics_flags.hit_by_moving_prop {
@@ -1536,13 +1560,20 @@ impl Katamari {
 
         let param_xz_elasticity = 0.95;
         let param_min_speed_ratio = 0.3;
-        let param_min_impact_angle = 0.3;
+        let param_min_impact_similarity = 0.3;
         let param_sound_cooldown_ms = 0xa5;
 
         let mut _play_map_sound = false;
         let mut speed = self.speed;
-        if !self.hit_flags.no_reaction_no_slope {
-            // if not on a `NoReactionNoSlope` surface:
+
+        'elastic_collision: {
+            if self.hit_flags.no_reaction_no_slope {
+                set_y!(self.velocity.vel_accel, 0.0);
+                vec3::normalize(&mut self.velocity.vel_accel_unit, &self.velocity.vel_accel);
+                if !fast_collision {
+                    break 'elastic_collision;
+                }
+            }
 
             let mut refl = [0.0; 3];
             vec3_reflection(
@@ -1554,30 +1585,23 @@ impl Katamari {
 
             if !self.physics_flags.contacts_wall {
                 if should_halve_speed {
-                } else {
+                } else if !self.physics_flags.vs_attack {
                     refl[0] *= param_xz_elasticity;
                     refl[1] *= self.y_elasticity;
                     refl[2] *= param_xz_elasticity;
+                } else {
+                    // TODO_VS: `kat_update_wall_contacts:324-326`
                 }
-                // TODO_VS: `kat_update_wall_contacts:324-326`
             } else {
                 let speed_ratio = self.speed / self.scaled_params.base_max_speed;
                 _play_map_sound = speed_ratio > param_min_speed_ratio
-                    && _impact_directness > param_min_impact_angle
-                    && global.game_time_ms - self.last_collision_game_time_ms
-                        > param_sound_cooldown_ms;
+                    && _impact_similarity > param_min_impact_similarity
+                    && global.game_time_ms - self.last_bonk_game_time_ms > param_sound_cooldown_ms;
                 speed *= self.y_elasticity;
             }
 
             self.physics_flags.bonked = true;
             vec3::scale(&mut self.init_bonk_velocity, &refl, -speed);
-        } else {
-            // if on a `NoReactionNoSlope` surface:
-            set_y!(self.velocity.vel_accel, 0.0);
-            vec3::normalize(&mut self.velocity.vel_accel_unit, &self.velocity.vel_accel);
-            if self.physics_flags.moved_fast_0x1d {
-                // TODO_LOW: goto
-            }
         }
 
         prince.end_spin_and_boost(self);
@@ -1586,19 +1610,25 @@ impl Katamari {
             return;
         }
 
-        if global.game_time_ms - self.last_collision_game_time_ms >= 0xa6 {
+        // TODO_PARAM
+        // 166ms cooldown on bonks, which is 1/6 of a second
+        let BONK_COOLDOWN_MS = 0xa6;
+        if global.game_time_ms - self.last_bonk_game_time_ms >= BONK_COOLDOWN_MS {
             // the katamari bonks and loses props
-
-            self.last_collision_game_time_ms = global.game_time_ms;
+            self.last_bonk_game_time_ms = global.game_time_ms;
             self.props_lost_from_bonks = 0;
-            if !self.physics_flags.climbing_wall
-                && !self.last_physics_flags.climbing_wall
-                && _impact_force > 0.0
-            {
+
+            let not_climbing = !self.physics_flags.climbing && !self.last_physics_flags.climbing;
+
+            if not_climbing && _impact_force > 0.0 {
                 // TODO_LOW: `kat_begin_screen_shake()`
                 let _can_lose_props = !camera.state.cam_eff_1P && !global.map_change_mode;
                 // TODO_PROPS: `kat_update_wall_contacts:380-409` (lose props from collision, play bonk sfx)
             }
+        }
+
+        if _play_map_sound {
+            // TODO_FX: `sound_play_map_size_sound(impact_force)`
         }
 
         self.play_bonk_fx(false);
@@ -1657,7 +1687,7 @@ impl Katamari {
         }
 
         // don't start a new wall climb if the katamari doesn't currently contact a wall
-        if !self.physics_flags.contacts_wall && !self.physics_flags.climbing_wall {
+        if !self.physics_flags.contacts_wall && !self.physics_flags.climbing {
             return false;
         }
 
@@ -1678,12 +1708,12 @@ impl Katamari {
             return false;
         }
 
-        if !self.physics_flags.climbing_wall {
+        if !self.physics_flags.climbing {
             // if the katamari isn't already wallclimbing:
             // start a new wallclimb
             self.wallclimb_normal_unit = self.contact_wall_normal_unit;
             self.wallclimb_speed = 0.0;
-            self.physics_flags.wallclimb_at_max_height = false;
+            self.physics_flags.at_max_wallclimb_height = false;
 
             // (??) not sure what this is doing
             // TODO_PARAM: factor out magic number as param
@@ -1710,18 +1740,18 @@ impl Katamari {
     /// really clear what this is for.
     /// offset: 0x16930
     fn maintain_wallclimb(&mut self) {
-        if !self.physics_flags.wallclimb_at_max_height {
+        if !self.physics_flags.at_max_wallclimb_height {
             self.is_climbing_0x898 = 1;
         }
 
         self.wallclimb_cooldown_timer = 0;
 
-        if !self.physics_flags.climbing_wall {
+        if !self.physics_flags.climbing {
             self.wallclimb_init_y = self.center[1];
             self.wallclimb_init_radius = self.climb_radius_cm;
         }
 
-        self.physics_flags.climbing_wall = true;
+        self.physics_flags.climbing = true;
         vec3::zero(&mut self.init_bonk_velocity);
         self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
         self.vault_ray_idx = None;
@@ -1737,12 +1767,12 @@ impl Katamari {
         // the max wallclimb speed is this value times katamari diameter
         let MAX_WALLCLIMB_SPEED_DIAMS = 0.15;
 
-        if self.physics_flags.wallclimb_at_max_height {
+        if self.physics_flags.at_max_wallclimb_height {
             self.wallclimb_max_height_ticks += 1;
             if self.wallclimb_max_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
                 self.end_wall_climb();
             }
-            self.physics_flags.wallclimb_at_max_height = true;
+            self.physics_flags.at_max_wallclimb_height = true;
             return;
         }
 
@@ -1753,13 +1783,13 @@ impl Katamari {
             if self.wallclimb_max_height_ticks > MAX_FRAMES_AT_MAX_WALLCLIMB_HEIGHT {
                 self.end_wall_climb();
             }
-            self.physics_flags.wallclimb_at_max_height = true;
+            self.physics_flags.at_max_wallclimb_height = true;
             return;
         }
 
-        self.wallclimb_ticks += 1;
+        self.wallclimb_duration += 1;
 
-        if self.wallclimb_ticks == WALLCLIMB_VFX_DELAY_FRAMES {
+        if self.wallclimb_duration == WALLCLIMB_VFX_DELAY_FRAMES {
             // TODO_FX: play lightning vfx below prince while climbing for >1 second
         }
 
@@ -1771,7 +1801,7 @@ impl Katamari {
             && self.max_wallclimb_height_gain < height_gain + self.wallclimb_speed
         {
             self.wallclimb_max_height_ticks = 0;
-            self.physics_flags.wallclimb_at_max_height = true;
+            self.physics_flags.at_max_wallclimb_height = true;
             self.max_wallclimb_height_gain - height_gain
         } else {
             self.wallclimb_speed
@@ -1783,16 +1813,16 @@ impl Katamari {
     /// End the current wallclimb, if one is ongoing.
     /// offset: 0x12ca0
     fn end_wall_climb(&mut self) {
-        if self.physics_flags.climbing_wall {
+        if self.physics_flags.climbing {
             if self.is_climbing_0x898 > 0 {
                 return self.is_climbing_0x898 -= 1;
             }
-            self.wallclimb_ticks = 0;
+            self.wallclimb_duration = 0;
             self.wallclimb_cooldown_timer = 10;
         }
 
-        self.physics_flags.climbing_wall = false;
-        self.physics_flags.wallclimb_at_max_height = false;
+        self.physics_flags.climbing = false;
+        self.physics_flags.at_max_wallclimb_height = false;
         self.wallclimb_init_y = 0.0;
         self.wallclimb_max_height_ticks = 0;
     }
@@ -1800,7 +1830,7 @@ impl Katamari {
     /// (??)
     /// offset: 0x16ed0
     fn compute_impact_force(&self) -> f32 {
-        if !self.physics_flags.moved_fast_0x1d && self.physics_flags.airborne {
+        if !self.physics_flags.moved_fast_shell_hit_0x1d && self.physics_flags.airborne {
             if self.physics_flags.contacts_floor {
                 // if contacting a floor, interpolate the number of ticks the katamari has been falling
                 return inv_lerp_clamp!(
@@ -1820,8 +1850,8 @@ impl Katamari {
 
     /// (??)
     /// offset: 0x16df0
-    fn compute_impact_directness(&self, kat_vel: &Vec3, surface_normal: &Vec3) -> f32 {
-        if self.last_physics_flags.climbing_wall {
+    fn compute_impact_similarity(&self, kat_vel: &Vec3, surface_normal: &Vec3) -> f32 {
+        if self.last_physics_flags.climbing {
             return 0.0;
         }
         // TODO_VS: `kat_compute_impact_angle:12-14`
@@ -1926,12 +1956,13 @@ impl Katamari {
     }
 
     fn another_end_wallclimb(&mut self) {
-        self.physics_flags.climbing_wall = false;
-        self.physics_flags.wallclimb_at_max_height = false;
+        self.physics_flags.climbing = false;
+        self.physics_flags.at_max_wallclimb_height = false;
         self.wallclimb_init_y = 0.0;
         self.wallclimb_max_height_ticks = 0;
     }
 
+    /// offset: 0x169a0
     fn update_airborne_timers(&mut self, new_airborne: bool) {
         if !self.physics_flags.airborne {
             self.airborne_ticks = 0;
