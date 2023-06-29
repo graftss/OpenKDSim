@@ -6,14 +6,14 @@ use super::collision::ray::{KatCollisionRayType, ShellRay};
 /// the surface it's moving on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KatInclineMoveType {
-    MoveFlatground,
-    MoveUphill,
-    MoveDownhill,
+    Flatground,
+    Uphill,
+    Downhill,
 }
 
 impl Default for KatInclineMoveType {
     fn default() -> Self {
-        Self::MoveFlatground
+        Self::Flatground
     }
 }
 

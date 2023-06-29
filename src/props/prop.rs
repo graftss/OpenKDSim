@@ -766,6 +766,7 @@ impl Prop {
     }
 
     /// Initialize the prop's AABB and volume
+    /// offset: 0x27750
     fn init_aabb_and_volume(&mut self, aabbs: &PropAabbs, config: &NamePropConfig) {
         // TODO: refactor this as a simulation param
         let VOL_RATIO_FOR_PICKUP = 0.1;
@@ -940,6 +941,10 @@ impl Prop {
 
     pub fn get_aabb_mesh(&self) -> &Mesh {
         &self.aabb_mesh
+    }
+
+    pub fn get_aabb_min_point(&self) -> &Vec3 {
+        &self.aabb_mesh.sectors[0].aabb.min
     }
 
     pub fn get_unattached_transform(&self) -> &Mat4 {

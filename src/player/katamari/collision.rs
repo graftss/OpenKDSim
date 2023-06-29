@@ -1639,51 +1639,54 @@ impl Katamari {
     /// when the current wallclimb should continue.
     /// offset: 0x16540
     fn can_climb_wall_contact(&mut self, prince: &Prince) -> bool {
-        'early_returns: {
-            if self.contact_prop.is_none()
-                || self.num_wall_contacts != 1
-                || self.num_floor_contacts == 0
-            {
-                // if one of the following hold:
-                //   - the katamari isn't colliding with a prop
-                //   - the katamari's isn't colliding with exactly 1 wall
-                //   - the katamari isn't colliding with a floor
+        let mut perform_checks = true;
+        let mut check_multiple_walls = true;
 
-                // do some early checks to rule out the possibility of being able to wallclimb
-                if self.hit_flags.wall_climb_disabled {
-                    return false;
-                }
-                if self.physics_flags.hit_shell_ray.is_some() {
-                    return false;
-                }
-                if self.hit_flags.small_ledge_climb {
-                    break 'early_returns;
-                } else if !self.hit_flags.wall_climb_free {
-                    if self.wallclimb_cooldown_timer > 0 {
-                        return false;
-                    }
-                    if self.last_physics_flags.airborne {
-                        return false;
-                    }
-                    if self.physics_flags.airborne {
-                        return false;
-                    }
-                    if self.physics_flags.incline_move_type != KatInclineMoveType::MoveFlatground {
-                        return false;
-                    }
-                }
-            } else {
-                // if all of the following hold:
-                //   - the katamari contacts a prop
-                //   - the katamari is colliding with exactly 1 wall
-                //   - the katamari is colliding with a floor
+        if self.num_wall_contacts == 1 && self.num_floor_contacts == 0 && self.contact_prop.is_some() {
+            // if all of the following hold:
+            //   - the katamari is colliding with a prop
+            //   - the katamari's is colliding with exactly one wall
+            //   - the katamari isn't colliding with a floor                
+            let prop_ref = self.contact_prop.as_ref().unwrap();
+            let prop = prop_ref.borrow();
 
-                // TODO_CLIMB: `kat_can_climb_wall_contact:69-82` (init prop wallclimb)
+            let mut aabb_min_world = vec3::create();
+            vec3::transform_mat4(&mut aabb_min_world, prop.get_aabb_min_point(), prop.get_unattached_transform());
+
+            // TODO_DOC: what does this condition mean
+            if aabb_min_world[1] > self.bottom[1] - self.max_wallclimb_height_gain {
+                self.hit_flags.wall_climb_free = true;
+                perform_checks = false;
             }
+        } 
 
-            if self.num_wall_contacts > 1 {
+        if perform_checks {
+            if self.hit_flags.wall_climb_disabled {
                 return false;
             }
+            if self.physics_flags.hit_shell_ray.is_some() {
+                return false;
+            }
+            if self.hit_flags.small_ledge_climb {
+                check_multiple_walls = false;
+            } else if !self.hit_flags.wall_climb_free {
+                if self.wallclimb_cooldown_timer > 0 {
+                    return false;
+                }
+                if self.last_physics_flags.airborne {
+                    return false;
+                }
+                if self.physics_flags.airborne {
+                    return false;
+                }
+                if self.physics_flags.incline_move_type != KatInclineMoveType::Flatground {
+                    return false;
+                }
+            }
+        }
+
+        if check_multiple_walls && self.num_wall_contacts > 1 {
+            return false;
         }
 
         // don't start a new wall climb if the katamari doesn't currently contact a wall
@@ -1703,7 +1706,7 @@ impl Katamari {
             return false;
         }
 
-        // check that the input is strong enough (and forward enough) to admit a wallclimb
+        // check that the input push and angle are suitable for a wallclimb
         if !prince.has_wallclimb_input() {
             return false;
         }
@@ -1715,7 +1718,7 @@ impl Katamari {
             self.wallclimb_speed = 0.0;
             self.physics_flags.at_max_wallclimb_height = false;
 
-            // (??) not sure what this is doing
+            // TODO_DOC
             // TODO_PARAM: factor out magic number as param
             if !self.hit_flags.wall_climb_free && self.base_speed * 0.95 < self.speed {
                 return false;
@@ -1726,13 +1729,14 @@ impl Katamari {
         // normal. if the two vectors are similar enough, we can start a wallclimb.
         let mut lateral_push_vel = self.velocity.push_vel_on_floor_unit;
         set_y!(lateral_push_vel, 0.0);
+        vec3_inplace_scale(&mut lateral_push_vel, -1.0);
         vec3_inplace_normalize(&mut lateral_push_vel);
 
         let mut lateral_wallclimb_normal = self.wallclimb_normal_unit;
         set_y!(lateral_wallclimb_normal, 0.0);
         vec3_inplace_normalize(&mut lateral_wallclimb_normal);
 
-        let push_to_wall_similarity = -vec3::dot(&lateral_push_vel, &lateral_wallclimb_normal);
+        let push_to_wall_similarity = vec3::dot(&lateral_push_vel, &lateral_wallclimb_normal);
         return push_to_wall_similarity >= self.params.min_wallclimb_similarity;
     }
 

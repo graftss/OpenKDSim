@@ -1,4 +1,5 @@
 #![feature(const_float_bits_conv)]
+#![feature(let_chains)]
 #![allow(non_snake_case, dead_code)]
 
 // reference this first so it's available to all other modules

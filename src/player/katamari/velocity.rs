@@ -205,29 +205,29 @@ impl Katamari {
                                 if self.physics_flags.contacts_wall {
                                     // case 1: if the katamari contacts a wall, set the movetype to
                                     // flatground regardless of the similarity.
-                                    KatInclineMoveType::MoveFlatground
+                                    KatInclineMoveType::Flatground
                                 } else if similarity <= -threshold {
                                     // case 2: `similarity <= -threshold`: moving against incline (i.e. uphill)
-                                    KatInclineMoveType::MoveUphill
+                                    KatInclineMoveType::Uphill
                                 } else if similarity <= threshold {
                                     // case 3: `-threshold < similarity <= threshold`: moving neutral
                                     // with respect to incline (i.e. on flat ground)
-                                    KatInclineMoveType::MoveFlatground
+                                    KatInclineMoveType::Flatground
                                 } else {
                                     // case 4: `threshold < similarity`: moving with incline (i.e. downhill)
-                                    KatInclineMoveType::MoveDownhill
+                                    KatInclineMoveType::Downhill
                                 }
                             } else {
                                 // if the player isn't moving, start downhill acceleration
                                 // along the incline.
                                 self.physics_flags.immobile = false;
                                 self.move_downhill_ticks = 10;
-                                KatInclineMoveType::MoveDownhill
+                                KatInclineMoveType::Downhill
                             };
 
                         // update the katamari's incline acceleration based on its incline movetype
                         match self.physics_flags.incline_move_type {
-                            KatInclineMoveType::MoveUphill => {
+                            KatInclineMoveType::Uphill => {
                                 // if moving uphill:
                                 // incline acceleration is a multiple of the unit rejection.
                                 // the multiple is determined by the prince's push strength and the number of
@@ -261,7 +261,7 @@ impl Katamari {
                                     incline_mult,
                                 );
                             }
-                            KatInclineMoveType::MoveDownhill => {
+                            KatInclineMoveType::Downhill => {
                                 // if moving downhill:
                                 self.move_downhill_ticks += 1;
                                 self.move_uphill_ticks = 0;
@@ -279,7 +279,7 @@ impl Katamari {
                                     incline_mult,
                                 );
                             }
-                            KatInclineMoveType::MoveFlatground => {
+                            KatInclineMoveType::Flatground => {
                                 self.end_incline_movement(prince);
                             }
                         }
@@ -310,7 +310,7 @@ impl Katamari {
     fn end_incline_movement(&mut self, prince: &mut Prince) {
         self.move_downhill_ticks = 0;
         self.move_uphill_ticks = 0;
-        self.physics_flags.incline_move_type = KatInclineMoveType::MoveFlatground;
+        self.physics_flags.incline_move_type = KatInclineMoveType::Flatground;
         prince.reset_push_uphill_strength();
     }
 
@@ -531,7 +531,7 @@ impl Katamari {
 
         // compute acceleration penalty when moving uphill
         let incline_accel_mult = match self.physics_flags.incline_move_type {
-            KatInclineMoveType::MoveUphill => prince.get_uphill_accel_penalty(),
+            KatInclineMoveType::Uphill => prince.get_uphill_accel_penalty(),
             _ => 1.0,
         };
 
@@ -581,7 +581,7 @@ impl Katamari {
         // the katamari's speed cap is greatly increased when moving downhill on floors
         // with the `SpeedCheckOff` hit attribute. (e.g. the mas5/mas8 hill)
         let uncap_speed = self.hit_flags.speed_check_off
-            && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill;
+            && self.physics_flags.incline_move_type == KatInclineMoveType::Downhill;
 
         if !is_shoot_brake {
             if !uncap_speed && next_speed > max_speed && next_speed > init_vel_accel_len {
@@ -834,7 +834,7 @@ impl Katamari {
         }
 
         if self.hit_flags.speed_check_off
-            && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill
+            && self.physics_flags.incline_move_type == KatInclineMoveType::Downhill
         {
             vec3_inplace_scale(
                 &mut self.velocity.accel_ground_friction,
@@ -858,7 +858,7 @@ impl Katamari {
         }
 
         if self.hit_flags.speed_check_off
-            && self.physics_flags.incline_move_type == KatInclineMoveType::MoveDownhill
+            && self.physics_flags.incline_move_type == KatInclineMoveType::Downhill
         {
             // while the `speedcheckoff` flag is on, the katamari constantly accelerates.
             // this block caps max speed to a multiple of its usual value (by default, 3x).
