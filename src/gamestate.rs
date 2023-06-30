@@ -347,12 +347,11 @@ impl GameState {
 
         self.global.ticks += 1;
 
-        // `update_game()`
-        // TODO: `update_game:23-89` (if store flag is on, which seems to be irrelevant)
+        // TODO_STOREFLAG: `update_game:23-89` (if store flag is on)
         self.global.updating_player = 0;
         self.props.update(&self.players[0], &self.mission_state);
         // TODO: `update_game:93-101` (but put this in `props_update`)
-        // TODO: `tutorial_update_flags`
+        // TODO_TUTORIAL: `tutorial_update_flags`
 
         // update the first player
         self.update_prince_and_kat(0);
@@ -380,12 +379,12 @@ impl GameState {
             // TODO: update prop fadeout alpha crap
         } else {
             self.global.updating_player = 1;
-            // TODO: self.cameras[1].update()`
+            self.players[1].update_camera(&self.mission_state);
         }
 
         self.global.updating_player = 0;
         if self.get_player(0).camera.preclear.get_enabled() {
-            // TODO: `update_game:142-173` (update preclear mode camera)
+            // TODO_PRECLEAR: `update_game:142-173` (update preclear mode camera)
         }
 
         self.players[0].update_camera(&self.mission_state);

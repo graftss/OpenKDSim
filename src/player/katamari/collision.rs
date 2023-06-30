@@ -16,7 +16,7 @@ use crate::{
     mission::{state::MissionState, GameMode, GameType, Mission},
     player::{camera::Camera, prince::Prince},
     props::{
-        config::NAME_PROP_CONFIGS,
+        config::{NamePropConfig, NAME_PROP_CONFIGS},
         prop::{Prop, PropGlobalState, PropRef, WeakPropRef},
         PropsState,
     },
@@ -123,7 +123,7 @@ impl Katamari {
 
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
-        self.find_nearby_props(props);
+        self.find_nearby_props(props, prince);
 
         if mission_state.gamemode == GameMode::Ending {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
@@ -203,7 +203,7 @@ impl Katamari {
     /// less than the sum of (1) the radii of the bounding spheres of the katamari and the prop,
     /// and (2) the distance that the katamari moved over the last frame.
     /// offset: 0x28870
-    fn find_nearby_props(&mut self, props: &mut PropsState) {
+    fn find_nearby_props(&mut self, props: &mut PropsState, prince: &mut Prince) {
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
 
         // TODO_PARAM: make this a global parameter
@@ -278,7 +278,48 @@ impl Katamari {
             let did_collide = false;
             if did_collide {
                 // TODO_PROPS: `kat_find_nearby_props:138-221`
+
+                // TODO_PARAM
+                let MIN_MAX_SPEED_RATIO_FOR_SCREAM = 0.6;
+                let MIN_DIAM_RATIO_FOR_SCREAM = 5.0;
+
+                let fast_enough_for_scream = self.max_speed_ratio >= MIN_MAX_SPEED_RATIO_FOR_SCREAM;
+                let big_enough_for_scream =
+                    prop.get_exact_attach_diam_cm() / self.diam_cm <= MIN_DIAM_RATIO_FOR_SCREAM;
+                let scream_off_cooldown = prop.get_scream_cooldown_timer() == 0;
+
+                if fast_enough_for_scream && big_enough_for_scream && scream_off_cooldown {
+                    let _sfx_idx = NamePropConfig::get(prop.get_name_idx()).scream_sfx_idx;
+                    // TODO_FX: play scream sfx
+                }
+
+                prop.reset_scream_cooldown_timer();
             }
+
+            self.contact_prop = Some(prop_ref.clone());
+            prop.set_kat_collision_vel(&kat_move);
+            // TODO: `player_resolve_uncollectible_prop_collision()`
+
+            // TODO_WOBBLE: `kat_find_nearby_props:169-178`
+
+            if prop.get_flags2() & 0x10 == 0 {
+                continue;
+            }
+
+            let prop_to_player = vec3_from!(-, self.center, prop.pos);
+            let prop_to_player_lateral_unit = vec3_unit_xz!(prop_to_player);
+
+            // TODO_PARAM
+            let KAT_SPEED_AFTER_PROP_HIT_MULT = 0.1;
+            self.speed = prop.get_radius() * KAT_SPEED_AFTER_PROP_HIT_MULT;
+            vec3::scale(
+                &mut self.velocity.vel_accel,
+                &prop_to_player_lateral_unit,
+                self.speed,
+            );
+
+            // TODO_VS: this call doesn't happen in vs mode
+            prince.end_spin_and_boost(self);
         }
     }
 

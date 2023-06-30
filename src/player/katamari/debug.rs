@@ -1,7 +1,7 @@
 use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
-    constants::{VEC3_X_POS},
+    constants::VEC3_X_POS,
     macros::{debug_log, vec3_from},
     math::acos_f32,
 };

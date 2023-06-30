@@ -913,12 +913,20 @@ impl Prop {
         self.attach_diam_mm
     }
 
+    pub fn get_exact_attach_diam_cm(&self) -> f32 {
+        self.exact_attach_diam_cm
+    }
+
     pub fn get_attach_vol_m3(&self) -> f32 {
         self.attach_vol_m3
     }
 
     pub fn get_flags(&self) -> u8 {
         self.flags
+    }
+
+    pub fn get_flags2(&self) -> u8 {
+        self.flags2
     }
 
     /// Turn off the lowest bit of `flags2`, which corresponds to following this prop's parent.
@@ -980,6 +988,21 @@ impl Prop {
 
     pub fn get_mono_data(&self) -> Option<&Rc<PropMonoData>> {
         self.mono_data.as_ref()
+    }
+
+    pub fn get_scream_cooldown_timer(&self) -> u8 {
+        self.scream_cooldown_timer
+    }
+
+    pub fn reset_scream_cooldown_timer(&mut self) {
+        // TODO_PARAM
+        let SCREAM_COOLDOWN_TICKS = 0xf;
+
+        self.scream_cooldown_timer = SCREAM_COOLDOWN_TICKS;
+    }
+
+    pub fn set_kat_collision_vel(&mut self, kat_collision_vel: &Vec3) {
+        self.kat_collision_vel = *kat_collision_vel;
     }
 
     pub fn decay_init_attached_transform(&mut self, decay: f32) {
