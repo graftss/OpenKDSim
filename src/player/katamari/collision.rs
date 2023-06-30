@@ -138,7 +138,9 @@ impl Katamari {
 
             mark_address!("0x13042");
             self.resolve_being_stuck();
+            mark_address!("0x1304a");
             self.update_vault_and_climb(prince, camera, global);
+            mark_address!("0x13052");
 
             if self.physics_flags.airborne && self.raycast_state.closest_hit_idx.is_some() {
                 let mut top = [0.0, self.radius_cm + self.radius_cm, 0.0];
@@ -214,7 +216,7 @@ impl Katamari {
         vec3_inplace_normalize(&mut lateral_move_unit);
 
         self.nearby_collectible_props.clear();
-        self.collected_props.clear();
+        self.new_collected_props.clear();
 
         self.contact_prop = None;
 
@@ -308,8 +310,8 @@ impl Katamari {
                     if can_prop_be_airborne && !is_prop_squashed {
                         // TODO_AIRBORNE: `kat_init_prop_launch()`
                     } else {
-                        self.collected_props.push(prop_ref.clone());
-                        if self.collected_props.len() >= MAX_COLLECTED_PROPS_PER_FRAME {
+                        self.new_collected_props.push(prop_ref.clone());
+                        if self.new_collected_props.len() >= MAX_COLLECTED_PROPS_PER_FRAME {
                             return;
                         }
                         if let Some(delegates) = &self.delegates {
@@ -368,7 +370,7 @@ impl Katamari {
 
     /// offset: 0x280c0
     fn process_collected_props(&mut self, mission_state: &MissionState, global: &mut GlobalState) {
-        if !self.collected_props.is_empty() {
+        if !self.new_collected_props.is_empty() {
             // if at least one prop was collected:
             if let Some(delegates) = &self.delegates {
                 if let Some(_vibration) = delegates.borrow().vibration {
@@ -380,7 +382,7 @@ impl Katamari {
             // TODO_FX: `kat_process_collected_props:41-67` (play the object collected sfx)
         }
 
-        let mut collected_props = self.collected_props.clone();
+        let mut collected_props = self.new_collected_props.clone();
 
         for (collection_idx, prop_ref) in collected_props.iter_mut().enumerate().rev() {
             // TODO_LOW: early exit from this loop if we reached the gametype c goal
@@ -1329,7 +1331,10 @@ impl Katamari {
                     &self.contact_floor_normal_unit,
                 );
 
+                mark_address!("0x14e8f");
                 let try_init_vault_result = self.try_init_vault();
+                mark_address!("0x14e97");
+
                 match try_init_vault_result {
                     // case 1: the katamari isn't vaulting
                     TryInitVaultResult::NoVault => return self.set_bottom_ray_contact(),
@@ -1998,8 +2003,9 @@ impl Katamari {
         // transform the angle between the rejections:
         //   [0, PI/2] -> [1, 0]
         //   [PI/2, PI] -> 0
-        let rej_similarity = vec3::dot(&vel_rej_floor, &ray_rej_floor);
-        let rej_angle = acos_f32(rej_similarity);
+
+        let rej_similarity = vec3::dot(&vel_rej_floor, &ray_rej_floor); // [-1, 1]
+        let rej_angle = acos_f32(rej_similarity); // [PI, 0]
         self.vault_rej_angle_t = inv_lerp_clamp!(rej_angle, 0.0, FRAC_PI_2);
 
         // (??) set the initial vault speed
@@ -2008,7 +2014,7 @@ impl Katamari {
                 inv_lerp_clamp!(self.speed, self.max_forwards_speed, self.max_boost_speed);
             let ray_len_t = inv_lerp_clamp!(self.fc_ray_len, self.radius_cm, self.max_ray_len);
             let ray_len_k = lerp!(ray_len_t, 1.0, self.params.vault_tuning_0x7b208);
-            let speed_k = lerp!(speed_t, ray_len_k, 1.0);
+            let k = lerp!(speed_t, ray_len_k, 1.0);
 
             // TODO: if this is buggy, this part is probably why
             let mut vel_reflect_floor = [0.0; 3];
@@ -2016,7 +2022,8 @@ impl Katamari {
             vec3_inplace_scale(&mut vel_reflect_floor, -1.0);
 
             let mut vel_accel = [0.0; 3];
-            vec3::lerp(&mut vel_accel, &vel_rej_floor, &vel_reflect_floor, speed_k);
+            vec3::lerp(&mut vel_accel, &vel_rej_floor, &vel_reflect_floor, k);
+            vec3_inplace_normalize(&mut vel_accel);
 
             vec3::scale(&mut self.velocity.vel_accel, &vel_accel, self.speed);
         }

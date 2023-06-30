@@ -1,6 +1,10 @@
-use gl_matrix::common::Vec3;
+use gl_matrix::{common::Vec3, vec3};
 
-use crate::macros::{debug_log, temp_debug_log, vec3_from};
+use crate::{
+    constants::{VEC3_X_POS},
+    macros::{debug_log, vec3_from},
+    math::acos_f32,
+};
 
 use super::Katamari;
 
@@ -116,12 +120,12 @@ impl Katamari {
         }
     }
 
-    pub fn debug_log_climb_state(&self) {
-        temp_debug_log!(
-            "    climb: speed={}, ticks={}",
-            self.climb_speed,
-            self.climb_ticks
-        );
-        temp_debug_log!("           pos={:?}", self.center);
+    pub fn debug_velocity_state(&self) -> String {
+        let vel_accel_len = vec3::length(&self.velocity.vel_accel);
+        let angle = acos_f32(vec3::dot(&VEC3_X_POS, &self.velocity.vel_accel));
+        format!(
+            "vel_accel_len:{:?}, bottom_ray={:?}, angle={}, speed={}",
+            vel_accel_len, self.physics_flags.grounded_ray_type, angle, self.speed
+        )
     }
 }

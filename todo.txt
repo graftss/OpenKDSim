@@ -17,3 +17,5 @@ random things that shouldn't be forgotten:
 - rename `ticks` -> `frames` everywhere
 - refactor `ray_idx` into an enum: { CollisionRay(i16), ShellRay(i16) }
 - `physics_flags.groudned_ray_type` shouldn't be an option, the defult should just be Bottom
+- remove `scale_translation` and `set_translation`, replace with `modify_translation`
+  - also rename `modify_translation` -> `assign_translation`

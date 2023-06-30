@@ -148,10 +148,11 @@ pub struct Katamari {
     /// offset: 0xd34c50
     nearby_collectible_props: Vec<PropRef>,
 
-    /// The list of props which will be collected, computed by `Katamari::process_nearby_collectible_props`.
+    /// The list of props which will be collected on this frame.
+    /// Computed by `Katamari::process_nearby_collectible_props`.
     /// Cleared and recomputed each frame.
     /// offset: 0xd35050
-    collected_props: Vec<PropRef>,
+    new_collected_props: Vec<PropRef>,
 
     attached_props: Vec<PropRef>,
 
@@ -1079,6 +1080,9 @@ impl Katamari {
         mark_address!("0x1df3a");
 
         self.update_friction_accel(prince, mission_state);
+
+        mark_address!("0x1df68");
+
         self.apply_acceleration(mission_state);
 
         mark_address!("0x1df7f");
@@ -1239,6 +1243,8 @@ impl Katamari {
                 let mut mesh_ray =
                     KAT_MESHES[self.mesh_index as usize].points[mesh_ray_idx].clone();
 
+                // TODO_DOC: where is that -50 even coming from
+                // TODO_PARAM
                 let x = self.fc_ray_len / -50.0;
                 vec3_inplace_scale(&mut mesh_ray, x);
 

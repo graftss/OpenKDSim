@@ -210,8 +210,24 @@ macro_rules! set_y {
     };
 }
 
+#[allow(unused_macros)]
+macro_rules! internal_mark_address {
+    ($value: expr) => {
+        crate::util::debug_log(&format!("    {:?}", $value));
+    };
+
+    ($($value: expr),+) => {
+        internal_mark_address!(+)
+    };
+}
+
 macro_rules! mark_address {
     ($addr: literal) => {};
+
+    ($addr: literal, $($y: expr),+) => {
+        crate::util::debug_log(&format!("  {}", $addr));
+        crate::macros::internal_mark_address!($($y),+);
+    };
 }
 
 macro_rules! mark_call {
@@ -225,6 +241,7 @@ macro_rules! mark_call {
 #[allow(unused_imports)]
 pub(crate) use {
     debug_log,
+    internal_mark_address,
     inv_lerp,
     inv_lerp_clamp,
     lerp,
