@@ -365,6 +365,8 @@ pub struct Katamari {
     pitch_rotation_mat: Mat4,
 
     /// The rotation component of the transform (with translation zeroed out)
+    /// NOTE that `rotation_mat` incorporation the extra katamari rotation caused by
+    /// spinning, while `transform` does not.
     /// offset: 0x5a0
     rotation_mat: Mat4,
 

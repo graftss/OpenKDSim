@@ -4,7 +4,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     constants::VEC3_ZERO,
-    macros::{inv_lerp_clamp, lerp, mark_address, vec3_from},
+    macros::{inv_lerp_clamp, lerp, mark_address, modify_translation, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
     props::{
@@ -154,17 +154,30 @@ impl Katamari {
         mark_address!("0x1af26");
         self.reset_collision_rays();
 
+        self.clear_prop_rays();
+
         mark_address!("0x1af2e");
         self.update_rays_with_attached_props();
-
         mark_address!("0x1af5b");
 
         if self.physics_flags.wheel_spin {
-            // if spinning, set the length of each ray to the katamari's radius
+            // if spinning, clear prop rays and a non-bottom-ray surface contact
+            self.clear_prop_rays();
             self.set_bottom_ray_contact();
         }
 
         self.update_mesh_ray_length();
+    }
+
+    fn clear_prop_rays(&mut self) {
+        for (ray_idx, ray) in self.collision_rays.iter_mut().enumerate() {
+            if ray_idx == 0 {
+                continue;
+            }
+
+            ray.ray_len = self.radius_cm;
+            ray.prop = None;
+        }
     }
 
     /// Adjust the length of collision rays
@@ -249,6 +262,11 @@ impl Katamari {
         // TODO_ENDING: `kat_update_rays_with_attached_props:137-143` (actually compute this based on game state)
         let prop_rays_enabled = true;
 
+        // note that `kat_transform` isn't just `self.transform`, since it incorporates rotation
+        // caused by spinning, which `self.transform` does not do.
+        let mut kat_transform = self.rotation_mat.clone();
+        modify_translation!(kat_transform, =, self.center);
+
         if prop_rays_enabled {
             let mut remaining_prop_effects = MAX_PROP_EFFECTS;
 
@@ -265,7 +283,7 @@ impl Katamari {
                     continue;
                 }
 
-                prop.update_transform_when_attached(&self.transform);
+                prop.update_transform_when_attached(&kat_transform);
 
                 // early return if the maximum number of prop effects on the
                 // katamari's mesh have already been made
@@ -391,12 +409,13 @@ impl Katamari {
                 ray.ray_len = prop_vault_point.length;
             }
         } else {
+            // if prop rays are disabled, just orient prop positions using the katamari's transform
             for prop_ref in self.attached_props.iter_mut() {
                 let mut prop = prop_ref.borrow_mut();
                 if prop.is_disabled() {
                     continue;
                 }
-                prop.update_transform_when_attached(&self.transform);
+                prop.update_transform_when_attached(&kat_transform);
             }
         }
     }
