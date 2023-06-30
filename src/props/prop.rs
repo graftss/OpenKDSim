@@ -23,9 +23,6 @@ use crate::{
     util::scale_sim_transform,
 };
 
-const FLAG_HAS_PARENT: u8 = 0x2;
-const FLAG_INTANGIBLE_CHILD: u8 = 0x4;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropGlobalState {
     /// Normal unattached state.
@@ -204,6 +201,56 @@ enum UnattachedTransformState {
     MovingChildStalled,
 }
 
+bitflags::bitflags! {
+    /// Definition of the 0x6 offset field of `Prop`, which is a 1-byte bitfield.
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+    pub struct PropFlags1: u8 {
+        /// True when the prop has a parent.
+        const HasParent = 0x2;
+
+        /// (??)
+        const IntangibleChild = 0x4;
+
+        /// (??) related to umbrellas, toy dispensers, and other props?
+        /// maybe encodes that something happens when the katamari bonks it?
+        const Unknown_0x8 = 0x8;
+
+        /// (??) probably related to intangible airborne props
+        const AirborneFlag_0x10 = 0x10;
+
+        /// (??) probably related to intangible airborne props
+        const AirborneFlag_0x20 = 0x20;
+
+        /// (??) True when the prop (1) has the "hop" motion action and (2) is mid-hop in the air.
+        const Hop = 0x40;
+
+        /// (??) probably related to intangible airborne props
+        const AirborneFlag_0x80 = 0x80;
+    }
+}
+
+bitflags::bitflags! {
+    /// Definition of the 0x8 offset field of `Prop`, which is a 1-byte bitfield.
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+    pub struct PropFlags2: u8 {
+        /// True if the prop is following its parent prop.
+        const FollowParent = 0x1;
+
+        // True if the prop is wobbling after being hit by the katamari
+        const Wobble = 0x2;
+
+        /// True if the prop is fleeing from the katamari.
+        const Flee = 0x8;
+
+        /// (??) True if the prop has the "spinning fight" behavior seen in e.g.
+        /// "Judo Contest" and "Sumo Bout" objects.
+        const SpinningFight = 0x10;
+
+        /// (??) Seems like something to do with parent/child links.
+        const Unknown0x80 = 0x80;
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Prop {
     /// The unique id of this prop.
@@ -214,16 +261,16 @@ pub struct Prop {
     /// offset: 0x2
     name_idx: u16,
 
-    /// (??) some flags
+    /// A set of flags encoding special prop behaviors.
     /// offset: 0x6
-    flags: u8,
+    flags: PropFlags1,
 
     /// offset: 0x7
     pub global_state: PropGlobalState,
 
-    /// (??) some more flags
+    /// A second set of flags encoding special prop behaviors.
     /// offset: 0x8
-    flags2: u8,
+    flags2: PropFlags2,
 
     /// If true, the prop won't update.
     /// offset: 0x9
@@ -659,9 +706,9 @@ impl Prop {
         let mut result = Prop {
             ctrl_idx,
             name_idx,
-            flags: 0,
+            flags: PropFlags1::default(),
             global_state: PropGlobalState::Unattached,
-            flags2: 0,
+            flags2: PropFlags2::default(),
             disabled: false,
             display_on: false,
             alpha: 1.0,
@@ -921,17 +968,20 @@ impl Prop {
         self.attach_vol_m3
     }
 
-    pub fn get_flags(&self) -> u8 {
-        self.flags
+    pub fn get_flags(&self) -> &PropFlags1 {
+        &self.flags
     }
 
-    pub fn get_flags2(&self) -> u8 {
-        self.flags2
+    pub fn get_flags_mut(&mut self) -> &mut PropFlags1 {
+        &mut self.flags
     }
 
-    /// Turn off the lowest bit of `flags2`, which corresponds to following this prop's parent.
-    pub fn stop_following_parent(&mut self) {
-        self.flags2 &= 0xf7;
+    pub fn get_flags2(&self) -> &PropFlags2 {
+        &self.flags2
+    }
+
+    pub fn get_flags2_mut(&mut self) -> &mut PropFlags2 {
+        &mut self.flags2
     }
 
     pub fn get_move_type(&self) -> Option<u16> {
@@ -1053,17 +1103,17 @@ impl Prop {
     }
 
     pub fn set_no_parent(&mut self) {
-        self.flags &= 0xfd;
+        self.flags.remove(PropFlags1::HasParent);
         self.parent = None;
         self.tree_id = None;
     }
 
     pub fn set_parent(&mut self, parent: WeakPropRef, tree_group_id: u16) {
-        self.flags |= FLAG_HAS_PARENT;
+        self.flags.insert(PropFlags1::HasParent);
         self.parent = Some(parent.clone());
 
         if self.link_action == Some(PropLinkAction::IntangibleChild) {
-            self.flags |= FLAG_INTANGIBLE_CHILD;
+            self.flags |= PropFlags1::IntangibleChild;
         }
 
         self.tree_id = Some(tree_group_id);
@@ -1288,8 +1338,8 @@ impl Prop {
     /// Update logic for a prop that's attached to the katamari.
     /// offset: 0x50f30
     fn update_attached(&mut self) {
-        self.flags &= 0xdf;
-        self.flags2 &= 0xfe;
+        self.flags.remove(PropFlags1::AirborneFlag_0x20);
+        self.flags2.remove(PropFlags2::FollowParent);
         self.move_type = None;
         self.has_motion = false;
         self.unattached_state = PropUnattachedState::Normal;
@@ -1318,7 +1368,7 @@ impl Prop {
     /// offset: 0x2e030
     fn update_child_link(&mut self) {
         if self.parent.is_none() {
-            self.flags &= 0xfd;
+            self.flags.remove(PropFlags1::HasParent);
             return;
         }
 

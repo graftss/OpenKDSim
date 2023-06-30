@@ -17,7 +17,7 @@ use crate::{
     player::{camera::Camera, prince::Prince},
     props::{
         config::{NamePropConfig, NAME_PROP_CONFIGS},
-        prop::{Prop, PropGlobalState, PropRef, WeakPropRef},
+        prop::{Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, WeakPropRef},
         PropsState,
     },
 };
@@ -274,11 +274,8 @@ impl Katamari {
             // otherwise, the prop is nearby, but uncollectible.
             prop.near_player = true;
 
-            // TODO_PROPS: `kat_check_prop_mesh_collision()` instead of `false` below
-            let did_collide = false;
+            let did_collide = self.check_prop_mesh_collision(&mut prop);
             if did_collide {
-                // TODO_PROPS: `kat_find_nearby_props:138-221`
-
                 // TODO_PARAM
                 let MIN_MAX_SPEED_RATIO_FOR_SCREAM = 0.6;
                 let MIN_DIAM_RATIO_FOR_SCREAM = 5.0;
@@ -302,7 +299,9 @@ impl Katamari {
 
             // TODO_WOBBLE: `kat_find_nearby_props:169-178`
 
-            if prop.get_flags2() & 0x10 == 0 {
+            // the remainder of the function handles collisions with spinning fight props
+            // (e.g. sumo bout, judo contest)
+            if !prop.get_flags2().contains(PropFlags2::SpinningFight) {
                 continue;
             }
 
@@ -310,8 +309,8 @@ impl Katamari {
             let prop_to_player_lateral_unit = vec3_unit_xz!(prop_to_player);
 
             // TODO_PARAM
-            let KAT_SPEED_AFTER_PROP_HIT_MULT = 0.1;
-            self.speed = prop.get_radius() * KAT_SPEED_AFTER_PROP_HIT_MULT;
+            let SPINNING_FIGHT_HIT_SPEED_MULT = 0.1;
+            self.speed = prop.get_radius() * SPINNING_FIGHT_HIT_SPEED_MULT;
             vec3::scale(
                 &mut self.velocity.vel_accel,
                 &prop_to_player_lateral_unit,
@@ -321,6 +320,10 @@ impl Katamari {
             // TODO_VS: this call doesn't happen in vs mode
             prince.end_spin_and_boost(self);
         }
+    }
+
+    fn check_prop_mesh_collision(&mut self, _prop: &mut Prop) -> bool {
+        false
     }
 
     /// offset: 0x28640
@@ -337,7 +340,8 @@ impl Katamari {
                 let prop = prop_ref.borrow_mut();
                 let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
 
-                let link_cond = prop.parent.is_none() || prop.get_flags() & 4 == 0;
+                let link_cond = prop.parent.is_none()
+                    || !prop.get_flags().contains(PropFlags1::IntangibleChild);
                 let is_dummy = prop_config.is_dummy_hit;
                 let did_collide = self.intersects_prop_bbox(&prop, mission_state);
                 if link_cond && !is_dummy && did_collide {
@@ -438,8 +442,8 @@ impl Katamari {
             prop.add_katamari_contact(self.player);
 
             self.attach_prop(prop_ref, &mut prop, mission_state, global);
-            // TODO: `attach_prop_with_children(prop)`
-            prop.stop_following_parent();
+            // TODO_LINK: `attach_prop_with_children(prop)`
+            prop.get_flags2_mut().remove(PropFlags2::Flee);
             // TODO_FX: `kat_process_collected_props:96-104` (play scream sound)
 
             // TODO: check that this (meaning `collection_idx == 0`) actually hits the last iteration
