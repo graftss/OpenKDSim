@@ -6,7 +6,7 @@ use crate::{
     global::GlobalState,
     macros::{
         inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, panic_log,
-        set_translation, set_y, temp_debug_log, vec3_from, vec3_unit_xz,
+        set_translation, set_y, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -1045,8 +1045,17 @@ impl Katamari {
             // if the primary floor contact point is from a non-bottom, non-vault ray:
             self.fc_ray_idx = min_ratio_ray_idx;
             self.fc_ray = min_ratio_ray;
-            temp_debug_log!("  hello: {:?}", min_ratio_ray_idx);
-            self.fc_ray_len = self.collision_rays[min_ratio_ray_idx.unwrap() as usize].ray_len;
+
+            // see the above assignment to `self.fc_ray_len`; the same rationale applies here
+            self.fc_ray_len = match min_ratio_ray_idx {
+                None => self.climb_radius_cm,
+                // this is a bug in the original sim where it reads back into the katamari struct at garbage:
+                // if `ray_idx == -2` -> `self.water_hit_point[3]`
+                // if `ray_idx == -3` -> `self.last_num_floor_contacts` and `self.last_num_wall_contacts`,
+                //                       both 2-byte ints, concatenated and coerced into a float
+                Some(ray_idx) if ray_idx < 0 => 0.0,
+                Some(ray_idx) => self.collision_rays[ray_idx as usize].ray_len,
+            };
 
             let mut contact_pt = vec3::create();
             vec3::scale_and_add(
