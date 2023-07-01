@@ -7,10 +7,7 @@ use crate::{
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
-    props::{
-        prop::{AddPropArgs, Prop},
-        PropsState,
-    },
+    props::{prop::AddPropArgs, PropsState},
 };
 
 #[derive(Debug, Default)]
@@ -226,25 +223,30 @@ impl GameState {
     }
 
     /// Mimicks the `MonoInitAddPropSetParent` API function.
-    pub fn add_prop_set_parent(&mut self, ctrl_idx: i32, parent_ctrl_idx: i32) {
+    pub fn add_prop_set_parent(&mut self, child_ctrl_idx: i32, parent_ctrl_idx: i32) {
         // the child prop must exist
-        let child_rc = self.props.get_prop(ctrl_idx as usize).unwrap_or_else(|| {
-            panic_log!("called `add_prop_set_parent` on a nonexistent prop: {ctrl_idx}");
-        });
+        let child_rc = self
+            .props
+            .get_prop(child_ctrl_idx as usize)
+            .unwrap_or_else(|| {
+                panic_log!("called `add_prop_set_parent` on a nonexistent prop: {child_ctrl_idx}");
+            });
 
         if let Some(parent_rc) = self.props.get_prop(parent_ctrl_idx as usize) {
             // adding a parent prop to the child
-            let weak_parent_ref = Rc::<RefCell<Prop>>::downgrade(&parent_rc);
-
             let area = self.mission_state.area as u32;
             let tree_id: u32 = 1000 * area + (self.global.num_root_props as u32);
 
             // declare that the child has a parent
-            child_rc
+            child_rc.clone().borrow_mut().set_parent(
+                &self.props,
+                parent_ctrl_idx as u16,
+                tree_id as u16,
+            );
+            parent_rc
                 .clone()
                 .borrow_mut()
-                .set_parent(weak_parent_ref, tree_id.try_into().unwrap());
-            parent_rc.clone().borrow_mut().add_child(child_rc.clone());
+                .add_child(&self.props, child_ctrl_idx as u16);
         } else {
             // declaring that the child prop has no parent
             child_rc.clone().borrow_mut().set_no_parent();

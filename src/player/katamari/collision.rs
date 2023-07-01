@@ -1,5 +1,3 @@
-use std::{rc::Rc};
-
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
@@ -19,10 +17,7 @@ use crate::{
     player::{camera::Camera, prince::Prince},
     props::{
         config::{NamePropConfig, NAME_PROP_CONFIGS},
-        prop::{
-            Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, PropUnattachedState,
-            WeakPropRef,
-        },
+        prop::{Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, PropUnattachedState},
         PropsState,
     },
 };
@@ -193,7 +188,7 @@ impl Katamari {
         }
 
         self.process_nearby_collectible_props(mission_state);
-        self.process_collected_props(mission_state, global);
+        self.process_collected_props(props, mission_state, global);
         // TODO: `kat_update_world_size_threshold??()`
 
         if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
@@ -235,7 +230,8 @@ impl Katamari {
             return;
         }
 
-        for prop_ref in props.props.iter_mut() {
+        let mut cloned_prop_list = props.props.clone();
+        for prop_ref in cloned_prop_list.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
 
             // return early from the collision check if the prop is still intangible.
@@ -310,30 +306,28 @@ impl Katamari {
 
             self.contact_prop = Some(prop_ref.clone());
             prop.set_kat_collision_vel(&kat_move);
-            // TODO: `player_resolve_uncollectible_prop_collision()`
+            self.resolve_uncollectible_prop_collision(props, prop_ref.clone(), &mut prop);
 
             // TODO_WOBBLE: `kat_find_nearby_props:169-178`
 
             // the remainder of the function handles collisions with spinning fight props
             // (e.g. sumo bout, judo contest)
-            if !prop.get_flags2().contains(PropFlags2::SpinningFight) {
-                continue;
+            if prop.get_flags2().contains(PropFlags2::SpinningFight) {
+                let prop_to_player = vec3_from!(-, self.center, prop.pos);
+                let prop_to_player_lateral_unit = vec3_unit_xz!(prop_to_player);
+
+                // TODO_PARAM
+                let SPINNING_FIGHT_HIT_SPEED_MULT = 0.1;
+                self.speed = prop.get_radius() * SPINNING_FIGHT_HIT_SPEED_MULT;
+                vec3::scale(
+                    &mut self.velocity.vel_accel,
+                    &prop_to_player_lateral_unit,
+                    self.speed,
+                );
+
+                // TODO_VS: this call doesn't happen in vs mode
+                prince.end_spin_and_boost(self);
             }
-
-            let prop_to_player = vec3_from!(-, self.center, prop.pos);
-            let prop_to_player_lateral_unit = vec3_unit_xz!(prop_to_player);
-
-            // TODO_PARAM
-            let SPINNING_FIGHT_HIT_SPEED_MULT = 0.1;
-            self.speed = prop.get_radius() * SPINNING_FIGHT_HIT_SPEED_MULT;
-            vec3::scale(
-                &mut self.velocity.vel_accel,
-                &prop_to_player_lateral_unit,
-                self.speed,
-            );
-
-            // TODO_VS: this call doesn't happen in vs mode
-            prince.end_spin_and_boost(self);
         }
     }
 
@@ -454,9 +448,8 @@ impl Katamari {
                     vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_ray);
                     vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_ray);
 
-                    let weak_prop_ref = Rc::downgrade(&prop_ref);
                     let record_result =
-                        self.record_surface_contact(shell_ray_idx, Some(weak_prop_ref));
+                        self.record_surface_contact(shell_ray_idx, Some(prop_ref.clone()));
 
                     if record_result != RecordSurfaceContactResult::ShellTop {
                         self.physics_flags.moved_fast_shell_hit = true;
@@ -544,8 +537,7 @@ impl Katamari {
                     .hit_shell_ray
                     .map(|sr| sr as i16)
                     .unwrap_or(0);
-                let weak_prop_ref = Rc::downgrade(&prop_ref);
-                let record_result = self.record_surface_contact(ray_idx, Some(weak_prop_ref));
+                let record_result = self.record_surface_contact(ray_idx, Some(prop_ref.clone()));
 
                 if record_result != RecordSurfaceContactResult::ShellTop {
                     self.play_bonk_fx(prop.get_move_type().is_some());
@@ -586,8 +578,7 @@ impl Katamari {
             };
 
             if should_contact {
-                let weak_prop_ref = Rc::downgrade(&prop_ref);
-                self.record_surface_contact(0, Some(weak_prop_ref));
+                self.record_surface_contact(0, Some(prop_ref.clone()));
             } else {
                 // TODO_DOC: if the katamari isn't going to contact the prop, then it
                 // should bounce off of the prop instead
@@ -620,6 +611,15 @@ impl Katamari {
         }
 
         found_any_hit
+    }
+
+    fn resolve_uncollectible_prop_collision(
+        &mut self,
+        _props: &mut PropsState,
+        _prop_ref: PropRef,
+        _prop: &mut Prop,
+    ) {
+        // TODO
     }
 
     /// offset: 0x28640
@@ -710,7 +710,12 @@ impl Katamari {
     }
 
     /// offset: 0x280c0
-    fn process_collected_props(&mut self, mission_state: &MissionState, global: &mut GlobalState) {
+    fn process_collected_props(
+        &mut self,
+        props: &PropsState,
+        mission_state: &MissionState,
+        global: &mut GlobalState,
+    ) {
         if !self.new_collected_props.is_empty() {
             // if at least one prop was collected:
             if let Some(delegates) = &self.delegates {
@@ -737,7 +742,7 @@ impl Katamari {
             // TODO_LOW: prop.game_time_when_collected = game_time_ms (move to `prop.attach_to_kat` or whatever)
             prop.set_katamari_contact(self.player);
 
-            self.attach_prop(prop_ref, &mut prop, mission_state, global);
+            self.attach_prop(props, prop_ref, &mut prop, mission_state, global);
             // TODO_LINK: `attach_prop_with_children(prop)`
             prop.get_flags2_mut().remove(PropFlags2::Flee);
             // TODO_FX: `kat_process_collected_props:96-104` (play scream sound)
@@ -757,6 +762,7 @@ impl Katamari {
     /// offset: 0x28ef0
     fn attach_prop(
         &mut self,
+        props: &PropsState,
         prop_ref: &PropRef,
         prop: &mut Prop,
         mission_state: &MissionState,
@@ -782,11 +788,11 @@ impl Katamari {
         if mission_state.mission_config.game_type == GameType::NumThemeProps {
             // increment gemini score if the attached prop's twin is already attached
             if mission_state.mission == Mission::Gemini {
-                if let Some(twin_weakref) = prop.get_twin() {
-                    let twin_ref = twin_weakref.upgrade().unwrap();
-                    let twin = twin_ref.borrow();
-                    if twin.is_attached() {
-                        global.catch_count_b += 1;
+                if let Some(twin_ctrl_idx) = prop.get_twin() {
+                    if let Some(twin_ref) = props.get_prop(twin_ctrl_idx as usize) {
+                        if twin_ref.borrow().is_attached() {
+                            global.catch_count_b += 1;
+                        }
                     }
                 }
             } else {
@@ -1087,7 +1093,7 @@ impl Katamari {
     fn record_surface_contact(
         &mut self,
         ray_idx: i16,
-        prop: Option<WeakPropRef>,
+        prop: Option<PropRef>,
     ) -> RecordSurfaceContactResult {
         let hit = self.raycast_state.get_closest_hit().unwrap_or_else(|| {
             panic_log!(
@@ -1164,7 +1170,7 @@ impl Katamari {
         normal_unit: &Vec3,
         clip_normal: &Vec3,
         ray_idx: i16,
-        prop: Option<WeakPropRef>,
+        prop: Option<PropRef>,
     ) {
         let num_contacts = self.get_num_surface_contacts(surface_type);
 

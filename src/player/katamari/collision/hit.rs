@@ -1,6 +1,6 @@
 use gl_matrix::common::Vec3;
 
-use crate::{collision::hit_attribute::HitAttribute, props::prop::WeakPropRef};
+use crate::{collision::hit_attribute::HitAttribute, props::prop::PropRef};
 
 /// Describes a collision between a katamari collision ray and another
 /// surface (which could be on either a prop or the map)
@@ -47,5 +47,5 @@ pub struct SurfaceHit {
     /// If the contact surface belongs to a prop collision mesh, this
     /// is a pointer to that prop.
     /// offset: 0x58
-    pub prop: Option<WeakPropRef>,
+    pub prop: Option<PropRef>,
 }

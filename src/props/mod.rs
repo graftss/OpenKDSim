@@ -39,10 +39,22 @@ impl PropsState {
 }
 
 impl PropsState {
+    /// An immutable iterator over all props.
+    pub fn props_iter(&self) -> impl Iterator<Item = &PropRef> {
+        self.props.iter()
+    }
+
+    /// A mutable iterator over all props.
+    pub fn props_iter_mut(&mut self) -> impl Iterator<Item = &mut PropRef> {
+        self.props.iter_mut()
+    }
+
+    /// Get an immutable reference to the prop with the given `ctrl_idx`.
     pub fn get_prop(&self, ctrl_idx: usize) -> Option<&PropRef> {
         self.props.get(ctrl_idx)
     }
 
+    /// Get a mutable reference to the prop with the given `ctrl_idx`.
     pub fn get_mut_prop(&mut self, ctrl_idx: usize) -> Option<&mut PropRef> {
         self.props.get_mut(ctrl_idx)
     }

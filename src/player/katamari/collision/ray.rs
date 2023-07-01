@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
@@ -7,10 +5,7 @@ use crate::{
     macros::{inv_lerp_clamp, lerp, mark_address, modify_translation, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small},
     player::katamari::Katamari,
-    props::{
-        config::NamePropConfig,
-        prop::{Prop, WeakPropRef},
-    },
+    props::{config::NamePropConfig, prop::PropRef},
 };
 
 use super::mesh::KAT_MESHES;
@@ -79,7 +74,7 @@ pub struct KatCollisionRay {
 
     /// If this ray is induced by a prop, points to that prop
     /// offset: 0x50
-    pub prop: Option<WeakPropRef>,
+    pub prop: Option<PropRef>,
 
     /// Length of the ray.
     /// offset: 0x58
@@ -116,7 +111,7 @@ pub type KatCollisionRays = Vec<KatCollisionRay>;
 struct PropVaultPoint {
     pub ray_unit: Vec3,
     pub length: f32,
-    pub prop: WeakPropRef,
+    pub prop: PropRef,
 }
 
 impl Katamari {
@@ -371,7 +366,7 @@ impl Katamari {
                 let mut kat_to_vault_point = vec3::create();
                 let mut max_vault_point_dist = 0.0;
                 let mut prop_vault_point = PropVaultPoint::default();
-                prop_vault_point.prop = Rc::<RefCell<Prop>>::downgrade(prop_ref);
+                prop_vault_point.prop = prop_ref.clone();
 
                 // iterate over all vault points to find the one furthest from the katamari center
                 for vault_point in vault_points.as_ref().unwrap() {
@@ -547,11 +542,9 @@ impl Katamari {
         // decay vault props
         let prop_ray_iter = self.collision_rays[self.first_prop_ray_index as usize..].iter();
         for ray in prop_ray_iter {
-            if let Some(prop_weakref) = &ray.prop {
-                if let Some(prop_ref) = prop_weakref.upgrade() {
-                    let mut prop = prop_ref.borrow_mut();
-                    prop.decay_init_attached_transform(decay);
-                }
+            if let Some(prop_ref) = &ray.prop {
+                let mut prop = prop_ref.borrow_mut();
+                prop.decay_init_attached_transform(decay);
             }
         }
     }

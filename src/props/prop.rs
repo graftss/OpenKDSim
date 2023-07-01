@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fmt::{Debug, Display},
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use gl_matrix::{
@@ -22,6 +22,8 @@ use crate::{
     props::config::NamePropConfig,
     util::scale_sim_transform,
 };
+
+use super::PropsState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropGlobalState {
@@ -321,12 +323,16 @@ pub struct Prop {
     has_motion: bool,
 
     /// The next sibling of this prop in its family tree.
+    /// NOTE: the original simulation keeps a pointer to the prop, but we only store
+    /// the control index here because it's safer/rustier.
     /// offset: 0x28
-    pub next_sibling: Option<PropRef>,
+    pub next_sibling: Option<u16>,
 
     /// The first child of this prop in its family tree.
+    /// NOTE: the original simulation keeps a pointer to the prop, but we only store
+    /// the control index here because it's safer/rustier.
     /// offset: 0x30
-    pub first_child: Option<PropRef>,
+    pub first_child: Option<u16>,
 
     /// The area in which this prop loaded.
     /// offset: 0x38
@@ -389,8 +395,10 @@ pub struct Prop {
     innate_script: Option<Box<PropScript>>,
 
     /// The prop's parent, if it has one.
+    /// NOTE: the original simulation keeps a pointer to the prop, but we only store
+    /// the control index here because it's safer/rustier.
     /// offset: 0x578
-    pub parent: Option<WeakPropRef>,
+    pub parent: Option<u16>,
 
     /// (??) name taken from unity code
     /// offset: 0x580
@@ -610,8 +618,10 @@ pub struct Prop {
     twin_id: Option<u16>,
 
     /// If this prop has a Gemini twin, points to the twin prop.
+    /// NOTE: the original simulation keeps a pointer to the prop, but we only store
+    /// the control index here because it's safer/rustier.
     /// offset: 0xb18
-    twin_prop: Option<WeakPropRef>,
+    twin_prop: Option<u16>,
 
     /// The transform matrix of this prop when it was loaded.
     /// offset: 0xb24
@@ -627,33 +637,11 @@ pub struct Prop {
 }
 
 pub type PropRef = Rc<RefCell<Prop>>;
-pub type WeakPropRef = Weak<RefCell<Prop>>;
 pub type MeshRef = Rc<RefCell<Mesh>>;
 
 impl Display for Prop {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Prop(ctrl={})", self.ctrl_idx)
-    }
-}
-
-// impl Debug for Prop {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         f.debug_struct("Prop")
-//             .field("ctrl_idx", &self.ctrl_idx)
-//             .finish()
-//     }
-// }
-
-impl Prop {
-    pub fn print_links(&self, label: &str) {
-        println!(
-            "{} (tree={:?}):\n  child: {:?}\n  next_sibling: {:?}\n  parent: {:?}",
-            label,
-            self.tree_id,
-            self.first_child,
-            self.next_sibling,
-            self.parent.as_ref().map(|p| p.upgrade().unwrap())
-        );
     }
 }
 
@@ -1037,8 +1025,8 @@ impl Prop {
         self.has_twin
     }
 
-    pub fn get_twin(&self) -> &Option<WeakPropRef> {
-        &self.twin_prop
+    pub fn get_twin(&self) -> Option<u16> {
+        self.twin_prop
     }
 
     pub fn get_nearest_kat_ray_idx(&mut self) -> Option<u16> {
@@ -1125,9 +1113,9 @@ impl Prop {
         self.tree_id = None;
     }
 
-    pub fn set_parent(&mut self, parent: WeakPropRef, tree_group_id: u16) {
+    pub fn set_parent(&mut self, _props: &PropsState, parent_ctrl_idx: u16, tree_group_id: u16) {
         self.flags.insert(PropFlags1::HasParent);
-        self.parent = Some(parent.clone());
+        self.parent = Some(parent_ctrl_idx);
 
         if self.link_action == Some(PropLinkAction::IntangibleChild) {
             self.flags |= PropFlags1::IntangibleChild;
@@ -1140,22 +1128,32 @@ impl Prop {
         mat4::identity(&mut self.motion_transform);
     }
 
-    /// Add `child` as a child of this prop by add it to the end
-    /// of the sibling list.
-    pub fn add_child(&mut self, child: PropRef) {
-        if let Some(first_child) = &self.first_child {
-            first_child.clone().borrow_mut().add_sibling(child);
-        } else {
-            self.first_child = Some(child);
+    /// Add `child` as a child of this prop by adding it to the end of the
+    /// sibling list.
+    pub fn add_child(&mut self, props: &PropsState, child_ctrl_idx: u16) {
+        if self.first_child.is_none() {
+            self.first_child = Some(child_ctrl_idx);
+        } else if let Some(first_child_idx) = self.first_child {
+            if let Some(first_child_ref) = props.get_prop(first_child_idx as usize) {
+                first_child_ref
+                    .clone()
+                    .borrow_mut()
+                    .add_sibling(props, child_ctrl_idx);
+            }
         }
     }
 
     /// Traverse this prop's sibling list, adding `sibling` to the end.
-    pub fn add_sibling(&mut self, sibling: PropRef) {
-        if let Some(next_sibling) = &self.next_sibling {
-            next_sibling.clone().borrow_mut().add_sibling(sibling);
-        } else {
-            self.next_sibling = Some(sibling);
+    pub fn add_sibling(&mut self, props: &PropsState, sibling_ctrl_idx: u16) {
+        if self.next_sibling.is_none() {
+            self.next_sibling = Some(sibling_ctrl_idx);
+        } else if let Some(next_sibling_idx) = self.next_sibling {
+            if let Some(next_sibling_ref) = props.get_prop(next_sibling_idx as usize) {
+                next_sibling_ref
+                    .clone()
+                    .borrow_mut()
+                    .add_sibling(props, sibling_ctrl_idx);
+            }
         }
     }
 
