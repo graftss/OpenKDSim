@@ -17,6 +17,7 @@ use crate::{
     player::{camera::Camera, prince::Prince},
     props::{
         config::{NamePropConfig, NAME_PROP_CONFIGS},
+        motion::behavior::PropBehavior,
         prop::{Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, PropUnattachedState},
         PropsState,
     },
@@ -306,7 +307,7 @@ impl Katamari {
 
             self.contact_prop = Some(prop_ref.clone());
             prop.set_kat_collision_vel(&kat_move);
-            self.resolve_uncollectible_prop_collision(props, prop_ref.clone(), &mut prop);
+            self.resolve_uncollectible_prop_collision(props, &mut prop);
 
             // TODO_WOBBLE: `kat_find_nearby_props:169-178`
 
@@ -331,6 +332,9 @@ impl Katamari {
         }
     }
 
+    /// Returns `true` if this katamari meets `prop` in a non-collection collision.
+    /// This collision uses the more precise collision mesh of `prop` as opposed to its AABB mesh.
+    /// offset: 0x29480
     fn check_prop_mesh_collision(
         &mut self,
         prop_ref: PropRef,
@@ -613,13 +617,52 @@ impl Katamari {
         found_any_hit
     }
 
-    fn resolve_uncollectible_prop_collision(
-        &mut self,
-        _props: &mut PropsState,
-        _prop_ref: PropRef,
-        _prop: &mut Prop,
-    ) {
-        // TODO
+    /// Resolve a collision between this katamari and an uncollectible prop.
+    /// offset: 0x2af40
+    fn resolve_uncollectible_prop_collision(&mut self, props: &mut PropsState, prop: &mut Prop) {
+        let root_ref = prop.get_root_ref(props);
+        let root_prop = root_ref.borrow();
+
+        // TODO_LINK:
+        // if `root_prop.link_action + ~CHILDREN_INTANGIBLE & 0xfd == 0` { root_prop = prop }
+
+        // Handle collisions with a stationary prop.
+        if root_prop.get_move_type().is_none() {
+            return self.resolve_stationary_prop_collision(prop);
+        }
+
+        // TODO_DOC: what is this doing, something to do with turntables
+        let behavior_cond = root_prop.get_behavior_type() == Some(PropBehavior::Value0x15);
+        let name_idx = prop.get_name_idx();
+        let prop_is_turntable = name_idx == 0x31d // Manhole Cover
+            || name_idx == 0x35b // Round Table
+            || name_idx == 0x55b; // Parking Turntable
+        let prop_barely_moved = vec3::len(&vec3_from!(-, prop.last_pos, prop.pos)) <= 1.0;
+        let weird_cond = behavior_cond || prop_is_turntable || prop_barely_moved;
+        if root_prop.get_stationary() && weird_cond {
+            return;
+        }
+
+        if self.physics_flags.vs_attack {
+            return;
+        }
+
+        if root_prop.get_flags2().contains(PropFlags2::Wobble) {
+            return;
+        }
+
+        // TODO_PROP_BEHAVIOR: `kat_resolve_uncollectible_prop_collision:72-`
+    }
+
+    /// Resolve a collision between this katamari and an uncollectible, stationary prop.
+    /// This implements inelastic collisions exhibited by e.g. toy capsules and baseballs.
+    /// offset: 0x2bd60
+    fn resolve_stationary_prop_collision(&mut self, prop: &mut Prop) {
+        if prop.get_unattached_state() != PropUnattachedState::InelasticRoll {
+            return;
+        }
+
+        // TODO_PROP_BEHAVIOR: `kat_resolve_stationary_prop_collision` (inelastic rolling collision)
     }
 
     /// offset: 0x28640

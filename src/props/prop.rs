@@ -23,7 +23,7 @@ use crate::{
     util::scale_sim_transform,
 };
 
-use super::PropsState;
+use super::{motion::behavior::PropBehavior, PropsState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropGlobalState {
@@ -110,7 +110,10 @@ pub enum PropUnattachedState {
     State1 = 1,
     State2 = 2,
     State3 = 3,
-    State4 = 4,
+
+    /// Active when a spherical object (capable of inelastic collisions while unattached)
+    /// is rolling with force from such an inelastic collision.
+    InelasticRoll = 4,
 
     /// Active after an airborne prop bounces off a floor once.
     AirborneBounced = 5,
@@ -424,7 +427,7 @@ pub struct Prop {
     /// (??) The prop's behavior type, which encodes the primary motion action, the alternate motion
     /// action, and the (???)
     /// offset: 0x585
-    behavior_type: Option<u16>,
+    behavior_type: Option<PropBehavior>,
 
     /// The prop's alternate concrete motion action, which can be triggered by various events
     /// (e.g. katamari gets close, or katamari collects this prop's parent, etc.)
@@ -989,6 +992,10 @@ impl Prop {
         self.move_type
     }
 
+    pub fn get_behavior_type(&self) -> Option<PropBehavior> {
+        self.behavior_type
+    }
+
     pub fn get_stationary(&self) -> bool {
         self.stationary
     }
@@ -1126,6 +1133,19 @@ impl Prop {
         // TODO: line 53: `prop_update_rotation_from_parent(self)`
 
         mat4::identity(&mut self.motion_transform);
+    }
+
+    // Compute the root prop of this prop's tree.
+    pub fn get_root_ref(&self, props: &PropsState) -> PropRef {
+        if let Some(parent_ctrl_idx) = self.parent {
+            props
+                .get_prop(parent_ctrl_idx as usize)
+                .unwrap()
+                .borrow()
+                .get_root_ref(props)
+        } else {
+            props.get_prop(self.ctrl_idx as usize).unwrap().clone()
+        }
     }
 
     /// Add `child` as a child of this prop by adding it to the end of the
