@@ -12,7 +12,7 @@ use gl_matrix::{
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
-    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
+    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
     macros::{
         max_to_none, modify_translation, new_mat4_copy, scale_translation, set_translation,
         vec3_from,
@@ -467,7 +467,7 @@ pub struct Prop {
 
     /// The AABB of this prop encoded as a collision mesh.
     /// offset: 0x5e0
-    pub aabb_mesh: Mesh,
+    pub aabb_mesh: Option<Rc<Mesh>>,
 
     /// The 8 corner points of the prop's AABB.
     /// offset: 0x870
@@ -530,7 +530,7 @@ pub struct Prop {
 
     /// The mesh used for non-collection collisions with this prop.
     /// offset: 0x960
-    // collision_mesh: Mesh,
+    collision_mesh: Option<Rc<Mesh>>,
 
     /// (??) The additional transform applied to the prop while it is attached to the katamari.
     /// offset: 0x968
@@ -692,6 +692,9 @@ impl Prop {
         // lines 108-149 of `prop_init` (init motion)
         // lines 150-162 of `prop_init` (init random group)
         // lines 163-190 of `prop_init` (init twin)
+
+        let collision_mesh = mono_data.collision_mesh.as_ref().map(|m| m.clone());
+
         // lines 348-349 (find first subobject)
         // lines 350-357 (init motion scripts)
         // lines 368-371, 392-401 (init wobble state)
@@ -760,7 +763,7 @@ impl Prop {
             parent: None,
 
             // initialized in `self.init_aabb_and_volume()`
-            aabb_mesh: Mesh::default(),
+            aabb_mesh: None,
             aabb_vertices: vec![],
             aabb_size: [0.0; 3],
             aabb_vol_m3: 0.0,
@@ -790,6 +793,7 @@ impl Prop {
             contact_katamari_idx: None,
             is_attached: false,
             attached_transform: [0.0; 16],
+            collision_mesh,
         };
 
         if let Some(aabbs) = &mono_data.aabbs {
@@ -827,7 +831,7 @@ impl Prop {
         // (but this behavior is in `aabbs.get_root_aabb` in this implementation)
         let root_aabb = aabbs.get_root_aabb();
         self.aabb_vertices = root_aabb.compute_vertices();
-        self.aabb_mesh = root_aabb.compute_mesh(&self.aabb_vertices);
+        self.aabb_mesh = Some(Rc::new(root_aabb.compute_mesh(&self.aabb_vertices)));
         self.aabb_size = root_aabb.size();
         self.radius = root_aabb.compute_radius();
 
@@ -1008,12 +1012,17 @@ impl Prop {
         self.aabb_radius
     }
 
-    pub fn get_aabb_mesh(&self) -> &Mesh {
-        &self.aabb_mesh
+    pub fn get_aabb_mesh(&self) -> Option<Rc<Mesh>> {
+        self.aabb_mesh.as_ref().map(|m| m.clone())
+    }
+
+    pub fn get_collision_mesh(&self) -> Option<Rc<Mesh>> {
+        self.collision_mesh.as_ref().map(|s| s.clone())
     }
 
     pub fn get_aabb_min_point(&self) -> &Vec3 {
-        &self.aabb_mesh.sectors[0].aabb.min
+        // &self.aabb_mesh.sectors[0].aabb.min
+        &VEC3_ZERO
     }
 
     pub fn get_unattached_transform(&self) -> &Mat4 {
@@ -1026,6 +1035,10 @@ impl Prop {
 
     pub fn get_attached_transform(&self) -> &Mat4 {
         &self.attached_transform
+    }
+
+    pub fn has_parent(&self) -> bool {
+        self.parent.is_some()
     }
 
     pub fn get_has_twin(&self) -> bool {

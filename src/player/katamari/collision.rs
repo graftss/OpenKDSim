@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
@@ -284,30 +286,32 @@ impl Katamari {
 
             let did_collide =
                 self.check_prop_mesh_collision(prop_ref.clone(), &mut prop, mission_state);
+
+            if !did_collide {
+                continue;
+            }
             if did_collide {
                 temp_debug_log!("  did_collide:{}", prop.get_ctrl_idx());
             }
-            if did_collide {
-                // TODO_PARAM
-                let MIN_MAX_SPEED_RATIO_FOR_SCREAM = 0.6;
-                let MIN_DIAM_RATIO_FOR_SCREAM = 5.0;
+            // TODO_PARAM
+            let MIN_MAX_SPEED_RATIO_FOR_SCREAM = 0.6;
+            let MIN_DIAM_RATIO_FOR_SCREAM = 5.0;
 
-                let fast_enough_for_scream = self.max_speed_ratio >= MIN_MAX_SPEED_RATIO_FOR_SCREAM;
-                let big_enough_for_scream =
-                    prop.get_exact_attach_diam_cm() / self.diam_cm <= MIN_DIAM_RATIO_FOR_SCREAM;
-                let scream_off_cooldown = prop.get_scream_cooldown_timer() == 0;
+            let fast_enough_for_scream = self.max_speed_ratio >= MIN_MAX_SPEED_RATIO_FOR_SCREAM;
+            let big_enough_for_scream =
+                prop.get_exact_attach_diam_cm() / self.diam_cm <= MIN_DIAM_RATIO_FOR_SCREAM;
+            let scream_off_cooldown = prop.get_scream_cooldown_timer() == 0;
 
-                if fast_enough_for_scream && big_enough_for_scream && scream_off_cooldown {
-                    let _sfx_idx = NamePropConfig::get(prop.get_name_idx()).scream_sfx_idx;
-                    // TODO_FX: play scream sfx
-                }
-
-                prop.reset_scream_cooldown_timer();
+            if fast_enough_for_scream && big_enough_for_scream && scream_off_cooldown {
+                let _sfx_idx = NamePropConfig::get(prop.get_name_idx()).scream_sfx_idx;
+                // TODO_FX: play scream sfx
             }
+
+            prop.reset_scream_cooldown_timer();
 
             self.contact_prop = Some(prop_ref.clone());
             prop.set_kat_collision_vel(&kat_move);
-            self.resolve_uncollectible_prop_collision(props, &mut prop);
+            self.resolve_uncollectible_prop_collision(props, prop_ref.clone(), &mut prop);
 
             // TODO_WOBBLE: `kat_find_nearby_props:169-178`
 
@@ -353,11 +357,8 @@ impl Katamari {
         // TODO_PERF: refactor code to only keep one mesh for each prop type.
         // (store it in `NamePropConfig`). then we wouldn't need to clone the mesh here
         let prop_mesh = match NamePropConfig::get(prop.get_name_idx()).use_aabb_for_collision {
-            true => prop.aabb_mesh.clone(),
-            false => {
-                prop.aabb_mesh.clone()
-                // todo!("unimplemented prop collision meshes");
-            }
+            true => prop.get_aabb_mesh().unwrap(),
+            false => prop.get_collision_mesh().unwrap(),
         };
 
         let mut prop_rot = prop.get_unattached_transform().clone();
@@ -619,37 +620,47 @@ impl Katamari {
 
     /// Resolve a collision between this katamari and an uncollectible prop.
     /// offset: 0x2af40
-    fn resolve_uncollectible_prop_collision(&mut self, props: &mut PropsState, prop: &mut Prop) {
-        let root_ref = prop.get_root_ref(props);
-        let root_prop = root_ref.borrow();
+    fn resolve_uncollectible_prop_collision(
+        &mut self,
+        props: &mut PropsState,
+        prop_ref: PropRef,
+        prop: &mut Prop,
+    ) {
+        // temp_debug_log!("... ctrl_idx={}", prop.get_ctrl_idx());
+        // let root_prop = if prop.has_parent() {
+        //     let root_ref = prop.get_root_ref(props);
+        //     root_ref.clone().borrow_mut()
+        // } else {
+        //     prop
+        // };
 
-        // TODO_LINK:
-        // if `root_prop.link_action + ~CHILDREN_INTANGIBLE & 0xfd == 0` { root_prop = prop }
+        // // TODO_LINK:
+        // // if `root_prop.link_action + ~CHILDREN_INTANGIBLE & 0xfd == 0` { root_prop = prop }
 
-        // Handle collisions with a stationary prop.
-        if root_prop.get_move_type().is_none() {
-            return self.resolve_stationary_prop_collision(prop);
-        }
+        // // Handle collisions with a stationary prop.
+        // if root_prop.get_move_type().is_none() {
+        //     return self.resolve_stationary_prop_collision(prop);
+        // }
 
-        // TODO_DOC: what is this doing, something to do with turntables
-        let behavior_cond = root_prop.get_behavior_type() == Some(PropBehavior::Value0x15);
-        let name_idx = prop.get_name_idx();
-        let prop_is_turntable = name_idx == 0x31d // Manhole Cover
-            || name_idx == 0x35b // Round Table
-            || name_idx == 0x55b; // Parking Turntable
-        let prop_barely_moved = vec3::len(&vec3_from!(-, prop.last_pos, prop.pos)) <= 1.0;
-        let weird_cond = behavior_cond || prop_is_turntable || prop_barely_moved;
-        if root_prop.get_stationary() && weird_cond {
-            return;
-        }
+        // // TODO_DOC: what is this doing, something to do with turntables
+        // let behavior_cond = root_prop.get_behavior_type() == Some(PropBehavior::Value0x15);
+        // let name_idx = prop.get_name_idx();
+        // let prop_is_turntable = name_idx == 0x31d // Manhole Cover
+        //     || name_idx == 0x35b // Round Table
+        //     || name_idx == 0x55b; // Parking Turntable
+        // let prop_barely_moved = vec3::len(&vec3_from!(-, prop.last_pos, prop.pos)) <= 1.0;
+        // let weird_cond = behavior_cond || prop_is_turntable || prop_barely_moved;
+        // if root_prop.get_stationary() && weird_cond {
+        //     return;
+        // }
 
-        if self.physics_flags.vs_attack {
-            return;
-        }
+        // if self.physics_flags.vs_attack {
+        //     return;
+        // }
 
-        if root_prop.get_flags2().contains(PropFlags2::Wobble) {
-            return;
-        }
+        // if root_prop.get_flags2().contains(PropFlags2::Wobble) {
+        //     return;
+        // }
 
         // TODO_PROP_BEHAVIOR: `kat_resolve_uncollectible_prop_collision:72-`
     }
@@ -745,7 +756,7 @@ impl Katamari {
 
         self.raycast_state.load_ray(&self.center, &ray_endpoint);
         let num_hit_tris = self.raycast_state.ray_hits_mesh(
-            &prop.get_aabb_mesh(),
+            &prop.get_aabb_mesh().unwrap(),
             prop.get_unattached_transform(),
             false,
         );

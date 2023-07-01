@@ -64,8 +64,8 @@ const NIL: u64 = 0x206c696e204c494e;
 #[derive(Debug, Default)]
 pub struct PropMonoData {
     pub ptrs: [MonoDataPtr; NUM_MONO_DATA_PROP_PTRS],
-    pub aabbs: Option<PropAabbs>,
-    pub collision_mesh: Option<Mesh>,
+    pub aabbs: Option<Rc<PropAabbs>>,
+    pub collision_mesh: Option<Rc<Mesh>>,
     pub vault_points: Option<Vec<Vec3>>,
 }
 
@@ -88,8 +88,12 @@ impl PropMonoData {
 
         PropMonoData {
             ptrs,
-            aabbs: ptrs[0].map(|ptr| PropMonoData::parse_aabbs(ptr as *const u8)),
-            collision_mesh: ptrs[7].map(|ptr| PropMonoData::parse_mesh(ptr as *const u8)),
+            aabbs: ptrs[0]
+                .map(|ptr| PropMonoData::parse_aabbs(ptr as *const u8))
+                .map(Rc::new),
+            collision_mesh: ptrs[7]
+                .map(|ptr| PropMonoData::parse_mesh(ptr as *const u8))
+                .map(Rc::new),
             vault_points: ptrs[8]
                 .map(|ptr| PropMonoData::parse_vault_points(ptr as *const u8, name_idx)),
         }

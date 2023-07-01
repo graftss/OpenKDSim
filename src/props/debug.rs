@@ -10,7 +10,7 @@ impl PropsState {
             if let Some(debug_draw_box) = delegates.borrow().debug_draw_box {
                 if let Some(prop_ref) = self.props.get(ctrl_idx as usize) {
                     let prop = prop_ref.borrow();
-                    let aabb = &prop.get_aabb_mesh().sectors[0].aabb;
+                    let aabb = &prop.get_aabb_mesh().unwrap().clone().sectors[0].aabb;
                     let mut min = vec3::create();
                     let mut max = vec3::create();
                     vec3::transform_mat4(&mut min, &aabb.min, prop.get_unattached_transform());
