@@ -20,3 +20,5 @@ random things that shouldn't be forgotten:
 - remove `scale_translation` and `set_translation`, replace with `modify_translation`
   - also rename `modify_translation` -> `assign_translation`
 - change argments of `vec3_from!` so that it's `u op v` 
+
+- prop meshes should presumably be Rc<RefCell<Mesh>>

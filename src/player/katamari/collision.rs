@@ -1,12 +1,14 @@
+use std::{rc::Rc};
+
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
-    constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG},
+    constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG, VEC3_ZERO},
     global::GlobalState,
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, panic_log,
-        set_translation, set_y, vec3_from, vec3_unit_xz,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, modify_translation,
+        panic_log, set_translation, set_y, temp_debug_log, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -17,7 +19,10 @@ use crate::{
     player::{camera::Camera, prince::Prince},
     props::{
         config::{NamePropConfig, NAME_PROP_CONFIGS},
-        prop::{Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, WeakPropRef},
+        prop::{
+            Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, PropUnattachedState,
+            WeakPropRef,
+        },
         PropsState,
     },
 };
@@ -123,7 +128,7 @@ impl Katamari {
 
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
-        self.find_nearby_props(props, prince);
+        self.find_nearby_props(props, prince, mission_state);
 
         if mission_state.gamemode == GameMode::Ending {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
@@ -203,7 +208,13 @@ impl Katamari {
     /// less than the sum of (1) the radii of the bounding spheres of the katamari and the prop,
     /// and (2) the distance that the katamari moved over the last frame.
     /// offset: 0x28870
-    fn find_nearby_props(&mut self, props: &mut PropsState, prince: &mut Prince) {
+    fn find_nearby_props(
+        &mut self,
+        props: &mut PropsState,
+        prince: &mut Prince,
+        mission_state: &MissionState,
+    ) {
+        temp_debug_log!("tick");
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
 
         // TODO_PARAM: make this a global parameter
@@ -274,7 +285,11 @@ impl Katamari {
             // otherwise, the prop is nearby, but uncollectible.
             prop.near_player = true;
 
-            let did_collide = self.check_prop_mesh_collision(&mut prop);
+            let did_collide =
+                self.check_prop_mesh_collision(prop_ref.clone(), &mut prop, mission_state);
+            if did_collide {
+                temp_debug_log!("  did_collide:{}", prop.get_ctrl_idx());
+            }
             if did_collide {
                 // TODO_PARAM
                 let MIN_MAX_SPEED_RATIO_FOR_SCREAM = 0.6;
@@ -322,8 +337,289 @@ impl Katamari {
         }
     }
 
-    fn check_prop_mesh_collision(&mut self, _prop: &mut Prop) -> bool {
-        false
+    fn check_prop_mesh_collision(
+        &mut self,
+        prop_ref: PropRef,
+        prop: &mut Prop,
+        mission_state: &MissionState,
+    ) -> bool {
+        // check if the loaded area is below the area where the prop becomes intangible
+        // TODO: should that `<=` be a `<`?
+        let hit_on_area = prop.get_hit_on_area();
+        if hit_on_area.is_some() && mission_state.area <= hit_on_area.unwrap() {
+            return false;
+        }
+
+        // TODO_WOBBLE: `kat_check_prop_mesh_collision:102-103` (intangibility check while prop is wobbling)
+
+        // TODO_PERF: refactor code to only keep one mesh for each prop type.
+        // (store it in `NamePropConfig`). then we wouldn't need to clone the mesh here
+        let prop_mesh = match NamePropConfig::get(prop.get_name_idx()).use_aabb_for_collision {
+            true => prop.aabb_mesh.clone(),
+            false => {
+                prop.aabb_mesh.clone()
+                // todo!("unimplemented prop collision meshes");
+            }
+        };
+
+        let mut prop_rot = prop.get_unattached_transform().clone();
+        modify_translation!(prop_rot, =, VEC3_ZERO);
+
+        let mut prop_rot_inv = mat4::create();
+        mat4::transpose(&mut prop_rot_inv, &prop_rot);
+
+        let prop_transform = &prop.get_unattached_transform().clone();
+
+        // The vector frmo the prop to the katamari in world space.
+        let prop_to_kat_world = vec3_from!(-, self.center, prop.pos);
+
+        // The vector from the prop to the katamari, relative to the prop's coordinate space.
+        let mut prop_to_kat_local = vec3::create();
+        vec3::transform_mat4(&mut prop_to_kat_local, &prop_to_kat_world, &prop_rot_inv);
+
+        if self.physics_flags.immobile {
+            if self.physics_flags.moved_fast {
+                // TODO: `kat_check_prop_mesh_collision:LAB18002a05e` (goto to check shell rays?)
+            }
+        } else if self.physics_flags.moved_fast {
+            // check shell ray collisions with props when katamari moved more than its radius
+
+            // TODO_BUG: the original sim seems to expect the shell ray at index 4 to be the bottom ray,
+            // but in reality it's `top_left`. this might be a source of dubs?
+            let mut shell_inits: [Vec3; 5] = Default::default();
+            let mut shell_ends: [Vec3; 5] = Default::default();
+
+            let shell_init_base = &vec3_from!(-, self.last_center, self.shell_vec);
+            let shell_end_base = &self.center;
+
+            vec3::copy(&mut shell_inits[0], shell_init_base);
+            vec3::add(&mut shell_inits[1], shell_init_base, &self.shell_top);
+            vec3::add(&mut shell_inits[2], shell_init_base, &self.shell_left);
+            vec3::add(&mut shell_inits[3], shell_init_base, &self.shell_right);
+            vec3::add(&mut shell_inits[4], shell_init_base, &self.shell_top_left);
+
+            vec3::copy(&mut shell_ends[0], &shell_end_base);
+            vec3::add(&mut shell_ends[1], &shell_end_base, &self.shell_top);
+            vec3::add(&mut shell_ends[2], &shell_end_base, &self.shell_left);
+            vec3::add(&mut shell_ends[3], &shell_end_base, &self.shell_right);
+            vec3::add(&mut shell_ends[4], &shell_end_base, &self.shell_top_left);
+
+            let mut found_hit = false;
+            for i in 0..5 {
+                self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
+                let hit_prop = self
+                    .raycast_state
+                    .ray_hits_mesh(&prop_mesh, prop_transform, false);
+
+                if hit_prop == 0 {
+                    continue;
+                }
+
+                prop.set_katamari_contact(self.player);
+                self.physics_flags.airborne = true;
+                self.physics_flags.moved_fast_shell_hit_0x14 = true;
+                self.physics_flags.moved_fast_shell_hit_0x1d = true;
+                found_hit = true;
+
+                let mut shell_ray = vec3::create();
+                match i {
+                    0 => {}
+                    1 => {
+                        vec3::copy(&mut shell_ray, &self.shell_top);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Top);
+                    }
+                    2 => {
+                        vec3::copy(&mut shell_ray, &self.shell_left);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Left);
+                    }
+                    3 => {
+                        vec3::copy(&mut shell_ray, &self.shell_right);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Right);
+                    }
+                    4 => {
+                        vec3::copy(&mut shell_ray, &self.shell_bottom);
+                        self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Bottom);
+                    }
+                    _ => {}
+                }
+
+                if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                    // TODO_BUG: in the original sum, if `hit_shell_ray` wasn't assigned above
+                    // (which happens when the only shell ray hit is when `i` is 0)
+                    let shell_ray_idx = match self.physics_flags.hit_shell_ray {
+                        Some(shell_ray) => -(shell_ray as i16),
+                        None => 0,
+                    };
+
+                    vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_ray);
+                    vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_ray);
+
+                    let weak_prop_ref = Rc::downgrade(&prop_ref);
+                    let record_result =
+                        self.record_surface_contact(shell_ray_idx, Some(weak_prop_ref));
+
+                    if record_result != RecordSurfaceContactResult::ShellTop {
+                        self.physics_flags.moved_fast_shell_hit = true;
+                        self.play_bonk_fx(prop.get_move_type().is_some());
+                        self.contact_prop = Some(prop_ref.clone());
+                        return true;
+                    }
+                }
+            }
+
+            if found_hit {
+                self.contact_prop = Some(prop_ref.clone());
+                return true;
+            }
+        }
+
+        // test "slow" shell rays against prop collision mesh
+        let mut shell_inits: [Vec3; 5] = Default::default();
+        let mut shell_ends: [Vec3; 5] = Default::default();
+
+        let shell_init_base = &mut vec3::create();
+        vec3::scale_and_add(shell_init_base, &self.last_center, &self.shell_vec, -0.5);
+
+        let shell_end_base = &self.center;
+
+        vec3::add(&mut shell_inits[0], shell_init_base, &self.shell_top);
+        vec3::add(&mut shell_inits[1], shell_init_base, &self.shell_left);
+        vec3::add(&mut shell_inits[2], shell_init_base, &self.shell_right);
+        vec3::add(&mut shell_inits[3], shell_init_base, &self.shell_top_left);
+        vec3::add(&mut shell_inits[4], shell_init_base, &self.shell_top_right);
+
+        vec3::add(&mut shell_ends[0], &shell_end_base, &self.shell_top);
+        vec3::add(&mut shell_ends[1], &shell_end_base, &self.shell_left);
+        vec3::add(&mut shell_ends[2], &shell_end_base, &self.shell_right);
+        vec3::add(&mut shell_ends[3], &shell_end_base, &self.shell_top_left);
+        vec3::add(&mut shell_ends[4], &shell_end_base, &self.shell_top_right);
+
+        for i in 0..5 {
+            self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
+            let found_hit = self
+                .raycast_state
+                .ray_hits_mesh(&prop_mesh, &prop_transform, false);
+
+            if found_hit == 0 {
+                continue;
+            }
+
+            // process shell hit
+            self.physics_flags.shell_ray_hit_surface = true;
+            self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Top);
+            prop.set_katamari_contact(self.player);
+
+            let mut shell_ray = vec3::create();
+            match i {
+                0 => {}
+                1 => {
+                    vec3::copy(&mut shell_ray, &self.shell_top);
+                    self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Top);
+                }
+                2 => {
+                    vec3::copy(&mut shell_ray, &self.shell_left);
+                    self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Left);
+                }
+                3 => {
+                    vec3::copy(&mut shell_ray, &self.shell_right);
+                    self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Right);
+                }
+                4 => {
+                    vec3::copy(&mut shell_ray, &self.shell_top_left);
+                    self.physics_flags.hit_shell_ray = Some(ray::ShellRay::TopLeft);
+                }
+                5 => {
+                    vec3::copy(&mut shell_ray, &self.shell_top_right);
+                    self.physics_flags.hit_shell_ray = Some(ray::ShellRay::TopRight);
+                }
+                _ => {}
+            }
+
+            if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_ray);
+                vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_ray);
+
+                let ray_idx = self
+                    .physics_flags
+                    .hit_shell_ray
+                    .map(|sr| sr as i16)
+                    .unwrap_or(0);
+                let weak_prop_ref = Rc::downgrade(&prop_ref);
+                let record_result = self.record_surface_contact(ray_idx, Some(weak_prop_ref));
+
+                if record_result != RecordSurfaceContactResult::ShellTop {
+                    self.play_bonk_fx(prop.get_move_type().is_some());
+                    break;
+                }
+            }
+        }
+
+        // test kat collision rays against prop collision mesh
+        let mut found_any_hit = false;
+        // TODO_PERF: don't clone collision rays here
+        let rays = self.collision_rays.clone();
+        for ray in rays.iter() {
+            let ray_endpoint = vec3_from!(+, self.center, ray.kat_to_endpoint);
+            self.raycast_state.load_ray(&self.center, &ray_endpoint);
+
+            let found_hit = self
+                .raycast_state
+                .ray_hits_mesh(&prop_mesh, &prop_transform, false);
+
+            if found_hit == 0 {
+                continue;
+            }
+
+            self.physics_flags.shell_ray_hit_surface = true;
+            prop.set_katamari_contact(self.player);
+            found_any_hit = true;
+
+            if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                vec3_inplace_zero_small(&mut hit.normal_unit, 0.00001);
+            }
+
+            let should_contact = match (prop.get_global_state(), prop.get_unattached_state()) {
+                (PropGlobalState::Unattached, PropUnattachedState::State2) => false,
+                (PropGlobalState::Unattached, PropUnattachedState::AirborneBounced) => false,
+                (PropGlobalState::AirborneIntangible, _) => false,
+                _ => true,
+            };
+
+            if should_contact {
+                let weak_prop_ref = Rc::downgrade(&prop_ref);
+                self.record_surface_contact(0, Some(weak_prop_ref));
+            } else {
+                // TODO_DOC: if the katamari isn't going to contact the prop, then it
+                // should bounce off of the prop instead
+                self.physics_flags.contacts_prop_0xa = true;
+                prop.intangible_timer = 10;
+
+                // TODO_PARAM
+                let MIN_KAT_SPEED_AFTER_PROP_HIT = 0.5;
+                let KAT_SPEED_AFTER_PROP_HIT_MULT = 0.75;
+
+                let base_speed = self.max_boost_speed;
+
+                // the katamari's speed after the collision is a clamped
+                let prop_moved = vec3::length(&vec3_from!(-, prop.last_pos, prop.pos));
+                let next_kat_speed = KAT_SPEED_AFTER_PROP_HIT_MULT
+                    * prop_moved.clamp(base_speed * MIN_KAT_SPEED_AFTER_PROP_HIT, base_speed);
+
+                // its velocity is in the direction that the prop moved the previous frame
+                let mut next_kat_vel = vec3_unit_xz!(vec3_from!(-, prop.pos, self.center));
+                vec3_inplace_scale(&mut next_kat_vel, next_kat_speed);
+                self.set_velocity(&next_kat_vel);
+                self.physics_flags.hit_by_moving_prop = true;
+            }
+
+            self.play_bonk_fx(prop.get_move_type().is_some());
+        }
+
+        if found_any_hit {
+            self.contact_prop = Some(prop_ref.clone());
+        }
+
+        found_any_hit
     }
 
     /// offset: 0x28640
@@ -335,7 +631,7 @@ impl Katamari {
         if mission_state.is_ending() {
             // TODO_ENDING: `kat_process_nearby_collectible_props:13-33`
         } else {
-            // TODO: not amazing having to clone the `nearby_collectible_props` list here
+            // TODO_PERF: not amazing having to clone the `nearby_collectible_props` list here
             for prop_ref in self.nearby_collectible_props.clone() {
                 let prop = prop_ref.borrow_mut();
                 let prop_config = NAME_PROP_CONFIGS.get(prop.get_name_idx() as usize).unwrap();
@@ -406,7 +702,7 @@ impl Katamari {
 
         self.raycast_state.load_ray(&self.center, &ray_endpoint);
         let num_hit_tris = self.raycast_state.ray_hits_mesh(
-            prop.get_aabb_mesh(),
+            &prop.get_aabb_mesh(),
             prop.get_unattached_transform(),
             false,
         );
@@ -439,7 +735,7 @@ impl Katamari {
             }
 
             // TODO_LOW: prop.game_time_when_collected = game_time_ms (move to `prop.attach_to_kat` or whatever)
-            prop.add_katamari_contact(self.player);
+            prop.set_katamari_contact(self.player);
 
             self.attach_prop(prop_ref, &mut prop, mission_state, global);
             // TODO_LINK: `attach_prop_with_children(prop)`
@@ -570,49 +866,25 @@ impl Katamari {
         let mut moved_fast_hit_shell = false;
 
         if self.physics_flags.moved_fast {
-            let mut shell_initial_pts: [Vec3; 5] = Default::default();
-            let mut shell_final_pts: [Vec3; 5] = Default::default();
+            let mut shell_inits: [Vec3; 5] = Default::default();
+            let mut shell_ends: [Vec3; 5] = Default::default();
 
-            let shell_initial_base = &self.last_center;
-            let shell_final_base = vec3_from!(+, self.center, self.shell_vec);
+            let shell_init_base = &self.last_center;
+            let shell_end_base = vec3_from!(+, self.center, self.shell_vec);
 
-            vec3::copy(&mut shell_initial_pts[0], shell_initial_base);
-            vec3::add(
-                &mut shell_initial_pts[1],
-                shell_initial_base,
-                &self.shell_top,
-            );
-            vec3::add(
-                &mut shell_initial_pts[2],
-                shell_initial_base,
-                &self.shell_left,
-            );
-            vec3::add(
-                &mut shell_initial_pts[3],
-                shell_initial_base,
-                &self.shell_right,
-            );
-            vec3::add(
-                &mut shell_initial_pts[4],
-                shell_initial_base,
-                &self.shell_bottom,
-            );
+            vec3::copy(&mut shell_inits[0], shell_init_base);
+            vec3::add(&mut shell_inits[1], shell_init_base, &self.shell_top);
+            vec3::add(&mut shell_inits[2], shell_init_base, &self.shell_left);
+            vec3::add(&mut shell_inits[3], shell_init_base, &self.shell_right);
+            vec3::add(&mut shell_inits[4], shell_init_base, &self.shell_bottom);
 
-            vec3::copy(&mut shell_final_pts[0], &shell_final_base);
-            vec3::add(&mut shell_final_pts[1], &shell_final_base, &self.shell_top);
-            vec3::add(&mut shell_final_pts[2], &shell_final_base, &self.shell_left);
-            vec3::add(
-                &mut shell_final_pts[3],
-                &shell_final_base,
-                &self.shell_right,
-            );
-            vec3::add(
-                &mut shell_final_pts[4],
-                &shell_final_base,
-                &self.shell_bottom,
-            );
+            vec3::copy(&mut shell_ends[0], &shell_end_base);
+            vec3::add(&mut shell_ends[1], &shell_end_base, &self.shell_top);
+            vec3::add(&mut shell_ends[2], &shell_end_base, &self.shell_left);
+            vec3::add(&mut shell_ends[3], &shell_end_base, &self.shell_right);
+            vec3::add(&mut shell_ends[4], &shell_end_base, &self.shell_bottom);
 
-            self.debug_draw_shell_rays(&shell_initial_pts, &shell_final_pts);
+            self.debug_draw_shell_rays(&shell_inits, &shell_ends);
 
             let max_idx = match self.physics_flags.vs_attack {
                 true => 1,
@@ -620,8 +892,7 @@ impl Katamari {
             };
 
             for i in 0..max_idx {
-                self.raycast_state
-                    .load_ray(&shell_initial_pts[i], &shell_final_pts[i]);
+                self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
                 let found_hit = self
                     .raycast_state
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
@@ -1626,10 +1897,8 @@ impl Katamari {
             }
         }
 
-        // this should be a no-op?
         if vec3::len(&surface_normal_unit) <= 1e-05 {
-            panic_log!("weird edge case");
-            // return;
+            return;
         }
 
         if should_halve_speed {

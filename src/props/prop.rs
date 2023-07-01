@@ -101,7 +101,7 @@ struct PropSubobject {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-enum PropUnattachedState {
+pub enum PropUnattachedState {
     /// The default state that most props are in most of the time.
     Normal = 0,
 
@@ -294,7 +294,7 @@ pub struct Prop {
 
     /// The prop is intangible until the player loads this area.
     /// offset: 0x1a
-    hit_on_area: Option<u16>,
+    hit_on_area: Option<u8>,
 
     /// (??) encodes the behavior of this prop relative to its child/parent
     /// offset: 0x1b
@@ -354,7 +354,7 @@ pub struct Prop {
 
     /// The prop's position on the previous tick.
     /// offset: 0xc0
-    last_pos: Vec3,
+    pub last_pos: Vec3,
 
     /// The prop's rotation as Euler angles on the previous tick.
     /// offset: 0xd0
@@ -456,7 +456,7 @@ pub struct Prop {
 
     /// The AABB of this prop encoded as a collision mesh.
     /// offset: 0x5e0
-    aabb_mesh: Mesh,
+    pub aabb_mesh: Mesh,
 
     /// The 8 corner points of the prop's AABB.
     /// offset: 0x870
@@ -517,6 +517,10 @@ pub struct Prop {
     /// Namely, its AABB, collision mesh, and vault points.
     mono_data: Option<Rc<PropMonoData>>,
 
+    /// The mesh used for non-collection collisions with this prop.
+    /// offset: 0x960
+    // collision_mesh: Mesh,
+
     /// (??) The additional transform applied to the prop while it is attached to the katamari.
     /// offset: 0x968
     pub init_attached_transform: Mat4,
@@ -574,7 +578,7 @@ pub struct Prop {
 
     /// True if this prop's collision mesh contacts a katamari.
     /// offset: 0xa41
-    mesh_contacts_katamari: bool,
+    hit_katamari: bool,
 
     /// If none, this prop's collision mesh doesn't contact any katamaris.
     /// If some, the player index of the katamari meeting this prop's collision mesh.
@@ -624,6 +628,7 @@ pub struct Prop {
 
 pub type PropRef = Rc<RefCell<Prop>>;
 pub type WeakPropRef = Weak<RefCell<Prop>>;
+pub type MeshRef = Rc<RefCell<Mesh>>;
 
 impl Display for Prop {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -713,7 +718,7 @@ impl Prop {
             display_on: false,
             alpha: 1.0,
             move_type: max_to_none!(u16, args.mono_move_type),
-            hit_on_area: max_to_none!(u16, args.mono_hit_on_area),
+            hit_on_area: (max_to_none!(u16, args.mono_hit_on_area)).map(|a| a as u8),
             link_action: max_to_none!(u16, args.link_action).map(|v| v.into()),
             innate_motion_type: max_to_none!(u8, config.innate_motion_type),
             innate_motion_state: 0,
@@ -790,7 +795,7 @@ impl Prop {
             delta_pos_unit: [0.0; 3],
             near_player: false,
             force_intangible: false,
-            mesh_contacts_katamari: false,
+            hit_katamari: false,
             contact_katamari_idx: None,
             is_attached: false,
             attached_transform: [0.0; 16],
@@ -952,6 +957,14 @@ impl Prop {
         self.global_state
     }
 
+    pub fn get_unattached_state(&self) -> PropUnattachedState {
+        self.unattached_state
+    }
+
+    pub fn get_hit_on_area(&self) -> Option<u8> {
+        self.hit_on_area
+    }
+
     pub fn get_radius(&self) -> f32 {
         self.radius
     }
@@ -1059,6 +1072,10 @@ impl Prop {
         scale_translation!(self.init_attached_transform, decay);
     }
 
+    pub fn get_force_no_wobble(&self) -> bool {
+        self.force_no_wobble
+    }
+
     pub fn get_dist_to_katamari(&self, player: i32) -> f32 {
         match player {
             0 => self.dist_to_p0,
@@ -1069,8 +1086,8 @@ impl Prop {
         }
     }
 
-    pub fn add_katamari_contact(&mut self, player_idx: u8) {
-        self.mesh_contacts_katamari = true;
+    pub fn set_katamari_contact(&mut self, player_idx: u8) {
+        self.hit_katamari = true;
         self.contact_katamari_idx = Some(player_idx);
     }
 

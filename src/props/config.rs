@@ -53,7 +53,7 @@ pub struct NamePropConfig {
 
     /// If true, the prop's triangulated AABB is used as its collision mesh.
     /// offset: 0x1d
-    pub use_aabb_as_collision_mesh: bool,
+    pub use_aabb_for_collision: bool,
 
     /// (??) If true, the prop tracks the distance from itself to the katamari.
     /// offset: 0x1e
@@ -131,7 +131,7 @@ impl NamePropConfig {
             config.move_speed_idx = read_u8!(table, base + 0x17);
             config.innate_motion_type = read_u8!(table, base + 0x18);
             config.cannot_wobble = read_bool!(table, base + 0x1b);
-            config.use_aabb_as_collision_mesh = read_bool!(table, base + 0x1d);
+            config.use_aabb_for_collision = read_bool!(table, base + 0x1d);
             config.kat_proximity_aware = read_bool!(table, base + 0x1e);
             config.is_fish = read_bool!(table, base + 0x1f);
             config.can_be_airborne = read_bool!(table, base + 0x20);

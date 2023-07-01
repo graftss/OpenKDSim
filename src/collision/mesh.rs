@@ -8,7 +8,7 @@ pub struct TriVertex {
     pub metadata: u32,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct TriGroup {
     // If true, the triangle group is encoded as a "triangle strip"
     pub is_tri_strip: bool,
@@ -18,13 +18,13 @@ pub struct TriGroup {
 // A mesh sector is a sequence of triangle groups, contained within an AABB.
 // Collision with the sector can be tested by first checking collision with the AABB
 // interior first, and then the triangle groups second.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct MeshSector {
     pub aabb: Aabb,
     pub tri_groups: Vec<TriGroup>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Mesh {
     pub sectors: Vec<MeshSector>,
 }
