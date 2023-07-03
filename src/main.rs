@@ -17,6 +17,7 @@ pub mod macros;
 
 mod collision;
 mod constants;
+mod debug;
 mod delegates;
 mod gamestate;
 mod global;

@@ -7,6 +7,7 @@ mod macros;
 
 mod collision;
 mod constants;
+mod debug;
 mod delegates;
 mod gamestate;
 mod global;
@@ -907,16 +908,9 @@ pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission:
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn TakesCallbackDebugDrawLine(cb: DebugDrawLineDelegate) {
+pub unsafe extern "C" fn TakesCallbackDebugDraw(cb: DebugDrawDelegate) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.borrow_mut().debug_draw_line = Some(cb);
-    });
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn TakesCallbackDebugDrawBox(cb: DebugDrawBoxDelegate) {
-    STATE.with(|state| {
-        state.borrow_mut().delegates.borrow_mut().debug_draw_box = Some(cb);
+        state.borrow_mut().delegates.borrow_mut().debug_draw = Some(cb);
     });
 }
 

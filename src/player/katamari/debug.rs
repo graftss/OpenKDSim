@@ -2,6 +2,7 @@ use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
     constants::VEC3_X_POS,
+    debug::DebugDrawType,
     macros::{debug_log, vec3_from},
     math::acos_f32,
 };
@@ -63,7 +64,7 @@ impl Katamari {
     pub fn debug_draw_collision_rays(&self) {
         if self.debug_config.draw_collision_rays {
             if let Some(delegates) = &self.delegates {
-                if let Some(draw) = delegates.borrow().debug_draw_line {
+                if let Some(draw) = delegates.borrow().debug_draw {
                     for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
                         let p0 = vec3_from!(+, ray.kat_to_endpoint, self.center);
                         let (r, g, b) = if self.vault_ray_idx == Some(ray_idx as i16) {
@@ -73,6 +74,7 @@ impl Katamari {
                         };
 
                         draw(
+                            DebugDrawType::Line,
                             p0[0],
                             p0[1],
                             p0[2],
@@ -98,12 +100,13 @@ impl Katamari {
 
         if self.debug_config.draw_collision_rays {
             if let Some(delegates) = &self.delegates {
-                if let Some(draw) = delegates.borrow().debug_draw_line {
+                if let Some(draw) = delegates.borrow().debug_draw {
                     for i in 0..5 {
                         let p0 = shell_initial_pts[i];
                         let p1 = shell_final_pts[i];
 
                         draw(
+                            DebugDrawType::Line,
                             p0[0],
                             p0[1],
                             p0[2],

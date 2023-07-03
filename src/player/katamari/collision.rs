@@ -1,5 +1,3 @@
-use std::ops::DerefMut;
-
 use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
@@ -19,7 +17,6 @@ use crate::{
     player::{camera::Camera, prince::Prince},
     props::{
         config::{NamePropConfig, NAME_PROP_CONFIGS},
-        motion::behavior::PropBehavior,
         prop::{Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, PropUnattachedState},
         PropsState,
     },
@@ -622,9 +619,9 @@ impl Katamari {
     /// offset: 0x2af40
     fn resolve_uncollectible_prop_collision(
         &mut self,
-        props: &mut PropsState,
-        prop_ref: PropRef,
-        prop: &mut Prop,
+        _props: &mut PropsState,
+        _prop_ref: PropRef,
+        _prop: &mut Prop,
     ) {
         // temp_debug_log!("... ctrl_idx={}", prop.get_ctrl_idx());
         // let root_prop = if prop.has_parent() {
