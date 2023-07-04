@@ -1,14 +1,13 @@
-use core::slice;
 use std::{cell::RefCell, rc::Rc};
 
 use gl_matrix::{
-    common::{Mat4, Vec3},
-    mat4, vec3, vec4,
+    common::{Mat4, Vec3, Vec4},
+    mat4, vec3,
 };
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
-    debug::{DebugDrawType, DEBUG_CONFIG},
+    debug::DEBUG_CONFIG,
     delegates::Delegates,
     macros::{panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
@@ -403,29 +402,24 @@ impl RaycastState {
             hit_aabbs.push(hit_aabb);
             hit_any_aabb |= hit_aabb;
 
-            if DEBUG_CONFIG.kat_draw_prop_aabb_collision && hit_aabb {
+            if !hit_aabb {
+                continue;
+            }
+
+            // if there was an aabb hit, attempt to do some debug collision drawing
+            // for the prop mesh that was hit
+            if DEBUG_CONFIG.draw_collided_prop_aabb_hits {
+                static AABB_HIT_COLOR: Vec4 = [0.7, 1.0, 0.3, 1.0];
+
                 if let Some(delegates) = &self.delegates {
-                    let my_delegates = delegates.borrow();
+                    let mut my_delegates = delegates.borrow_mut();
 
                     let mut world_point = vec3::create();
                     vec3::transform_mat4(&mut world_point, &aabb_collision_out, &transform);
 
-                    if let Some(draw) = my_delegates.debug_draw {
-                        unsafe {
-                            let mut out = my_delegates.debug_draw_data as *mut f32;
-
-                            let mut out_point: &mut [f32; 3] =
-                                slice::from_raw_parts_mut(out, 3).try_into().unwrap();
-                            vec3::copy(&mut out_point, &world_point);
-                            out = out.offset(3);
-
-                            let mut out_color: &mut [f32; 4] =
-                                slice::from_raw_parts_mut(out, 4).try_into().unwrap();
-                            vec4::copy(&mut out_color, &[0.7, 1.0, 0.3, 1.0]);
-                        }
-
-                        draw(DebugDrawType::Point);
-                    }
+                    my_delegates
+                        .debug_draw
+                        .draw_point(&world_point, &AABB_HIT_COLOR);
                 }
             }
         }
@@ -433,6 +427,11 @@ impl RaycastState {
         self.num_hit_tris = 0;
         if !hit_any_aabb {
             return 0;
+        }
+
+        // if any aabb was hit, attempt to draw the prop's mesh
+        if DEBUG_CONFIG.draw_collided_prop_mesh {
+            self.debug_draw_collided_prop_mesh(&mesh, &transform);
         }
 
         // iterate over the sectors again, this time refining the successful AABB collisions with
@@ -559,6 +558,14 @@ impl RaycastState {
         }
 
         self.num_hit_tris as i32
+    }
+
+    fn debug_draw_collided_prop_mesh(&self, mesh: &Mesh, _transform: &Mat4) {
+        for sector in mesh.sectors.iter() {
+            for tri_group in sector.tri_groups.iter() {
+                if tri_group.is_tri_strip {}
+            }
+        }
     }
 }
 

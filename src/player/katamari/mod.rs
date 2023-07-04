@@ -70,25 +70,10 @@ pub enum CamRelativeDir {
     Right,
 }
 
-#[derive(Debug)]
-pub struct DebugConfig {
-    pub draw_collision_rays: bool,
-}
-
-impl Default for DebugConfig {
-    fn default() -> Self {
-        Self {
-            draw_collision_rays: true,
-        }
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct Katamari {
     // BEGIN new fields (that were not part of the original simulation's `Katamari` struct.)
     delegates: Option<DelegatesRef>,
-
-    debug_config: DebugConfig,
 
     /// Parameters that affect katamari movement. In the original simulation these were
     /// mostly static constants.
@@ -278,7 +263,7 @@ pub struct Katamari {
     /// offset: 0x116
     falling_ticks: u16,
 
-    /// counts down from 10 after falling from a climb; if still nonzero, can't climb again    
+    /// counts down from 10 after falling from a climb; if still nonzero, can't climb again
     /// offset: 0x118
     wallclimb_cooldown_timer: u16,
 

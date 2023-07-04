@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::debug::DebugDrawType;
+use crate::debug::draw::{DebugDrawBus, DebugDrawType};
 
 pub type MonoGenerateDelegate = extern "C" fn(ctrl_idx: i32, name_idx: i32) -> ();
 pub type MotionEndDelegate = extern "C" fn(player: i32) -> ();
@@ -77,8 +77,7 @@ pub struct Delegates {
     pub vs_volume_diff: Option<VsVolumeDiffDelegate>,
 
     // delegates unique to the open simulation
-    pub debug_draw: Option<DebugDrawDelegate>,
-    pub debug_draw_data: usize,
+    pub debug_draw: DebugDrawBus,
 }
 
 pub type DelegatesRef = Rc<RefCell<Delegates>>;

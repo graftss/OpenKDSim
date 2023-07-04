@@ -22,5 +22,3 @@ random things that shouldn't be forgotten:
 - change argments of `vec3_from!` so that it's `u op v`
 
 - prop meshes should presumably be Rc<RefCell<Mesh>>
-
-- factor all the unsafe stuff for `draw` calls into an interface for writing points, matrices, colors to `out`

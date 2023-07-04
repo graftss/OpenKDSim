@@ -20,6 +20,7 @@ mod util;
 
 use backtrace::Backtrace;
 use collision::raycast_state::{RaycastCallType, RaycastState};
+use debug::draw::DebugDrawBus;
 use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
@@ -908,12 +909,11 @@ pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission:
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn TakesCallbackDebugDraw(cb: DebugDrawDelegate, data: usize) {
+pub unsafe extern "C" fn TakesCallbackDebugDraw(cb: DebugDrawDelegate, unity_data_ptr: usize) {
     STATE.with(|state| {
         let state_mut = state.borrow_mut();
         let mut delegates = state_mut.delegates.borrow_mut();
-        delegates.debug_draw = Some(cb);
-        delegates.debug_draw_data = data as usize;
+        delegates.debug_draw = DebugDrawBus::new(cb, unity_data_ptr);
     });
 }
 

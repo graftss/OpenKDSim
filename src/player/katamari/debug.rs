@@ -1,10 +1,8 @@
-use core::slice;
-
-use gl_matrix::{common::Vec3, vec3, vec4};
+use gl_matrix::{common::Vec3, vec3};
 
 use crate::{
     constants::VEC3_X_POS,
-    debug::{DebugDrawType, DEBUG_CONFIG},
+    debug::DEBUG_CONFIG,
     macros::{debug_log, vec3_from},
     math::acos_f32,
 };
@@ -67,40 +65,18 @@ impl Katamari {
     pub fn debug_draw_collision_rays(&self) {
         if !DEBUG_CONFIG.kat_draw_collision_rays { return; }
 
-        if self.debug_config.draw_collision_rays {
-            if let Some(delegates) = &self.delegates {
-                let my_delegates = delegates.borrow();
-                if let Some(draw) = my_delegates.debug_draw {
-                    for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
-                        let p0 = &self.center;
-                        let p1 = vec3_from!(+, ray.kat_to_endpoint, self.center);
-                        let (r, g, b, a) = if self.vault_ray_idx == Some(ray_idx as i16) {
-                            (0.0, 1.0, 0.0, 1.0)
-                        } else {
-                            (1.0, 0.0, 0.0, 1.0)
-                        };
+        if let Some(delegates) = &self.delegates {
+            let mut my_delegates = delegates.borrow_mut();
+            for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
+                let p0 = &self.center;
+                let p1 = vec3_from!(+, ray.kat_to_endpoint, self.center);
+                let color = if self.vault_ray_idx == Some(ray_idx as i16) {
+                    [0.0, 1.0, 0.0, 1.0]
+                } else {
+                    [1.0, 0.0, 0.0, 1.0]
+                };
 
-                        unsafe {
-                            let mut out = my_delegates.debug_draw_data as *mut f32;
-
-                            let mut out_p0: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
-                            vec3::copy(&mut out_p0, &p0);
-                            out = out.offset(3);
-
-                            let mut out_p1: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
-                            vec3::copy(&mut out_p1, &p1);
-                            out = out.offset(3);
-
-                            let out_color: &mut [f32; 4] = slice::from_raw_parts_mut(out, 4).try_into().unwrap();
-                            out_color[0] = r;
-                            out_color[1] = g;
-                            out_color[2] = b;
-                            out_color[3] = a;
-                        }
-
-                        draw(DebugDrawType::Line);
-                    }
-                }
+                my_delegates.debug_draw.draw_line(p0, &p1, &color);
             }
         }
     }
@@ -115,33 +91,12 @@ impl Katamari {
 
         let SHELL_RAY_COLOR = [0.0, 1.0, 1.0, 1.0];
 
-        if self.debug_config.draw_collision_rays {
-            if let Some(delegates) = &self.delegates {
-                let my_delegates = delegates.borrow();
-                if let Some(draw) = my_delegates.debug_draw {
-                    for i in 0..5 {
-                        let p0 = shell_initial_pts[i];
-                        let p1 = shell_final_pts[i];
-
-
-                        unsafe {
-                            let mut out = my_delegates.debug_draw_data as *mut f32;
-
-                            let mut out_p0: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
-                            vec3::copy(&mut out_p0, &p0);
-                            out = out.offset(3);
-
-                            let mut out_p1: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
-                            vec3::copy(&mut out_p1, &p1);
-                            out = out.offset(3);
-
-                            let mut out_color: &mut [f32; 4] = slice::from_raw_parts_mut(out, 4).try_into().unwrap();
-                            vec4::copy(&mut out_color, &SHELL_RAY_COLOR);
-                        }
-
-                        draw(DebugDrawType::Line);
-                    }
-                }
+        if let Some(delegates) = &self.delegates {
+            let mut my_delegates = delegates.borrow_mut();
+            for i in 0..5 {
+                let p0 = shell_initial_pts[i];
+                let p1 = shell_final_pts[i];
+                my_delegates.debug_draw.draw_line(&p0, &p1, &SHELL_RAY_COLOR);
             }
         }
     }
