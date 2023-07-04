@@ -76,6 +76,7 @@ pub enum TryInitVaultResult {
 
 impl Katamari {
     /// The main function to update the katamari's collision state.
+    /// offset: 0x12cf0
     pub fn update_collision(
         &mut self,
         prince: &mut Prince,
@@ -281,6 +282,10 @@ impl Katamari {
             // otherwise, the prop is nearby, but uncollectible.
             prop.near_player = true;
 
+            if prop.get_ctrl_idx() == 680 {
+                temp_debug_log!("  mandarin near player");
+            }
+
             let did_collide =
                 self.check_prop_mesh_collision(prop_ref.clone(), &mut prop, mission_state);
 
@@ -366,7 +371,7 @@ impl Katamari {
 
         let prop_transform = &prop.get_unattached_transform().clone();
 
-        // The vector frmo the prop to the katamari in world space.
+        // The vector from the prop to the katamari in world space.
         let prop_to_kat_world = vec3_from!(-, self.center, prop.pos);
 
         // The vector from the prop to the katamari, relative to the prop's coordinate space.

@@ -1,6 +1,6 @@
 random things that shouldn't be forgotten:
 
-- is it possible to drop the static `include_bytes!` data after 
+- is it possible to drop the static `include_bytes!` data after
   reading it into tables? (e.g. for stage config table)
 
 - gachas are bugged somehow: holding one stick up and repeating up-down on the other stick
@@ -19,6 +19,8 @@ random things that shouldn't be forgotten:
 - `physics_flags.groudned_ray_type` shouldn't be an option, the defult should just be Bottom
 - remove `scale_translation` and `set_translation`, replace with `modify_translation`
   - also rename `modify_translation` -> `assign_translation`
-- change argments of `vec3_from!` so that it's `u op v` 
+- change argments of `vec3_from!` so that it's `u op v`
 
 - prop meshes should presumably be Rc<RefCell<Mesh>>
+
+- factor all the unsafe stuff for `draw` calls into an interface for writing points, matrices, colors to `out`

@@ -1,12 +1,14 @@
+use core::slice;
 use std::{cell::RefCell, rc::Rc};
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4, vec3,
+    mat4, vec3, vec4,
 };
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
+    debug::{DebugDrawType, DEBUG_CONFIG},
     delegates::Delegates,
     macros::{panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
@@ -362,8 +364,14 @@ impl RaycastState {
     }
 
     /// Returns the number of triangles in `mesh` hit by the ray.
+    /// `transform` is the transform matrix of the `mesh`.
     /// offset: 0x10da0
-    pub fn ray_hits_mesh(&mut self, mesh: &Mesh, transform: &Mat4, flag: bool) -> i32 {
+    pub fn ray_hits_mesh(
+        &mut self,
+        mesh: &Mesh,
+        transform: &Mat4,
+        ray_in_mesh_coords: bool,
+    ) -> i32 {
         let mut local_p0 = self.point0.clone();
         let mut local_p1 = self.point1.clone();
 
@@ -371,9 +379,9 @@ impl RaycastState {
         // still computes it. so whatever
         let mut aabb_collision_out = vec3::create();
 
-        // if the collision ray isn't already transformed, multiply the endpoints of
-        // the collision ray by the inverse of `transform`.
-        if !flag {
+        // if the collision ray isn't already in the mesh's coordinate space, multiply
+        // the endpoints of the collision ray by the inverse of the mesh's `transform`.
+        if !ray_in_mesh_coords {
             let mut transform_inv = mat4::create();
 
             mat4::invert(&mut transform_inv, &transform);
@@ -394,6 +402,32 @@ impl RaycastState {
             );
             hit_aabbs.push(hit_aabb);
             hit_any_aabb |= hit_aabb;
+
+            if DEBUG_CONFIG.kat_draw_prop_aabb_collision && hit_aabb {
+                if let Some(delegates) = &self.delegates {
+                    let my_delegates = delegates.borrow();
+
+                    let mut world_point = vec3::create();
+                    vec3::transform_mat4(&mut world_point, &aabb_collision_out, &transform);
+
+                    if let Some(draw) = my_delegates.debug_draw {
+                        unsafe {
+                            let mut out = my_delegates.debug_draw_data as *mut f32;
+
+                            let mut out_point: &mut [f32; 3] =
+                                slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                            vec3::copy(&mut out_point, &world_point);
+                            out = out.offset(3);
+
+                            let mut out_color: &mut [f32; 4] =
+                                slice::from_raw_parts_mut(out, 4).try_into().unwrap();
+                            vec4::copy(&mut out_color, &[0.7, 1.0, 0.3, 1.0]);
+                        }
+
+                        draw(DebugDrawType::Point);
+                    }
+                }
+            }
         }
 
         self.num_hit_tris = 0;
@@ -428,7 +462,8 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform, flag);
+                        let tri_hit_dist =
+                            self.ray_hits_triangle(&triangle, transform, ray_in_mesh_coords);
                         if tri_hit_dist > 0.0 {
                             // if we hit the triangle:
 
@@ -461,7 +496,8 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform, flag);
+                        let tri_hit_dist =
+                            self.ray_hits_triangle(&triangle, transform, ray_in_mesh_coords);
                         if tri_hit_dist > 0.0 {
                             // if we hit the triangle:
 
@@ -504,7 +540,7 @@ impl RaycastState {
             hit.impact_dist_ratio = impact_dist / self.ray_len;
 
             // TODO: no clue what this is doing
-            if flag {
+            if ray_in_mesh_coords {
                 hit.impact_point = min_tri_hit_point
             } else {
                 let mut normal_unit = hit.normal_unit;

@@ -1,9 +1,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
+    debug::DEBUG_CONFIG,
     delegates::Delegates,
     global::GlobalState,
-    macros::panic_log,
+    macros::{panic_log, temp_debug_log},
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
@@ -344,7 +345,10 @@ impl GameState {
 
     /// Mimicks the `Tick` API function.
     pub fn tick(&mut self, _delta: f32) {
-        // temp_debug_log!("tick");
+        if DEBUG_CONFIG.log_tick {
+            temp_debug_log!("tick");
+        }
+
         let is_vs_mode = self.mission_state.is_vs_mode;
 
         self.global.ticks += 1;

@@ -4,7 +4,7 @@ use gl_matrix::{common::Vec3, vec3, vec4};
 
 use crate::{
     constants::VEC3_X_POS,
-    debug::DebugDrawType,
+    debug::{DebugDrawType, DEBUG_CONFIG},
     macros::{debug_log, vec3_from},
     math::acos_f32,
 };
@@ -65,6 +65,8 @@ impl Katamari {
     /// Use the `debug_draw_line` delegate to draw the katamari's collision rays on the screen.
     #[rustfmt::skip]
     pub fn debug_draw_collision_rays(&self) {
+        if !DEBUG_CONFIG.kat_draw_collision_rays { return; }
+
         if self.debug_config.draw_collision_rays {
             if let Some(delegates) = &self.delegates {
                 let my_delegates = delegates.borrow();
@@ -109,6 +111,8 @@ impl Katamari {
         shell_initial_pts: &[Vec3; 5],
         shell_final_pts: &[Vec3; 5],
     ) {
+        if !DEBUG_CONFIG.kat_draw_shell_rays { return; }
+
         let SHELL_RAY_COLOR = [0.0, 1.0, 1.0, 1.0];
 
         if self.debug_config.draw_collision_rays {
