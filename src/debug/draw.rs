@@ -1,11 +1,11 @@
-use core::slice;
+use std::mem::transmute;
 
 use gl_matrix::{
     common::{Mat4, Vec3, Vec4},
     mat4, vec3, vec4,
 };
 
-use crate::delegates::DebugDrawDelegate;
+use crate::{collision::mesh::TriGroup, delegates::DebugDrawDelegate};
 
 /// The draw commands performed by the `debug_draw` delegate.
 #[repr(C)]
@@ -13,6 +13,8 @@ pub enum DebugDrawType {
     Line = 0,
     Box = 1,
     Point = 2,
+    TriangleList = 3,
+    TriangleStrip = 4,
 }
 
 impl From<DebugDrawType> for i32 {
@@ -21,6 +23,8 @@ impl From<DebugDrawType> for i32 {
             DebugDrawType::Line => 0,
             DebugDrawType::Box => 1,
             DebugDrawType::Point => 2,
+            DebugDrawType::TriangleList => 3,
+            DebugDrawType::TriangleStrip => 4,
         }
     }
 }
@@ -29,6 +33,14 @@ impl From<DebugDrawType> for i32 {
 pub struct DebugDrawBus {
     delegate: Option<DebugDrawDelegate>,
     unity_data_ptr: usize,
+}
+
+macro_rules! slice {
+    ($out: expr, $count: expr) => {
+        core::slice::from_raw_parts_mut($out, $count)
+            .try_into()
+            .unwrap()
+    };
 }
 
 impl DebugDrawBus {
@@ -45,18 +57,15 @@ impl DebugDrawBus {
             unsafe {
                 let mut out = self.unity_data_ptr as *mut f32;
 
-                let mut out_p0: &mut [f32; 3] =
-                    slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                let mut out_p0: &mut [f32; 3] = slice!(out, 3);
                 vec3::copy(&mut out_p0, &p0);
                 out = out.offset(3);
 
-                let mut out_p1: &mut [f32; 3] =
-                    slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                let mut out_p1: &mut [f32; 3] = slice!(out, 3);
                 vec3::copy(&mut out_p1, &p1);
                 out = out.offset(3);
 
-                let mut out_color: &mut [f32; 4] =
-                    slice::from_raw_parts_mut(out, 4).try_into().unwrap();
+                let mut out_color: &mut [f32; 4] = slice!(out, 4);
                 vec4::copy(&mut out_color, &color);
                 // out = out.offset(4)
             }
@@ -72,23 +81,19 @@ impl DebugDrawBus {
             unsafe {
                 let mut out = self.unity_data_ptr as *mut f32;
 
-                let mut out_min: &mut [f32; 3] =
-                    slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                let mut out_min: &mut [f32; 3] = slice!(out, 3);
                 vec3::copy(&mut out_min, &min);
                 out = out.offset(3);
 
-                let mut out_max: &mut [f32; 3] =
-                    slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                let mut out_max: &mut [f32; 3] = slice!(out, 3);
                 vec3::copy(&mut out_max, &max);
                 out = out.offset(3);
 
-                let mut out_transform: &mut [f32; 16] =
-                    slice::from_raw_parts_mut(out, 16).try_into().unwrap();
+                let mut out_transform: &mut [f32; 16] = slice!(out, 16);
                 mat4::copy(&mut out_transform, &transform);
                 out = out.offset(16);
 
-                let mut out_color: &mut [f32; 4] =
-                    slice::from_raw_parts_mut(out, 4).try_into().unwrap();
+                let mut out_color: &mut [f32; 4] = slice!(out, 4);
                 vec4::copy(&mut out_color, color);
                 // out = out.offset(4)
             }
@@ -103,18 +108,50 @@ impl DebugDrawBus {
             unsafe {
                 let mut out = self.unity_data_ptr as *mut f32;
 
-                let mut out_point: &mut [f32; 3] =
-                    slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                let mut out_point: &mut [f32; 3] = slice!(out, 3);
                 vec3::copy(&mut out_point, &point);
                 out = out.offset(3);
 
-                let mut out_color: &mut [f32; 4] =
-                    slice::from_raw_parts_mut(out, 4).try_into().unwrap();
+                let mut out_color: &mut [f32; 4] = slice!(out, 4);
                 vec4::copy(&mut out_color, color);
                 // out = out.offset(4)
             }
 
             draw(DebugDrawType::Point);
+        }
+    }
+
+    /// Draw a triangle group relative to the transform matrix `transform`.
+    pub fn draw_tri_group(&mut self, tri_group: &TriGroup, transform: &Mat4, color: &Vec4) {
+        if let Some(draw) = self.delegate {
+            unsafe {
+                let mut out = self.unity_data_ptr as *mut f32;
+
+                let out_num_vertices: &mut [f32; 1] = slice!(out, 1);
+                let num_vertices = tri_group.vertices.len() as u32;
+                out_num_vertices[0] = transmute::<u32, f32>(num_vertices);
+                out = out.offset(1);
+
+                for vertex in &tri_group.vertices {
+                    let mut out_vertex: &mut [f32; 3] = slice!(out, 3);
+                    vec3::copy(&mut out_vertex, &vertex.point);
+                    out = out.offset(3);
+                }
+
+                let mut out_transform: &mut [f32; 16] = slice!(out, 16);
+                mat4::copy(&mut out_transform, transform);
+                out = out.offset(16);
+
+                let mut out_color: &mut [f32; 4] = slice!(out, 4);
+                vec4::copy(&mut out_color, color);
+                // out = out.offset(4);
+            }
+
+            let draw_type = match tri_group.is_tri_strip {
+                true => DebugDrawType::TriangleStrip,
+                false => DebugDrawType::TriangleList,
+            };
+            draw(draw_type);
         }
     }
 }

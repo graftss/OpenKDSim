@@ -409,18 +409,7 @@ impl RaycastState {
             // if there was an aabb hit, attempt to do some debug collision drawing
             // for the prop mesh that was hit
             if DEBUG_CONFIG.draw_collided_prop_aabb_hits {
-                static AABB_HIT_COLOR: Vec4 = [0.7, 1.0, 0.3, 1.0];
-
-                if let Some(delegates) = &self.delegates {
-                    let mut my_delegates = delegates.borrow_mut();
-
-                    let mut world_point = vec3::create();
-                    vec3::transform_mat4(&mut world_point, &aabb_collision_out, &transform);
-
-                    my_delegates
-                        .debug_draw
-                        .draw_point(&world_point, &AABB_HIT_COLOR);
-                }
+                self.debug_draw_collided_aabb_hits(&aabb_collision_out, transform);
             }
         }
 
@@ -560,10 +549,32 @@ impl RaycastState {
         self.num_hit_tris as i32
     }
 
-    fn debug_draw_collided_prop_mesh(&self, mesh: &Mesh, _transform: &Mat4) {
-        for sector in mesh.sectors.iter() {
-            for tri_group in sector.tri_groups.iter() {
-                if tri_group.is_tri_strip {}
+    fn debug_draw_collided_aabb_hits(&self, aabb_collision_out: &Vec3, transform: &Mat4) {
+        static AABB_HIT_COLOR: Vec4 = [0.7, 1.0, 0.3, 1.0];
+
+        if let Some(delegates) = &self.delegates {
+            let mut my_delegates = delegates.borrow_mut();
+
+            let mut world_point = vec3::create();
+            vec3::transform_mat4(&mut world_point, &aabb_collision_out, &transform);
+
+            my_delegates
+                .debug_draw
+                .draw_point(&world_point, &AABB_HIT_COLOR);
+        }
+    }
+
+    fn debug_draw_collided_prop_mesh(&self, mesh: &Mesh, transform: &Mat4) {
+        static MESH_COLOR: Vec4 = [0.0, 0.7, 0.0, 0.2];
+        if let Some(delegates) = &self.delegates {
+            let mut my_delegates = delegates.borrow_mut();
+
+            for sector in mesh.sectors.iter() {
+                for tri_group in sector.tri_groups.iter() {
+                    my_delegates
+                        .debug_draw
+                        .draw_tri_group(tri_group, transform, &MESH_COLOR);
+                }
             }
         }
     }
