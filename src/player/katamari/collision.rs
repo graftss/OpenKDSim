@@ -209,7 +209,7 @@ impl Katamari {
         prince: &mut Prince,
         mission_state: &MissionState,
     ) {
-        temp_debug_log!("tick");
+        // temp_debug_log!("tick");
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
 
         // TODO_PARAM: make this a global parameter

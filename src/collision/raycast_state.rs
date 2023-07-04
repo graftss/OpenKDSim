@@ -363,9 +363,9 @@ impl RaycastState {
 
     /// Returns the number of triangles in `mesh` hit by the ray.
     /// offset: 0x10da0
-    pub fn ray_hits_mesh(&mut self, mesh: &Mesh, mesh_transform: &Mat4, flag: bool) -> i32 {
-        let mut p0 = self.point0.clone();
-        let mut p1 = self.point1.clone();
+    pub fn ray_hits_mesh(&mut self, mesh: &Mesh, transform: &Mat4, flag: bool) -> i32 {
+        let mut local_p0 = self.point0.clone();
+        let mut local_p1 = self.point1.clone();
 
         // the original simulation doesn't seem to use the ray-to-aabb intersection point, but it
         // still computes it. so whatever
@@ -376,9 +376,9 @@ impl RaycastState {
         if !flag {
             let mut transform_inv = mat4::create();
 
-            mat4::invert(&mut transform_inv, &mesh_transform);
-            vec3::transform_mat4(&mut p0, &self.point0, &transform_inv);
-            vec3::transform_mat4(&mut p1, &self.point1, &transform_inv);
+            mat4::invert(&mut transform_inv, &transform);
+            vec3::transform_mat4(&mut local_p0, &self.point0, &transform_inv);
+            vec3::transform_mat4(&mut local_p1, &self.point1, &transform_inv);
         }
 
         // iterate over the mesh sectors, checking if the ray meets each sector's AABB
@@ -386,8 +386,8 @@ impl RaycastState {
         let mut hit_any_aabb = false;
         for sector in mesh.sectors.iter() {
             let hit_aabb = ray_hits_aabb(
-                &p0,
-                &p1,
+                &local_p0,
+                &local_p1,
                 &sector.aabb.min,
                 &sector.aabb.max,
                 &mut aabb_collision_out,
@@ -428,7 +428,7 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist = self.ray_hits_triangle(&triangle, mesh_transform, flag);
+                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform, flag);
                         if tri_hit_dist > 0.0 {
                             // if we hit the triangle:
 
@@ -461,7 +461,7 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist = self.ray_hits_triangle(&triangle, mesh_transform, flag);
+                        let tri_hit_dist = self.ray_hits_triangle(&triangle, transform, flag);
                         if tri_hit_dist > 0.0 {
                             // if we hit the triangle:
 

@@ -676,7 +676,7 @@ pub unsafe extern "C" fn GetRadiusTargetPercent(player_idx: i32) -> f32 {
     })
 }
 
-/// Writes 3 bytes of status data to `out` for each loaded prop.    
+/// Writes 3 bytes of status data to `out` for each loaded prop.
 #[no_mangle]
 pub unsafe extern "C" fn GetPropAttached(out: *mut u8) -> i32 {
     STATE.with(|state| state.borrow().get_props_attach_status(out))
@@ -908,9 +908,12 @@ pub unsafe extern "C" fn Init(player_idx: i32, override_init_size: f32, mission:
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn TakesCallbackDebugDraw(cb: DebugDrawDelegate) {
+pub unsafe extern "C" fn TakesCallbackDebugDraw(cb: DebugDrawDelegate, data: usize) {
     STATE.with(|state| {
-        state.borrow_mut().delegates.borrow_mut().debug_draw = Some(cb);
+        let state_mut = state.borrow_mut();
+        let mut delegates = state_mut.delegates.borrow_mut();
+        delegates.debug_draw = Some(cb);
+        delegates.debug_draw_data = data as usize;
     });
 }
 

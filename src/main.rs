@@ -2,15 +2,17 @@
 #![feature(vec_into_raw_parts)]
 #![allow(non_snake_case, dead_code, unused_imports)]
 
-use std::{borrow::Borrow, cell::RefCell};
+use std::cell::RefCell;
 
 use collision::raycast_state::ray_hits_aabb;
 use gamestate::GameState;
-use gl_matrix::{common::Vec3, mat4, quat, vec3};
+use gl_matrix::{common::Vec3, mat3, mat4, quat, vec3};
 use mono_data::MonoData;
 use props::prop::AddPropArgs;
 
-use crate::collision::raycast_state::RaycastState;
+use crate::{
+    collision::raycast_state::RaycastState, constants::VEC3_ZERO, macros::set_translation,
+};
 
 // reference this first so it's available to all other modules
 pub mod macros;
@@ -48,7 +50,7 @@ const CHILD_PROP_ARGS: AddPropArgs = AddPropArgs {
     scale_x: 6.0,
     scale_y: 6.0,
     scale_z: 6.0,
-    name_idx: 837, // B pencil
+    name_idx: 269, // mandarin slice
     loc_pos_type: u16::MAX,
     random_group_id: u16::MAX,
     mono_move_type: u16::MAX,
@@ -126,31 +128,17 @@ struct Test {
 
 unsafe fn test() {
     use mission::stage::*;
-    // let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
+    let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
 
     STATE.with(|_state| {
-        // let mut state = state.borrow_mut();
+        let mut state = _state.borrow_mut();
 
-        // state.mono_init_start(mono_data_ptr, 1, 2, 3, 4, 5, 6);
-        // state.add_prop(CHILD_PROP_ARGS);
-        // let prop = state.props[0].as_ref().borrow();
-        // println!("{}", prop.max_aabb_y());
-        // println!("{:#?}", x);
-        // println!("{:?}", state.mono_data.props.get(12).unwrap().aabbs)
+        state.mono_init_start(mono_data_ptr, 1, 2, 3, false, false, false);
+        state.add_prop(&CHILD_PROP_ARGS);
+        let prop = state.props.get_prop(0).unwrap().as_ref().borrow();
 
-        let mut sc = StageConfig::default();
-        StageConfig::get(&mut sc, 2);
-        println!("stage config: {sc:?}");
+        println!("prop: {:?}", prop);
     });
-
-    let mut s = mission::config::MissionConfig::default();
-    mission::config::MissionConfig::get(&mut s, 1);
-    // let mut params = mission::config::CamScaledCtrlPt::default()
-
-    // println!("max size: {:#?}", s.scaled_params_max_size);
-
-    let mesh = &player::katamari::collision::mesh::KAT_MESHES[1];
-    println!("mesh points:\n {:?}", mesh.points);
 }
 
 fn test_cam_pos(
@@ -185,14 +173,14 @@ fn test_cam_pos(
 }
 
 unsafe fn test_monodata() {
-    let mut md = MonoData::default();
-    md.init(MAS1_MONO_DATA.as_ptr());
+    // let mut md = MonoData::default();
+    // md.init(MAS1_MONO_DATA.as_ptr());
 
-    for pd in md.props.iter() {
-        if let Some(mesh) = pd.collision_mesh.borrow() {
-            for _sector in mesh.sectors.iter() {}
-        }
-    }
+    // for pd in md.props.iter() {
+    //     if let Some(mesh) = pd.collision_mesh {
+    //         for _sector in mesh.sectors.iter() {}
+    //     }
+    // }
 }
 
 fn test_triangle_hit() {
@@ -223,6 +211,67 @@ fn test_triangle_hit() {
     );
     // let result = ray_hits_aabb(&p0, &p1, &aabb_min, &aabb_max, &mut out);
     println!("result={}, out={:?}", result, out)
+}
+
+fn test_mandarin_bbox() {
+    let mandarin_transform_init = [
+        0.002576,
+        0.9961967,
+        0.0870953,
+        0.0,
+        -0.83553123,
+        0.0499979,
+        -0.547163,
+        0.0,
+        -0.5494370,
+        -0.071361511,
+        0.83248,
+        0.0,
+        -13.9263998,
+        -25.134098,
+        -7.061699867,
+        1.0,
+    ];
+
+    let mut mandarin_transform = mat4::create();
+
+    // mat4::transpose(&mut mandarin_transform, &mandarin_transform_init);
+    mat4::copy(&mut mandarin_transform, &mandarin_transform_init);
+
+    let mut mandarin_rot = mat3::create();
+    mat3::from_mat4(&mut mandarin_rot, &mandarin_transform_init);
+
+    println!("mandarin_rot: {:?}", mandarin_rot);
+
+    let mut mandarin_quat = quat::create();
+    quat::from_mat3(&mut mandarin_quat, &mandarin_rot);
+    println!("mandarin_quat: {:?}", mandarin_quat);
+
+    let mandarin_aabb_min = [-1.48049, -1.78526, -0.999617];
+    let mandarin_aabb_max = [1.48049, 1.78526, 0.999617];
+    println!(
+        "min: {:?}, len={:?}",
+        mandarin_aabb_min,
+        vec3::len(&mandarin_aabb_min)
+    );
+    println!(
+        "max: {:?}, len={:?}",
+        mandarin_aabb_max,
+        vec3::len(&mandarin_aabb_max)
+    );
+
+    let mut out_min = vec3::create();
+    let mut out_max = vec3::create();
+
+    vec3::transform_mat4(&mut out_min, &mandarin_aabb_min, &mandarin_transform);
+    vec3::transform_mat4(&mut out_max, &mandarin_aabb_max, &mandarin_transform);
+    println!("out_min: {:?}, len={:?}", out_min, vec3::len(&out_min));
+    println!("out_max: {:?}, len={:?}", out_max, vec3::len(&out_max));
+
+    vec3::transform_mat3(&mut out_min, &mandarin_aabb_min, &mandarin_rot);
+    vec3::transform_mat3(&mut out_max, &mandarin_aabb_max, &mandarin_rot);
+    println!("out_min: {:?}, len={:?}", out_min, vec3::len(&out_min));
+    println!("out_max: {:?}, len={:?}", out_max, vec3::len(&out_max));
 }
 
 fn test_prop_attached_transform() {
@@ -298,6 +347,6 @@ fn main() {
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
     {
-        test_prop_attached_transform();
+        test_mandarin_bbox();
     }
 }

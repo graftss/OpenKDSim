@@ -1,4 +1,6 @@
-use gl_matrix::{common::Vec3, vec3};
+use core::slice;
+
+use gl_matrix::{common::Vec3, vec3, vec4};
 
 use crate::{
     constants::VEC3_X_POS,
@@ -61,62 +63,79 @@ impl Katamari {
     }
 
     /// Use the `debug_draw_line` delegate to draw the katamari's collision rays on the screen.
+    #[rustfmt::skip]
     pub fn debug_draw_collision_rays(&self) {
         if self.debug_config.draw_collision_rays {
             if let Some(delegates) = &self.delegates {
-                if let Some(draw) = delegates.borrow().debug_draw {
+                let my_delegates = delegates.borrow();
+                if let Some(draw) = my_delegates.debug_draw {
                     for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
-                        let p0 = vec3_from!(+, ray.kat_to_endpoint, self.center);
-                        let (r, g, b) = if self.vault_ray_idx == Some(ray_idx as i16) {
-                            (0.0, 1.0, 0.0)
+                        let p0 = &self.center;
+                        let p1 = vec3_from!(+, ray.kat_to_endpoint, self.center);
+                        let (r, g, b, a) = if self.vault_ray_idx == Some(ray_idx as i16) {
+                            (0.0, 1.0, 0.0, 1.0)
                         } else {
-                            (1.0, 0.0, 0.0)
+                            (1.0, 0.0, 0.0, 1.0)
                         };
 
-                        draw(
-                            DebugDrawType::Line,
-                            p0[0],
-                            p0[1],
-                            p0[2],
-                            self.center[0],
-                            self.center[1],
-                            self.center[2],
-                            r,
-                            g,
-                            b,
-                        );
+                        unsafe {
+                            let mut out = my_delegates.debug_draw_data as *mut f32;
+
+                            let mut out_p0: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                            vec3::copy(&mut out_p0, &p0);
+                            out = out.offset(3);
+
+                            let mut out_p1: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                            vec3::copy(&mut out_p1, &p1);
+                            out = out.offset(3);
+
+                            let out_color: &mut [f32; 4] = slice::from_raw_parts_mut(out, 4).try_into().unwrap();
+                            out_color[0] = r;
+                            out_color[1] = g;
+                            out_color[2] = b;
+                            out_color[3] = a;
+                        }
+
+                        draw(DebugDrawType::Line);
                     }
                 }
             }
         }
     }
 
+    #[rustfmt::skip]
     pub fn debug_draw_shell_rays(
         &self,
         shell_initial_pts: &[Vec3; 5],
         shell_final_pts: &[Vec3; 5],
     ) {
-        let SHELL_RAY_COLOR = [0.0, 1.0, 1.0];
+        let SHELL_RAY_COLOR = [0.0, 1.0, 1.0, 1.0];
 
         if self.debug_config.draw_collision_rays {
             if let Some(delegates) = &self.delegates {
-                if let Some(draw) = delegates.borrow().debug_draw {
+                let my_delegates = delegates.borrow();
+                if let Some(draw) = my_delegates.debug_draw {
                     for i in 0..5 {
                         let p0 = shell_initial_pts[i];
                         let p1 = shell_final_pts[i];
 
-                        draw(
-                            DebugDrawType::Line,
-                            p0[0],
-                            p0[1],
-                            p0[2],
-                            p1[0],
-                            p1[1],
-                            p1[2],
-                            SHELL_RAY_COLOR[0],
-                            SHELL_RAY_COLOR[1],
-                            SHELL_RAY_COLOR[2],
-                        );
+
+                        unsafe {
+                            let mut out = my_delegates.debug_draw_data as *mut f32;
+
+                            let mut out_p0: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                            vec3::copy(&mut out_p0, &p0);
+                            out = out.offset(3);
+
+                            let mut out_p1: &mut [f32; 3] = slice::from_raw_parts_mut(out, 3).try_into().unwrap();
+                            vec3::copy(&mut out_p1, &p1);
+                            out = out.offset(3);
+
+                            let mut out_color: &mut [f32; 4] = slice::from_raw_parts_mut(out, 4).try_into().unwrap();
+                            vec4::copy(&mut out_color, &SHELL_RAY_COLOR);
+                        }
+
+                        draw(DebugDrawType::Line);
                     }
                 }
             }
