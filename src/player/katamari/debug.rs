@@ -75,9 +75,9 @@ impl Katamari {
                 let p0 = &self.center;
                 let p1 = vec3_from!(+, ray.kat_to_endpoint, self.center);
                 let color = if self.vault_ray_idx == Some(ray_idx as i16) {
-                    [0.0, 1.0, 0.0, 1.0]
+                    [0.0, 1.0, 0.0, 0.2]
                 } else {
-                    [1.0, 0.0, 0.0, 1.0]
+                    [1.0, 0.0, 0.0, 0.2]
                 };
 
                 my_delegates.debug_draw.draw_line(p0, &p1, &color);

@@ -10,7 +10,7 @@ use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     debug::DEBUG_CONFIG,
     delegates::Delegates,
-    macros::{panic_log, temp_debug_log, vec3_from},
+    macros::{panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
@@ -324,10 +324,11 @@ impl RaycastState {
 
         let t = f * vec3::dot(&edge2, &q);
 
-        if t > EPS {
-            let ray_len = vec3::length(&ray);
+        if t > EPS && t < 1.0 {
             vec3::scale_and_add(&mut self.triangle_hit_point, &self.point0, &ray, t);
-            self.ray_to_triangle_hit.impact_point[2] = t;
+            let ray_len = vec3::length(&ray);
+            let p0_to_impact_len = t * ray_len;
+            self.ray_to_triangle_hit.impact_point[2] = p0_to_impact_len;
 
             // compute unit normal of the triangle
             let mut normal_unit = vec3::create();
@@ -335,7 +336,26 @@ impl RaycastState {
             vec3_inplace_normalize(&mut normal_unit);
             vec3::copy(&mut self.ray_to_triangle_hit.normal_unit, &normal_unit);
 
-            Some(t * ray_len)
+            // temp_debug_log!("  ray_hits_triangle hit (flag={tri_in_world_space}):");
+            // temp_debug_log!("    let ray = [{:?}, {:?}];", self.point0, self.point1);
+            // temp_debug_log!("    let triangle = {:?};", triangle);
+            // temp_debug_log!("    let transform = {:?};", transform);
+            // temp_debug_log!("    normal_unit={:?}", normal_unit);
+            // temp_debug_log!(
+            //     "    t={t}, impact_dist={}, impact_point={:?}",
+            //     t * vec3::length(&ray),
+            //     self.triangle_hit_point
+            // );
+
+            static HIT_COLOR: Vec4 = [1.0, 0.0, 1.0, 1.0];
+            if let Some(delegates) = &self.delegates {
+                delegates
+                    .borrow_mut()
+                    .debug_draw
+                    .draw_point(&self.triangle_hit_point, &HIT_COLOR);
+            }
+
+            Some(p0_to_impact_len)
         } else {
             None
         }
@@ -502,6 +522,7 @@ impl RaycastState {
         // let impact_dist_ratio = self.get_closest_hit().unwrap().impact_dist_ratio;
 
         for hit in self.tri_hits.iter_mut() {
+            // temp_debug_log!("    ======");
             // TODO: undo goofy hack where `ray_hits_triangle` misuses the z coordinate of the
             // impact point to store the impact distance. why?? who knows
             let impact_dist = hit.impact_point[2];
@@ -526,19 +547,27 @@ impl RaycastState {
                     t * ray_dot_normal,
                 );
 
-                temp_debug_log!(
-                    "    impact_dist={}, impact_dist_ratio={}",
-                    hit.impact_dist,
-                    hit.impact_dist_ratio
-                );
+                // temp_debug_log!(
+                //     "    impact_dist={}, impact_dist_ratio={}, ray_len={}, t={t}",
+                //     hit.impact_dist,
+                //     hit.impact_dist_ratio,
+                //     self.ray_len
+                // );
 
-                static COLOR: Vec4 = [0.0, 0.5, 0.5, 1.0];
-                self.delegates
-                    .as_ref()
-                    .unwrap()
-                    .borrow_mut()
-                    .debug_draw
-                    .draw_point(&mut hit.impact_point, &COLOR);
+                // temp_debug_log!("    ray_unit={:?}", self.ray_unit);
+
+                static RED: Vec4 = [1.0, 0.0, 0.0, 1.0];
+                let debug_draw = &mut self.delegates.as_ref().unwrap().borrow_mut().debug_draw;
+
+                debug_draw.draw_point(&hit.impact_point, &RED);
+                // temp_debug_log!("    drawing red impact point: {:?}", hit.impact_point);
+                // temp_debug_log!("    tri: {:?}", hit.tri);
+                // temp_debug_log!("    ray: [{:?}, {:?}]", self.point0, self.point1);
+                // temp_debug_log!("    transform: {:?}", transform);
+                static POINT0_COLOR: Vec4 = [0.0, 1.0, 0.0, 1.0];
+                static POINT1_COLOR: Vec4 = [0.0, 1.0, 0.0, 1.0];
+                debug_draw.draw_point(&mut self.point0, &POINT0_COLOR);
+                debug_draw.draw_point(&mut self.point1, &POINT1_COLOR);
             }
         }
 

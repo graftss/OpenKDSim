@@ -1083,6 +1083,9 @@ impl Katamari {
         mark_address!("0x1e076");
 
         self.update_collision_rays();
+
+        self.debug_draw_collision_rays();
+
         self.pull_vaulted_props_towards_center();
 
         mark_address!("0x1e080");
@@ -1099,8 +1102,6 @@ impl Katamari {
 
         // TODO_FX: `kat_update:390-415` (self.update_dust_cloud_vfx())
         // TODO_LOW: `kat_update:416-447` (self.update_prop_combo())
-
-        self.debug_draw_collision_rays();
 
         if !camera.preclear.get_enabled() {
             // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)

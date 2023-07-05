@@ -135,13 +135,7 @@ impl Katamari {
             mark_address!("0x1302a");
             self.compute_surface_contacts();
 
-            mark_address!(
-                "0x1303a",
-                format!(
-                    "floors={:?}, walls={:?}",
-                    self.num_floor_contacts, self.num_wall_contacts
-                )
-            );
+            mark_address!("0x1303a");
             self.process_surface_contacts();
 
             mark_address!("0x13042");
@@ -1182,13 +1176,13 @@ impl Katamari {
             RecordSurfaceContactResult::Wall
         };
 
-        if prop.is_some() {
-            temp_debug_log!("  record_surface_contact (prop):");
-            temp_debug_log!(
-                "    threshold={}, normal_unit={normal_unit:?}, surface_type={surface_type:?}",
-                self.params.surface_normal_y_threshold
-            );
-        }
+        // if prop.is_some() {
+        //     temp_debug_log!("  record_surface_contact (prop):");
+        //     temp_debug_log!(
+        //         "    threshold={}, normal_unit={normal_unit:?}, surface_type={surface_type:?}",
+        //         self.params.surface_normal_y_threshold
+        //     );
+        // }
 
         let dot = vec3::dot(&normal_unit, &self.raycast_state.ray_unit);
         let ray_clip_len = (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant)
@@ -1483,12 +1477,6 @@ impl Katamari {
                 }
             }
         }
-
-        temp_debug_log!(
-            "  compute_contact_floor_clip: min={:?}, max={:?}",
-            min_clip_coords,
-            max_clip_coords
-        );
 
         vec3::add(
             &mut self.contact_floor_clip,
@@ -2516,8 +2504,6 @@ impl Katamari {
             self.clip_translation[0] += self.center[0] - self.last_center[0];
             self.clip_translation[2] += self.center[2] - self.last_center[2];
         }
-
-        temp_debug_log!("    floor_clip: {:?}", self.contact_floor_clip);
 
         // apply the clip translation to the katamari center
         vec3_inplace_subtract_vec(&mut self.center, &self.clip_translation);
