@@ -1890,10 +1890,12 @@ impl Katamari {
 
             // TODO_VIBRATION: `kat_update_wall_contacts:169-171` (call vibration callback)
 
-            if self.can_climb_wall_contact(prince) {
+            let can_climb = self.can_climb_wall_contact(prince);
+
+            if can_climb {
                 return self.maintain_wallclimb();
             } else {
-                return self.end_wall_climb();
+                self.end_wall_climb();
             }
         } else {
             // if the katamari is airborne:
@@ -1999,6 +2001,7 @@ impl Katamari {
             return;
         }
 
+        // TODO_PARAM
         let param_xz_elasticity = 0.95;
         let param_min_speed_ratio = 0.3;
         let param_min_impact_similarity = 0.3;
@@ -2302,6 +2305,8 @@ impl Katamari {
         }
 
         let speed_ratio = (self.speed / self.base_speed).clamp(0.0, 1.0);
+
+        // TODO_PARAM
         return ((speed_ratio - 0.25) * 4.0).clamp(0.0, 1.0);
     }
 
@@ -2316,11 +2321,14 @@ impl Katamari {
             return 1.0;
         }
 
-        let similarity = if !self.physics_flags.airborne || !self.physics_flags.contacts_floor {
-            vec3::dot(&kat_vel, &surface_normal)
+        let impact_vel = if !self.physics_flags.airborne || !self.physics_flags.contacts_floor {
+            &kat_vel
         } else {
-            vec3::dot(&VEC3_Y_NEG, &surface_normal)
+            // if airborne and contacting a floor, force the impact to be straight
+            &VEC3_Y_NEG
         };
+
+        let similarity = vec3::dot(impact_vel, surface_normal);
 
         if similarity >= 0.0 {
             return 0.0;
