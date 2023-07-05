@@ -74,8 +74,9 @@ pub struct KatPhysicsFlags {
     pub moved_fast_shell_hit: bool,
 
     /// If true, a katamari shell ray hit a surface.
+    /// TODO_DOC: this field is also set true when a collision ray hits a prop surface, so this is wrong.
     /// offset: 0xd
-    pub shell_ray_hit_surface: bool,
+    pub kat_hit_surface_maybe_0xd: bool,
 
     /// (??) The shell ray which collided with something
     /// offset: 0xe
@@ -162,7 +163,7 @@ impl KatPhysicsFlags {
     pub fn reset_for_collision_update(&mut self) {
         self.contacts_down_slanted_ceiling = false;
         self.moved_fast_shell_hit = false;
-        self.shell_ray_hit_surface = false;
+        self.kat_hit_surface_maybe_0xd = false;
         self.hit_shell_ray = None;
         self.moved_fast_shell_hit_0x1d = false;
         self.hit_by_moving_prop = false;

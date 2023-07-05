@@ -3,6 +3,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 use crate::{
     collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
     constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG, VEC3_ZERO},
+    debug::DEBUG_CONFIG,
     global::GlobalState,
     macros::{
         inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, modify_translation,
@@ -134,7 +135,13 @@ impl Katamari {
             mark_address!("0x1302a");
             self.compute_surface_contacts();
 
-            mark_address!("0x1303a");
+            mark_address!(
+                "0x1303a",
+                format!(
+                    "floors={:?}, walls={:?}",
+                    self.num_floor_contacts, self.num_wall_contacts
+                )
+            );
             self.process_surface_contacts();
 
             mark_address!("0x13042");
@@ -281,10 +288,6 @@ impl Katamari {
 
             // otherwise, the prop is nearby, but uncollectible.
             prop.near_player = true;
-
-            if prop.get_ctrl_idx() == 680 {
-                temp_debug_log!("  mandarin near player");
-            }
 
             let did_collide =
                 self.check_prop_mesh_collision(prop_ref.clone(), &mut prop, mission_state);
@@ -505,7 +508,7 @@ impl Katamari {
             }
 
             // process shell hit
-            self.physics_flags.shell_ray_hit_surface = true;
+            self.physics_flags.kat_hit_surface_maybe_0xd = true;
             self.physics_flags.hit_shell_ray = Some(ray::ShellRay::Top);
             prop.set_katamari_contact(self.player);
 
@@ -557,7 +560,7 @@ impl Katamari {
         let mut found_any_hit = false;
         // TODO_PERF: don't clone collision rays here
         let rays = self.collision_rays.clone();
-        for ray in rays.iter() {
+        for (ray_idx, ray) in rays.iter().enumerate() {
             let ray_endpoint = vec3_from!(+, self.center, ray.kat_to_endpoint);
             self.raycast_state.load_ray(&self.center, &ray_endpoint);
 
@@ -569,7 +572,7 @@ impl Katamari {
                 continue;
             }
 
-            self.physics_flags.shell_ray_hit_surface = true;
+            self.physics_flags.kat_hit_surface_maybe_0xd = true;
             prop.set_katamari_contact(self.player);
             found_any_hit = true;
 
@@ -585,7 +588,7 @@ impl Katamari {
             };
 
             if should_contact {
-                self.record_surface_contact(0, Some(prop_ref.clone()));
+                self.record_surface_contact(ray_idx as i16, Some(prop_ref.clone()));
             } else {
                 // TODO_DOC: if the katamari isn't going to contact the prop, then it
                 // should bounce off of the prop instead
@@ -615,6 +618,11 @@ impl Katamari {
 
         if found_any_hit {
             self.contact_prop = Some(prop_ref.clone());
+
+            // if any aabb was hit, attempt to draw the prop's mesh
+            if DEBUG_CONFIG.draw_collided_prop_mesh {
+                self.debug_draw_collided_prop_mesh(&prop_mesh, &prop_transform);
+            }
         }
 
         found_any_hit
@@ -1085,7 +1093,7 @@ impl Katamari {
                     continue;
                 }
 
-                self.physics_flags.shell_ray_hit_surface = true;
+                self.physics_flags.kat_hit_surface_maybe_0xd = true;
                 let mut shell_base_pt = vec3::create();
 
                 match i {
@@ -1153,15 +1161,15 @@ impl Katamari {
     ) -> RecordSurfaceContactResult {
         let hit = self.raycast_state.get_closest_hit().unwrap_or_else(|| {
             panic_log!(
-                "`Katamari::record_surface_contact`: tried to record a nonexistent surface contact"
+                "`Katamari::record_surface_contact`: tried to record a nonexistent surface contact: {:?}", self.raycast_state
             );
         });
 
-        let mut impact_unit = hit.normal_unit;
-        vec3_inplace_zero_small(&mut impact_unit, 1e-05);
+        let mut normal_unit = hit.normal_unit;
+        vec3_inplace_zero_small(&mut normal_unit, 1e-05);
 
         // use the y component of the hit surface's unit normal to decide if it's a wall or floor
-        let surface_type = if self.params.surface_normal_y_threshold < impact_unit[1] {
+        let surface_type = if self.params.surface_normal_y_threshold < normal_unit[1] {
             if ray_idx == -1 || ray_idx == -5 || ray_idx == -6 {
                 return RecordSurfaceContactResult::ShellTop;
             }
@@ -1174,15 +1182,23 @@ impl Katamari {
             RecordSurfaceContactResult::Wall
         };
 
-        let dot = vec3::dot(&impact_unit, &self.raycast_state.ray_unit);
+        if prop.is_some() {
+            temp_debug_log!("  record_surface_contact (prop):");
+            temp_debug_log!(
+                "    threshold={}, normal_unit={normal_unit:?}, surface_type={surface_type:?}",
+                self.params.surface_normal_y_threshold
+            );
+        }
+
+        let dot = vec3::dot(&normal_unit, &self.raycast_state.ray_unit);
         let ray_clip_len = (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant)
             * self.raycast_state.ray_len;
 
-        let mut clip_normal = vec3::clone(&impact_unit);
+        let mut clip_normal = vec3::clone(&normal_unit);
         vec3_inplace_scale(&mut clip_normal, dot * ray_clip_len);
 
-        if impact_unit[1] < -0.1 {
-            let normal_angle_y = acos_f32(impact_unit[1]);
+        if normal_unit[1] < -0.1 {
+            let normal_angle_y = acos_f32(normal_unit[1]);
             if normal_angle_y < 1.047198 {
                 self.physics_flags.contacts_down_slanted_ceiling = true;
                 if self.physics_flags.contacts_prop_0xa {
@@ -1193,7 +1209,7 @@ impl Katamari {
 
         self.add_surface_contact(
             surface_type.try_into().unwrap(),
-            &impact_unit,
+            &normal_unit,
             &clip_normal,
             ray_idx,
             prop,
@@ -1277,10 +1293,10 @@ impl Katamari {
         let closest_hit = self.raycast_state.get_closest_hit().unwrap();
 
         // write the new data to the added surface
-        added_surface.normal_unit = normal_unit.clone();
-        added_surface.clip_normal = clip_normal.clone();
-        added_surface.ray = self.raycast_state.ray.clone();
-        added_surface.contact_point = closest_hit.impact_point.clone();
+        added_surface.normal_unit = *normal_unit;
+        added_surface.clip_normal = clip_normal;
+        added_surface.ray = self.raycast_state.ray;
+        added_surface.contact_point = closest_hit.impact_point;
         added_surface.clip_normal_len = clip_normal_len;
         added_surface.impact_dist_ratio = closest_hit.impact_dist_ratio;
         added_surface.ray_len = self.raycast_state.ray_len;
@@ -1467,6 +1483,12 @@ impl Katamari {
                 }
             }
         }
+
+        temp_debug_log!(
+            "  compute_contact_floor_clip: min={:?}, max={:?}",
+            min_clip_coords,
+            max_clip_coords
+        );
 
         vec3::add(
             &mut self.contact_floor_clip,
@@ -2494,6 +2516,8 @@ impl Katamari {
             self.clip_translation[0] += self.center[0] - self.last_center[0];
             self.clip_translation[2] += self.center[2] - self.last_center[2];
         }
+
+        temp_debug_log!("    floor_clip: {:?}", self.contact_floor_clip);
 
         // apply the clip translation to the katamari center
         vec3_inplace_subtract_vec(&mut self.center, &self.clip_translation);

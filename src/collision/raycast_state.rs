@@ -6,14 +6,18 @@ use gl_matrix::{
 };
 
 use crate::{
+    collision::mesh::TriGroup,
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     debug::DEBUG_CONFIG,
     delegates::Delegates,
-    macros::{panic_log, vec3_from},
+    macros::{panic_log, temp_debug_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
-use super::{hit_attribute::HitAttribute, mesh::Mesh};
+use super::{
+    hit_attribute::HitAttribute,
+    mesh::{Mesh, TriVertex},
+};
 
 const IMPACT_EPS: f32 = 0.0001;
 
@@ -55,7 +59,7 @@ pub struct RaycastState {
 
     /// For some reason this was a global vector instead of part of the raycast state...
     /// offset: 0xb3230
-    ray_to_triangle_hit_point: Vec3,
+    triangle_hit_point: Vec3,
     // END fields not in the original simulation
     /// Initial point of the collision ray.
     /// offset: 0x0
@@ -270,96 +274,71 @@ impl RaycastState {
         false
     }
 
+    /// If this raycast's state cached ray hits the triangle `triangle`
+    /// Adapted from https://en.m.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     /// offset: 0x11d70
     pub fn ray_hits_triangle(
         &mut self,
         triangle: &[Vec3; 3],
         transform: &Mat4,
-        transform_tri: bool,
-    ) -> f32 {
+        tri_in_world_space: bool,
+    ) -> Option<f32> {
         let EPS = 0.000001;
 
         let [mut p0, mut p1, mut p2] = &triangle;
 
-        if !transform_tri {
+        if !tri_in_world_space {
             vec3::transform_mat4(&mut p0, &triangle[0], transform);
             vec3::transform_mat4(&mut p1, &triangle[1], transform);
             vec3::transform_mat4(&mut p2, &triangle[2], transform);
         }
 
-        // just naively copy this i guess
-        let p0p1 = vec3_from!(-, p1, p0);
-        let p0p2 = vec3_from!(-, p2, p0);
+        let edge1 = vec3_from!(-, p1, p0);
+        let edge2 = vec3_from!(-, p2, p0);
         let ray = vec3_from!(-, self.point1, self.point0);
-        let ray_len = vec3::length(&ray);
 
-        let d0 = p0p2[2] * ray[1] - p0p2[1] * ray[2];
-        let d1 = p0p2[0] * ray[2] - p0p2[2] * ray[0];
-        let d2 = p0p2[1] * ray[0] - p0p2[0] * ray[1];
-        let d = d1 * p0p1[1] + d0 * p0p1[0] + d2 * p0p1[2];
+        let mut h = vec3::create();
+        vec3::cross(&mut h, &ray, &edge2);
+        let a = vec3::dot(&edge1, &h);
 
-        // if d is (almost) 0, the ray is parallel (enough) to the plane of the triangle (to admit defeat)
-        if d > -EPS && d < EPS {
-            return 0.0;
+        // detect if the ray is parallel to the triangle
+        if a > -EPS && a < EPS {
+            return None;
         }
 
-        let d_inv = 1.0 / d;
+        let f = 1.0 / a;
+        let s = vec3_from!(-, self.point0, p0);
+        let u = f * vec3::dot(&s, &h);
 
-        let p0r0 = vec3_from!(-, self.point0, p0);
-        let dt = (p0r0[1] * d1 + p0r0[0] * d0 + p0r0[2] * d2) * d_inv;
-
-        if dt < 0.0 || dt > 1.0 {
-            return 0.0;
+        if u < 0.0 || u > 1.0 {
+            return None;
         }
 
-        let x0 = p0r0[1] * p0p1[2] - p0r0[2] * p0p1[1];
-        let x1 = p0r0[2] * p0p1[0] - p0r0[0] * p0p1[2];
-        let x2 = p0r0[0] * p0p1[1] - p0r0[1] * p0p1[0];
-        let du = (x0 * ray[0] + x1 * ray[1] + x2 * ray[2]) * d_inv;
+        let mut q = vec3::create();
+        vec3::cross(&mut q, &s, &edge1);
+        let v = f * vec3::dot(&ray, &q);
 
-        if du < 0.0 || (du + dt) > 1.0 {
-            return 0.0;
+        if v < 0.0 || u + v > 1.0 {
+            return None;
         }
 
-        let dv = (x0 * p0p2[0] + x1 * p0p2[1] + x2 * p0p2[2]) * d_inv;
+        let t = f * vec3::dot(&edge2, &q);
 
-        if dv <= EPS || dv > ray_len
-        /* something else here maybe */
-        {
-            return 0.0;
-        }
-
-        // compute the point at which the stored ray hits the input triangle
-        let t = dv * ray_len;
-        vec3::scale_and_add(
-            &mut self.ray_to_triangle_hit_point,
-            &self.point0,
-            &self.ray_unit,
-            t,
-        );
-
-        if t < 0.0 || t > self.ray_len {
-            return 0.0;
-        }
-
-        self.ray_to_triangle_hit.impact_point = self.ray_to_triangle_hit_point;
-        // TODO: ?? what is this doing
-        if !transform_tri {
+        if t > EPS {
+            let ray_len = vec3::length(&ray);
+            vec3::scale_and_add(&mut self.triangle_hit_point, &self.point0, &ray, t);
             self.ray_to_triangle_hit.impact_point[2] = t;
+
+            // compute unit normal of the triangle
+            let mut normal_unit = vec3::create();
+            vec3::cross(&mut normal_unit, &edge2, &edge1);
+            vec3_inplace_normalize(&mut normal_unit);
+            vec3::copy(&mut self.ray_to_triangle_hit.normal_unit, &normal_unit);
+
+            Some(t * ray_len)
+        } else {
+            None
         }
-
-        let l0 = p0p2[2] * p0p1[1] - p0p2[1] * p0p1[2];
-        let l1 = p0p2[0] * p0p1[2] - p0p2[2] * p0p1[0];
-        let l2 = p0p2[1] * p0p1[0] - p0p2[0] * p0p1[1];
-        let mut normal_unit = [l0, l1, l2];
-        vec3_inplace_normalize(&mut normal_unit);
-        vec3::scale(
-            &mut self.ray_to_triangle_hit.normal_unit,
-            &normal_unit,
-            -1.0,
-        );
-
-        return t;
     }
 
     /// Returns the number of triangles in `mesh` hit by the ray.
@@ -418,11 +397,6 @@ impl RaycastState {
             return 0;
         }
 
-        // if any aabb was hit, attempt to draw the prop's mesh
-        if DEBUG_CONFIG.draw_collided_prop_mesh {
-            self.debug_draw_collided_prop_mesh(&mesh, &transform);
-        }
-
         // iterate over the sectors again, this time refining the successful AABB collisions with
         // more precise triangle mesh collisions
 
@@ -450,10 +424,17 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist =
+                        let tri_hit_result =
                             self.ray_hits_triangle(&triangle, transform, ray_in_mesh_coords);
-                        if tri_hit_dist > 0.0 {
+                        if let Some(tri_hit_dist) = tri_hit_result {
                             // if we hit the triangle:
+
+                            if DEBUG_CONFIG.draw_collided_prop_tris {
+                                self.debug_draw_collided_tri_hit(
+                                    vertices.try_into().unwrap(),
+                                    transform,
+                                );
+                            }
 
                             // finish copying data to the triangle (this should probably be in `ray_hits_triangle`)
                             let mut hit = self.ray_to_triangle_hit;
@@ -471,6 +452,7 @@ impl RaycastState {
                                 min_tri_hit_dist = tri_hit_dist;
                                 vec3::copy(&mut min_tri_hit_point, &hit.impact_point);
                             }
+                            self.num_hit_tris += 1;
                         }
                     }
                 } else {
@@ -484,9 +466,9 @@ impl RaycastState {
                             }
                         }
 
-                        let tri_hit_dist =
+                        let tri_hit_result =
                             self.ray_hits_triangle(&triangle, transform, ray_in_mesh_coords);
-                        if tri_hit_dist > 0.0 {
+                        if let Some(tri_hit_dist) = tri_hit_result {
                             // if we hit the triangle:
 
                             // finish copying data to the triangle (this should probably be in `ray_hits_triangle`)
@@ -517,7 +499,7 @@ impl RaycastState {
             return 0;
         }
 
-        let impact_dist_ratio = self.get_closest_hit().unwrap().impact_dist_ratio;
+        // let impact_dist_ratio = self.get_closest_hit().unwrap().impact_dist_ratio;
 
         for hit in self.tri_hits.iter_mut() {
             // TODO: undo goofy hack where `ray_hits_triangle` misuses the z coordinate of the
@@ -527,7 +509,7 @@ impl RaycastState {
             hit.impact_dist = impact_dist;
             hit.impact_dist_ratio = impact_dist / self.ray_len;
 
-            // TODO: no clue what this is doing
+            // TODO_DOC: no clue what this is doing
             if ray_in_mesh_coords {
                 hit.impact_point = min_tri_hit_point
             } else {
@@ -535,7 +517,7 @@ impl RaycastState {
                 vec3_inplace_zero_small(&mut normal_unit, 0.00001);
 
                 let ray_dot_normal = vec3::dot(&normal_unit, &self.ray_unit);
-                let t = (1.0 - impact_dist_ratio - 0.0005) * self.ray_len;
+                let t = (1.0 - hit.impact_dist_ratio - 0.0005) * self.ray_len;
 
                 vec3::scale_and_add(
                     &mut hit.impact_point,
@@ -543,6 +525,20 @@ impl RaycastState {
                     &normal_unit,
                     t * ray_dot_normal,
                 );
+
+                temp_debug_log!(
+                    "    impact_dist={}, impact_dist_ratio={}",
+                    hit.impact_dist,
+                    hit.impact_dist_ratio
+                );
+
+                static COLOR: Vec4 = [0.0, 0.5, 0.5, 1.0];
+                self.delegates
+                    .as_ref()
+                    .unwrap()
+                    .borrow_mut()
+                    .debug_draw
+                    .draw_point(&mut hit.impact_point, &COLOR);
             }
         }
 
@@ -564,18 +560,20 @@ impl RaycastState {
         }
     }
 
-    fn debug_draw_collided_prop_mesh(&self, mesh: &Mesh, transform: &Mat4) {
-        static MESH_COLOR: Vec4 = [0.0, 0.7, 0.0, 0.2];
+    fn debug_draw_collided_tri_hit(&self, triangle: &[TriVertex; 3], transform: &Mat4) {
+        static TRIANGLE_HIT_COLOR: Vec4 = [0.8, 0.4, 0.3, 1.0];
+
         if let Some(delegates) = &self.delegates {
             let mut my_delegates = delegates.borrow_mut();
 
-            for sector in mesh.sectors.iter() {
-                for tri_group in sector.tri_groups.iter() {
-                    my_delegates
-                        .debug_draw
-                        .draw_tri_group(tri_group, transform, &MESH_COLOR);
-                }
-            }
+            let tri_group = TriGroup {
+                is_tri_strip: false,
+                vertices: triangle.to_vec(),
+            };
+
+            my_delegates
+                .debug_draw
+                .draw_tri_group(&tri_group, transform, &TRIANGLE_HIT_COLOR);
         }
     }
 }

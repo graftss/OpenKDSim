@@ -1,6 +1,10 @@
-use gl_matrix::{common::Vec3, vec3};
+use gl_matrix::{
+    common::{Mat4, Vec3, Vec4},
+    vec3,
+};
 
 use crate::{
+    collision::mesh::Mesh,
     constants::VEC3_X_POS,
     debug::DEBUG_CONFIG,
     macros::{debug_log, vec3_from},
@@ -108,5 +112,20 @@ impl Katamari {
             "vel_accel_len:{:?}, bottom_ray={:?}, angle={}, speed={}",
             vel_accel_len, self.physics_flags.grounded_ray_type, angle, self.speed
         )
+    }
+
+    pub fn debug_draw_collided_prop_mesh(&self, mesh: &Mesh, transform: &Mat4) {
+        static MESH_COLOR: Vec4 = [0.0, 0.4, 0.0, 0.1];
+        if let Some(delegates) = &self.delegates {
+            let mut my_delegates = delegates.borrow_mut();
+
+            for sector in mesh.sectors.iter() {
+                for tri_group in sector.tri_groups.iter() {
+                    my_delegates
+                        .debug_draw
+                        .draw_tri_group(tri_group, transform, &MESH_COLOR);
+                }
+            }
+        }
     }
 }
