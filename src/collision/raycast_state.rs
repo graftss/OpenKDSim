@@ -590,7 +590,7 @@ impl RaycastState {
     }
 
     fn debug_draw_collided_tri_hit(&self, triangle: &[TriVertex; 3], transform: &Mat4) {
-        static TRIANGLE_HIT_COLOR: Vec4 = [0.8, 0.4, 0.3, 1.0];
+        static TRIANGLE_HIT_COLOR: Vec4 = [0.8, 0.4, 0.3, 0.5];
 
         if let Some(delegates) = &self.delegates {
             let mut my_delegates = delegates.borrow_mut();

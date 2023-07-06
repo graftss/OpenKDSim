@@ -2146,12 +2146,21 @@ impl Katamari {
             return false;
         }
 
+        // NOTE: this deviates from the logic of the original simulation. See the
+        // documentation of `most_recent_wall_normal`.
+        let most_recent_wall_normal = if self.num_wall_contacts > 0 {
+            self.most_recent_wall_normal = Some(self.hit_walls[0].normal_unit);
+            self.hit_walls[0].normal_unit
+        } else {
+            self.most_recent_wall_normal.unwrap()
+        };
+
         // check that the angle between the katamari's push velocity and the wall normal are close
         // enough to admit a wallclimb. since the wall normal is actually pointing *out* of the wall,
         // we need to throw in a negative somewhere in there.
         let similarity = vec3::dot(
             &self.velocity.push_vel_on_floor_unit,
-            &self.hit_walls[0].normal_unit,
+            &most_recent_wall_normal,
         );
         let angle = acos_f32(-similarity);
         if angle > self.params.max_wallclimb_angle {

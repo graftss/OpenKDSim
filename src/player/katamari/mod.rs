@@ -139,7 +139,18 @@ pub struct Katamari {
     /// offset: 0xd35050
     new_collected_props: Vec<PropRef>,
 
+    /// The list of props attached to the katamari.
+    /// In the original simulation, this list was not stored as an array; instead each attached prop
+    /// had a pointer to the props that are/were last attached and next attached.
+    /// This linked list was then traversed when iterating over all attached props.
     attached_props: Vec<PropRef>,
+
+    /// In the original simulation, `Katamari::can_climb_wall_contact` attempts to read the normal of
+    /// wall contact at index 0 (`hit_walls[0]`) on a frame when `num_wall_contacts == 0`.
+    /// This abuses the fact that the original simulation leaves old wall contacts in memory
+    /// after they aren't contacted.
+    /// Since we can't do that because it's crazy, we have to save a copy of that wall normal here.
+    most_recent_wall_normal: Option<Vec3>,
 
     // END new fields
     /// A reference to the vector of katamari meshes.
