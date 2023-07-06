@@ -2,7 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
-    constants::{FRAC_PI_2, FRAC_PI_90, VEC3_Y_NEG, VEC3_ZERO},
+    constants::{FRAC_PI_2, FRAC_PI_90, PI, VEC3_Y_NEG, VEC3_ZERO},
     debug::DEBUG_CONFIG,
     global::GlobalState,
     macros::{
@@ -1859,9 +1859,9 @@ impl Katamari {
         let flag_d_false_in_1p = false;
 
         let mut surface_normal_unit = [0.0; 3];
-        let mut _impact_similarity = 0.0;
-        let mut _impact_force = 0.0;
-        let mut _impact_volume = 0.0;
+        let impact_similarity;
+        let impact_force;
+        let mut impact_volume;
 
         if !self.physics_flags.airborne {
             // if the katamari contacts a surface:
@@ -1883,10 +1883,10 @@ impl Katamari {
                 return;
             }
 
-            _impact_force = self.compute_impact_force();
-            _impact_similarity =
+            impact_force = self.compute_impact_force();
+            impact_similarity =
                 self.compute_impact_similarity(&lateral_vel_unit, &surface_normal_unit);
-            _impact_volume = _impact_force * _impact_similarity;
+            impact_volume = impact_force * impact_similarity;
 
             // TODO_VIBRATION: `kat_update_wall_contacts:169-171` (call vibration callback)
 
@@ -1929,17 +1929,17 @@ impl Katamari {
                 return;
             }
 
-            _impact_force = self.compute_impact_force();
-            _impact_similarity = self.compute_impact_similarity(
+            impact_force = self.compute_impact_force();
+            impact_similarity = self.compute_impact_similarity(
                 &self.velocity.vel_accel_grav_unit,
                 &surface_normal_unit,
             );
-            _impact_volume = _impact_force * _impact_similarity;
+            impact_volume = impact_force * impact_similarity;
 
             if self.physics_flags.moved_fast_shell_hit_0x14
                 && self.physics_flags.grounded_ray_type != Some(KatCollisionRayType::Bottom)
             {
-                _impact_volume = 0.0;
+                impact_volume = 0.0;
             }
 
             // TODO_PARAM
@@ -1984,8 +1984,8 @@ impl Katamari {
             self.falling_ticks = 0;
         }
 
-        if _impact_similarity <= 0.0 {
-            if _impact_volume > 0.0 {
+        if impact_similarity <= 0.0 {
+            if impact_volume > 0.0 {
                 return;
             }
             if self.physics_flags.hit_by_moving_prop {
@@ -2039,7 +2039,7 @@ impl Katamari {
             } else {
                 let speed_ratio = self.speed / self.scaled_params.base_max_speed;
                 _play_map_sound = speed_ratio > param_min_speed_ratio
-                    && _impact_similarity > param_min_impact_similarity
+                    && impact_similarity > param_min_impact_similarity
                     && global.game_time_ms - self.last_bonk_game_time_ms > param_sound_cooldown_ms;
                 speed *= self.y_elasticity;
             }
@@ -2064,7 +2064,7 @@ impl Katamari {
 
             let not_climbing = !self.physics_flags.climbing && !self.last_physics_flags.climbing;
 
-            if not_climbing && _impact_force > 0.0 {
+            if not_climbing && impact_force > 0.0 {
                 // TODO_LOW: `kat_begin_screen_shake()`
                 let _can_lose_props = !camera.state.cam_eff_1P && !global.map_change_mode;
                 // TODO_PROPS: `kat_update_wall_contacts:380-409` (lose props from collision, play bonk sfx)
@@ -2363,8 +2363,8 @@ impl Katamari {
         }
 
         // compute features of the vault ray length
-        self.vault_ray_idx = self.fc_ray_idx;
         self.vault_ray_len_radii = vault_ray_len_radii;
+        self.vault_ray_idx = self.fc_ray_idx;
         self.vault_ray_max_len_ratio =
             min!(vault_ray_len_radii / self.params.max_ray_len_radii, 1.0);
 
@@ -2384,23 +2384,37 @@ impl Katamari {
         vec3_inplace_normalize(&mut fc_ray_unit);
         vec3_inplace_zero_small(&mut fc_ray_unit, 1e-05);
 
-        let mut ray_proj_floor = [0.0; 3];
-        let mut ray_rej_floor = [0.0; 3];
+        let mut fc_proj_floor = [0.0; 3];
+        let mut fc_rej_floor = [0.0; 3];
         vec3_projection(
-            &mut ray_proj_floor,
-            &mut ray_rej_floor,
+            &mut fc_proj_floor,
+            &mut fc_rej_floor,
             &fc_ray_unit,
             &self.contact_floor_normal_unit,
         );
-        vec3_inplace_zero_small(&mut ray_rej_floor, 1e-05);
+        vec3_inplace_zero_small(&mut fc_rej_floor, 1e-05);
 
         // transform the angle between the rejections:
         //   [0, PI/2] -> [1, 0]
         //   [PI/2, PI] -> 0
 
-        let rej_similarity = vec3::dot(&vel_rej_floor, &ray_rej_floor); // [-1, 1]
-        let rej_angle = acos_f32(rej_similarity); // [PI, 0]
-        self.vault_rej_angle_t = inv_lerp_clamp!(rej_angle, 0.0, FRAC_PI_2);
+        let rej_similarity = vec3::dot(&vel_rej_floor, &fc_rej_floor); // [-1, 1]
+                                                                       // let rej_angle = acos_f32(rej_similarity); // [PI, 0]
+                                                                       // self.vault_rej_angle_t = inv_lerp_clamp!(rej_angle, 0.0, FRAC_PI_2);
+        self.vault_rej_angle_t = if rej_similarity < 1.0 {
+            let rej_angle = if rej_similarity > -1.0 {
+                acos_f32(rej_similarity)
+            } else {
+                PI
+            };
+            if rej_angle > FRAC_PI_2 {
+                0.0
+            } else {
+                (FRAC_PI_2 - rej_angle) / FRAC_PI_2
+            }
+        } else {
+            1.0
+        };
 
         // (??) set the initial vault speed
         if FRAC_PI_90 < rej_similarity {
@@ -2410,16 +2424,22 @@ impl Katamari {
             let ray_len_k = lerp!(ray_len_t, 1.0, self.params.vault_tuning_0x7b208);
             let k = lerp!(speed_t, ray_len_k, 1.0);
 
-            // TODO: if this is buggy, this part is probably why
             let mut vel_reflect_floor = [0.0; 3];
-            vec3_reflection(&mut vel_reflect_floor, &ray_rej_floor, &vel_rej_floor);
+            vec3_reflection(&mut vel_reflect_floor, &fc_rej_floor, &vel_rej_floor);
             vec3_inplace_scale(&mut vel_reflect_floor, -1.0);
 
-            let mut vel_accel = [0.0; 3];
-            vec3::lerp(&mut vel_accel, &vel_rej_floor, &vel_reflect_floor, k);
-            vec3_inplace_normalize(&mut vel_accel);
+            let __old_vel = self.velocity.vel_accel;
 
-            vec3::scale(&mut self.velocity.vel_accel, &vel_accel, self.speed);
+            let mut vel_accel_unit = [0.0; 3];
+            vec3::lerp(
+                &mut vel_accel_unit,
+                &vel_rej_floor,
+                &vel_reflect_floor,
+                1.0 - k,
+            );
+            vec3_inplace_normalize(&mut vel_accel_unit);
+
+            vec3::scale(&mut self.velocity.vel_accel, &vel_accel_unit, self.speed);
         }
 
         return TryInitVaultResult::InitVault;

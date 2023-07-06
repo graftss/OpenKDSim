@@ -5,15 +5,20 @@
 use std::cell::RefCell;
 
 use collision::raycast_state::ray_hits_aabb;
+use constants::{FRAC_PI_2, FRAC_PI_90, PI};
 use gamestate::GameState;
 use gl_matrix::{common::Vec3, mat3, mat4, quat, vec3};
+use macros::{inv_lerp_clamp, lerp};
+use math::{
+    acos_f32, vec3_inplace_normalize, vec3_inplace_scale, vec3_projection, vec3_reflection,
+};
 use mono_data::MonoData;
 use props::prop::AddPropArgs;
 
 use crate::{
     collision::raycast_state::RaycastState,
     constants::VEC3_ZERO,
-    macros::{set_translation, vec3_from},
+    macros::{set_translation, temp_debug_log, vec3_from},
     math::vec3_inplace_zero_small,
 };
 
@@ -186,6 +191,124 @@ unsafe fn test_monodata() {
     // }
 }
 
+fn replicate_init_vault() {
+    let contact_floor_normal_unit = [0.0, 1.0, 0.0];
+    let vel_unit = [-0.33118119835854, 0.0, -0.94356715679169];
+    let vel_accel = [-0.22452616691589, 0.0, -0.63969671726227];
+    let fc_ray = [-0.58637666702271, -2.8934364318848, -1.3940563201904];
+    let max_forwards_speed = 0.8875373005867;
+    let max_boost_speed = 2.6494677066803;
+    let fc_ray_len = 3.2648437023163;
+    let max_ray_len = 6.7128653526306;
+    let radius_cm = 2.6851460933685;
+    let speed = 0.67795568704605;
+    let vault_tuning_0x7b208 = 0.30000001192093;
+
+    let mut fc_ray_unit = vec3::create();
+    vec3::normalize(&mut fc_ray_unit, &fc_ray);
+
+    let mut vel_proj_floor = [0.0; 3];
+    let mut vel_rej_floor = [0.0; 3];
+    vec3_projection(
+        &mut vel_proj_floor,
+        &mut vel_rej_floor,
+        &vel_unit,
+        &contact_floor_normal_unit,
+    );
+    println!("++ vel_rej_floor: {vel_rej_floor:?}");
+    vec3_inplace_normalize(&mut vel_rej_floor);
+
+    // compute the unit `fc_ray`
+    let mut fc_ray_unit = fc_ray;
+    vec3_inplace_normalize(&mut fc_ray_unit);
+    vec3_inplace_zero_small(&mut fc_ray_unit, 1e-05);
+
+    println!("++ fc_ray_unit: {fc_ray_unit:?}");
+
+    let mut fc_proj_floor = [0.0; 3];
+    let mut fc_rej_floor = [0.0; 3];
+    vec3_projection(
+        &mut fc_proj_floor,
+        &mut fc_rej_floor,
+        &fc_ray_unit,
+        &contact_floor_normal_unit,
+    );
+    println!("++ fc_rej_floor: {fc_rej_floor:?}");
+    // println!("fc_proj_floor: {fc_proj_floor:?}");
+    vec3_inplace_zero_small(&mut fc_rej_floor, 1e-05);
+
+    let rej_similarity = vec3::dot(&vel_rej_floor, &fc_rej_floor); // [-1, 1]
+                                                                   // let rej_angle = acos_f32(rej_similarity); // [PI, 0]
+                                                                   // self.vault_rej_angle_t = inv_lerp_clamp!(rej_angle, 0.0, FRAC_PI_2);
+    let vault_rej_angle_t = if rej_similarity < 1.0 {
+        let rej_angle = if rej_similarity > -1.0 {
+            acos_f32(rej_similarity)
+        } else {
+            PI
+        };
+        if rej_angle > FRAC_PI_2 {
+            0.0
+        } else {
+            (FRAC_PI_2 - rej_angle) / FRAC_PI_2
+        }
+    } else {
+        1.0
+    };
+
+    println!("++ rej_similarity: {rej_similarity}");
+    println!("++ vault_rej_angle_t: {vault_rej_angle_t}");
+
+    let mut new_vel_accel = vec3::create();
+    if rej_similarity > FRAC_PI_90 {
+        let speed_t = inv_lerp_clamp!(speed, max_forwards_speed, max_boost_speed);
+        let ray_len_t = inv_lerp_clamp!(fc_ray_len, radius_cm, max_ray_len);
+        let ray_len_k = lerp!(ray_len_t, 1.0, vault_tuning_0x7b208);
+        let k = lerp!(speed_t, ray_len_k, 1.0);
+
+        println!("++ speed_t: {speed_t}");
+        println!("++ ray_len_t: {ray_len_t}");
+        println!("++ ray_len_k: {ray_len_k}");
+        println!("++ k: {k}");
+
+        let mut vel_reflect_floor = [0.0; 3];
+        vec3_reflection(&mut vel_reflect_floor, &fc_rej_floor, &vel_rej_floor);
+        vec3_inplace_scale(&mut vel_reflect_floor, -1.0);
+
+        let dot2 = vec3::dot(&vel_rej_floor, &fc_rej_floor) * 2.0;
+        let v1 = [
+            vel_rej_floor[0] * dot2 - fc_rej_floor[0], // -(u - dot2*v)
+            vel_rej_floor[1] * dot2 - fc_rej_floor[1],
+            vel_rej_floor[2] * dot2 - fc_rej_floor[2],
+        ];
+
+        let v2 = [
+            (1.0 - k) * v1[0] + vel_rej_floor[0] * k,
+            (1.0 - k) * v1[1] + vel_rej_floor[1] * k,
+            (1.0 - k) * v1[2] + vel_rej_floor[2] * k,
+        ];
+
+        println!("vel_reflect_floor: {vel_reflect_floor:?}");
+        println!("v1: {v1:?}");
+        println!("v2: {v2:?}");
+
+        let __old_vel = vel_accel;
+
+        let mut vel_accel_unit = [0.0; 3];
+        vec3::lerp(
+            &mut vel_accel_unit,
+            &vel_rej_floor,
+            &vel_reflect_floor,
+            1.0 - k,
+        );
+        println!("vel_accel after lerp: {vel_accel_unit:?}");
+        vec3_inplace_normalize(&mut vel_accel_unit);
+
+        vec3::scale(&mut new_vel_accel, &vel_accel_unit, speed);
+    }
+
+    println!("new_vel_accel: {:?}", new_vel_accel);
+}
+
 fn replicate_triangle_hit() {
     let mut raycast_state = RaycastState::default();
     let ray_pts = [
@@ -297,6 +420,6 @@ fn main() {
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
     {
-        replicate_triangle_hit();
+        replicate_init_vault();
     }
 }

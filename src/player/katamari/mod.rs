@@ -21,7 +21,7 @@ use crate::{
     },
     delegates::{Delegates, DelegatesRef},
     global::GlobalState,
-    macros::{inv_lerp, mark_address, min, set_translation, vec3_from},
+    macros::{inv_lerp, mark_address, min, panic_log, set_translation, vec3_from},
     math::{
         normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
@@ -1249,7 +1249,7 @@ impl Katamari {
                 );
             }
             a @ _ => {
-                panic!("weird thingy: {:?}", a);
+                panic_log!("unexpected collision ray type in `update_transform_vaulted`: {a:?}");
             }
         }
 

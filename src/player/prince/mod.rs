@@ -466,6 +466,10 @@ impl Prince {
         &self.pos
     }
 
+    pub fn get_angle(&self) -> f32 {
+        self.angle
+    }
+
     pub fn get_oujistate(&self) -> OujiState {
         self.oujistate.clone()
     }
@@ -862,7 +866,7 @@ impl Prince {
         let change = self.push_dirs_changed;
         let push = self.push_dirs;
         let new_gacha =
-            // left stick push dir just changed to the opposite of the right stick push dir 
+            // left stick push dir just changed to the opposite of the right stick push dir
             (change.left != None && push.right != None && change.left != push.right) ||
             // right stick push dir just changed to the opposite of the left stick push dir
             (change.right != None && push.left != None && change.right != push.left);
