@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use gl_matrix::{common::Vec3, vec3};
 
 use crate::constants::AABB_TRIANGULATION;
@@ -8,6 +10,12 @@ use super::mesh::{Mesh, MeshSector, TriGroup, TriVertex};
 pub struct Aabb {
     pub min: Vec3,
     pub max: Vec3,
+}
+
+impl Display for Aabb {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Aabb(min={:?}, max={:?})", self.min, self.max)
+    }
 }
 
 impl Aabb {

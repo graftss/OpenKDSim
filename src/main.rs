@@ -366,49 +366,14 @@ fn replicate_triangle_hit() {
     println!("normal_unit: {:?}", normal_unit);
 }
 
-fn test_triangle_hit() {
-    let mut raycast_state = RaycastState::default();
+unsafe fn print_square_dish_mesh() {
+    let mut md = MonoData::default();
+    md.init(MAS1_MONO_DATA.as_ptr());
 
-    let ray = [
-        [-7.64054, -62.921543, -164.34523],
-        [-9.983479, -62.070057, -164.91994],
-    ];
-    let triangle = [
-        [-1.71, 3.0645614, 1.71],
-        [-1.71, -3.0645616, 1.71],
-        [-1.71, 3.0645614, -1.71],
-    ];
-    let transform = [
-        -3.6199901e-6,
-        1.0,
-        0.0,
-        0.0,
-        -1.0,
-        -3.6199901e-6,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.99999994,
-        0.0,
-        63.4754,
-        -24.2936,
-        1.7704,
-        1.0,
-    ];
-
-    raycast_state.load_ray(&ray[0], &ray[1]);
-    let t = raycast_state.ray_hits_triangle(&triangle, &transform, false);
-    println!("t: {t:?}");
-    // let triangle = [[-2.6363091468811,0.020901577547193,-4.1993327140808],[-2.6363091468811,-6.4182171821594,4.274188041687],[-2.6363091468811,-6.4182171821594,-4.199333190918]];
-    // let ray = [[-26.963624954224,-24.175483703613,17.492353439331],[-25.76362991333,-25.552066802979,15.770400047302]];
-    // let result=[[-26.267070770264,-24.974540710449,1.4569648504257],[0.70710015296936,2.0945599032984e-007,0.70711332559586]];
-    // let t = 1.46;
-
-    // println!("init state {:?}", raycast_state);
-    // let t = raycast_state.ray_hits_triangle(&triangle, &None);
-    // println!("result: {:?}", raycast_state.ray_to_triangle_hit);
-    // println!("t={}", t);
+    let md = &md.props.get(867).unwrap().clone();
+    let mesh = &md.collision_mesh.clone().unwrap();
+    // let mesh = md.props.get(867).as_ref().unwrap().collision_mesh.unwrap().as_ref();
+    println!("square dish:\n{}", mesh);
 }
 
 fn main() {
@@ -419,7 +384,7 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
-    {
-        replicate_init_vault();
+    unsafe {
+        print_square_dish_mesh();
     }
 }
