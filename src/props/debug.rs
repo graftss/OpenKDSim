@@ -1,6 +1,6 @@
 use gl_matrix::common::Vec4;
 
-use crate::util::color::{CLEAR, RED_TRANS};
+use crate::util::color::{CLEAR, GREEN, RED_TRANS};
 
 use super::PropsState;
 
@@ -23,6 +23,7 @@ impl PropsState {
         }
     }
 
+    /// Request to draw the mesh of the prop with control index `ctrl_idx`.
     pub fn debug_draw_prop_mesh(&self, ctrl_idx: u16) {
         static TRI_GROUP_COLORS: [Vec4; 2] = [RED_TRANS, CLEAR];
 
@@ -37,6 +38,13 @@ impl PropsState {
                     my_delegates
                         .debug_draw
                         .draw_mesh_sector(sector, transform, &TRI_GROUP_COLORS);
+
+                    my_delegates.debug_draw.draw_box(
+                        &sector.aabb.min,
+                        &sector.aabb.max,
+                        transform,
+                        &GREEN,
+                    );
                 }
             }
         }

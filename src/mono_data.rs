@@ -106,10 +106,10 @@ impl PropMonoData {
 
         for i in 0..num_aabbs as isize {
             let aabb_offset = md_read!(mono_data, u32, i * 4 + 4) as isize;
-            aabbs.push(Aabb {
-                min: md_read!(mono_data, Vec3, aabb_offset),
-                max: md_read!(mono_data, Vec3, aabb_offset + 0x10),
-            });
+            let min = md_read!(mono_data, Vec3, aabb_offset);
+            let max = md_read!(mono_data, Vec3, aabb_offset + 0x10);
+
+            aabbs.push(Aabb { min, max });
         }
 
         PropAabbs { aabbs }
@@ -143,10 +143,11 @@ impl PropMonoData {
 
             // parse the sector's AABB
             let aabb_offset = sector_offset + sector_idx * 0x18 + 8;
-            let aabb = Aabb {
+            let mut aabb = Aabb {
                 min: md_read!(mono_data, Vec3, aabb_offset),
                 max: md_read!(mono_data, Vec3, aabb_offset + 12),
             };
+            aabb.negate_coords();
 
             // parse the offset of the first triangle group
             let mut tri_group_offset = md_read!(mono_data, u32, sector_idx * 4 + 8) as isize;

@@ -153,7 +153,7 @@ impl PropsState {
             self.update_nonending(player)
         }
 
-        self.debug_draw_prop_bbox(271);
+        // self.debug_draw_prop_bbox(271);
         self.debug_draw_prop_mesh(271);
     }
 

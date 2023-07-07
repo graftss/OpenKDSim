@@ -19,6 +19,16 @@ impl Display for Aabb {
 }
 
 impl Aabb {
+    /// Multiple the coordinates of the `min` and `max` vectors by -1, in-place.
+    /// This is used to transform from simulation coordinates to unity coordinates.
+    /// NOTE that the `min` and `max` vectors also need to be swapped after this occurs,
+    /// since the ray-AABB collision algorithm expects `min` to have smaller coordinates than `max`.
+    pub fn negate_coords(&mut self) {
+        let temp = self.min;
+        vec3::scale(&mut self.min, &self.max, -1.0);
+        vec3::scale(&mut self.max, &temp, -1.0);
+    }
+
     /// Compute the side lengths of this AABB.
     pub fn size(&self) -> Vec3 {
         let Self { min, max } = self;

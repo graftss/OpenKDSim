@@ -584,14 +584,15 @@ impl Katamari {
             if should_contact {
                 self.record_surface_contact(ray_idx as i16, Some(prop_ref.clone()));
             } else {
-                // TODO_DOC: if the katamari isn't going to contact the prop, then it
-                // should bounce off of the prop instead
-                self.physics_flags.contacts_prop_0xa = true;
-                prop.intangible_timer = 10;
-
                 // TODO_PARAM
                 let MIN_KAT_SPEED_AFTER_PROP_HIT = 0.5;
                 let KAT_SPEED_AFTER_PROP_HIT_MULT = 0.75;
+                let PROP_INTANGIBILITY_AFTER_HIT = 10;
+
+                // TODO_DOC: if the katamari isn't going to contact the prop, then it
+                // should bounce off of the prop instead
+                self.physics_flags.contacts_prop_0xa = true;
+                prop.intangible_timer = PROP_INTANGIBILITY_AFTER_HIT;
 
                 let base_speed = self.max_boost_speed;
 

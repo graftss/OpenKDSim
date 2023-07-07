@@ -54,8 +54,8 @@ impl Display for MeshSector {
         for (idx, tri_group) in self.tri_groups.iter().enumerate() {
             writeln!(
                 f,
-                "    TriGroup {idx} (tristrip={}):",
-                tri_group.is_tri_strip
+                "    TriGroup {idx} (tristrip={})\n    {}",
+                tri_group.is_tri_strip, self.aabb
             )?;
             write!(f, "{tri_group}")?;
         }

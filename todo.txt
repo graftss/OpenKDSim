@@ -21,4 +21,6 @@ random things that shouldn't be forgotten:
   - also rename `modify_translation` -> `assign_translation`
 - change argments of `vec3_from!` so that it's `u op v`
 
-- prop meshes should presumably be Rc<RefCell<Mesh>>
+- do a search for prop AABB's that aren't symmetrical about the origin
+  - i.e. where min != -max
+  - not clear whether the min/max vec3's should be multiplied by -1 in `PropMonoData::parse_aabbs`

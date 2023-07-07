@@ -391,6 +391,9 @@ impl RaycastState {
         let mut hit_aabbs = vec![];
         let mut hit_any_aabb = false;
         for sector in mesh.sectors.iter() {
+            // the original simulation multiplies all the AABB coordinates by -1 here, but we
+            // already did that once when the AABBs were parsed (in `PropMonoData::parse_aabbs`)
+            // so that we don't have to do it over and over again here.
             let hit_aabb = ray_hits_aabb(
                 &local_p0,
                 &local_p1,
