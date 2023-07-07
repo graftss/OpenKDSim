@@ -434,11 +434,23 @@ impl RaycastState {
                 continue;
             }
             for tri_group in sector.tri_groups.iter() {
-                // TODO: this is gross, there should really be a way to abstract the iterator
                 if tri_group.is_tri_strip {
+                    // For a triangle strip sector, the normals of successive triangles would have
+                    // normals pointing in opposite directions if we always oriented the triangle
+                    // from three vertices.
+                    // To account for this, we reverse the orientation of every other triangle.
+                    // To reverse the orientation, we reverse the order of the first two vertices
+                    // for the purposes of the ray-triangle collision algorithm.
+                    let mut reverse_orientation = false;
+
                     for vertices in tri_group.vertices.windows(3) {
-                        let mut triangle =
-                            [vertices[0].point, vertices[1].point, vertices[2].point];
+                        let mut triangle = if !reverse_orientation {
+                            [vertices[0].point, vertices[1].point, vertices[2].point]
+                        } else {
+                            [vertices[1].point, vertices[0].point, vertices[2].point]
+                        };
+                        reverse_orientation = !reverse_orientation;
+
                         // TODO: not sure if this is actually negating the coordinates here?
                         // TODO: if it is, then this should probably be done when the mono data is parsed??
                         for i in 0..3 {
@@ -459,7 +471,9 @@ impl RaycastState {
                                 );
                             }
 
-                            // finish copying data to the triangle (this should probably be in `ray_hits_triangle`)
+                            // TODO_DOC
+                            // finish copying data to the triangle (this should probably be
+                            // in `ray_hits_triangle`)
                             let mut hit = self.ray_to_triangle_hit;
                             hit.metadata = vertices[2].metadata as i32;
                             for i in 0..3 {
@@ -482,7 +496,6 @@ impl RaycastState {
                     for vertices in tri_group.vertices.chunks_exact(3) {
                         let mut triangle =
                             [vertices[0].point, vertices[1].point, vertices[2].point];
-                        // TODO: not sure if this is actually negating the coordinates here?
                         for i in 0..3 {
                             for j in 0..3 {
                                 triangle[i][j] *= -1.0;
@@ -525,15 +538,14 @@ impl RaycastState {
         // let impact_dist_ratio = self.get_closest_hit().unwrap().impact_dist_ratio;
 
         for hit in self.tri_hits.iter_mut() {
-            // temp_debug_log!("    ======");
-            // TODO: undo goofy hack where `ray_hits_triangle` misuses the z coordinate of the
+            // TODO_DOC: undo goofy hack where `ray_hits_triangle` misuses the z coordinate of the
             // impact point to store the impact distance. why?? who knows
             let impact_dist = hit.impact_point[2];
 
             hit.impact_dist = impact_dist;
             hit.impact_dist_ratio = impact_dist / self.ray_len;
 
-            // TODO_DOC: no clue what this is doing
+            // TODO: no clue what this is doing
             if ray_in_mesh_coords {
                 hit.impact_point = min_tri_hit_point
             } else {
@@ -549,28 +561,6 @@ impl RaycastState {
                     &normal_unit,
                     t * ray_dot_normal,
                 );
-
-                // temp_debug_log!(
-                //     "    impact_dist={}, impact_dist_ratio={}, ray_len={}, t={t}",
-                //     hit.impact_dist,
-                //     hit.impact_dist_ratio,
-                //     self.ray_len
-                // );
-
-                // temp_debug_log!("    ray_unit={:?}", self.ray_unit);
-
-                static RED: Vec4 = [1.0, 0.0, 0.0, 1.0];
-                let debug_draw = &mut self.delegates.as_ref().unwrap().borrow_mut().debug_draw;
-
-                debug_draw.draw_point(&hit.impact_point, &RED);
-                // temp_debug_log!("    drawing red impact point: {:?}", hit.impact_point);
-                // temp_debug_log!("    tri: {:?}", hit.tri);
-                // temp_debug_log!("    ray: [{:?}, {:?}]", self.point0, self.point1);
-                // temp_debug_log!("    transform: {:?}", transform);
-                static POINT0_COLOR: Vec4 = [0.0, 1.0, 0.0, 1.0];
-                static POINT1_COLOR: Vec4 = [0.0, 1.0, 0.0, 1.0];
-                debug_draw.draw_point(&mut self.point0, &POINT0_COLOR);
-                debug_draw.draw_point(&mut self.point1, &POINT1_COLOR);
             }
         }
 

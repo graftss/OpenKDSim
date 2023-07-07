@@ -11,6 +11,7 @@ pub struct DebugConfig {
     /// Draw the meshes of collided props.
     pub draw_collided_prop_mesh: bool,
 
+    /// TODO_DOC
     pub draw_collided_prop_tris: bool,
 
     /// Draw katamari collision rays.
@@ -23,8 +24,8 @@ pub struct DebugConfig {
 pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
     log_tick: false,
     draw_collided_prop_aabb_hits: false,
-    draw_collided_prop_mesh: true,
-    draw_collided_prop_tris: true,
+    draw_collided_prop_mesh: false,
+    draw_collided_prop_tris: false,
     kat_draw_collision_rays: true,
     kat_draw_shell_rays: true,
 };

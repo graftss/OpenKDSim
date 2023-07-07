@@ -152,9 +152,6 @@ impl PropsState {
         } else {
             self.update_nonending(player)
         }
-
-        // self.debug_draw_prop_bbox(271);
-        self.debug_draw_prop_mesh(271);
     }
 
     /// Root function to update all props when not in the `Ending` game mode.
