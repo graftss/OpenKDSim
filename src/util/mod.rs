@@ -1,3 +1,4 @@
+pub mod color;
 pub mod spline;
 
 use std::{fs::OpenOptions, path::Path};

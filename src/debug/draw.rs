@@ -5,7 +5,10 @@ use gl_matrix::{
     mat4, vec3, vec4,
 };
 
-use crate::{collision::mesh::TriGroup, delegates::DebugDrawDelegate};
+use crate::{
+    collision::mesh::{MeshSector, TriGroup},
+    delegates::DebugDrawDelegate,
+};
 
 /// The draw commands performed by the `debug_draw` delegate.
 #[repr(C)]
@@ -152,6 +155,17 @@ impl DebugDrawBus {
                 false => DebugDrawType::TriangleList,
             };
             draw(draw_type);
+        }
+    }
+
+    pub fn draw_mesh_sector(
+        &mut self,
+        sector: &MeshSector,
+        transform: &Mat4,
+        sector_colors: &[Vec4],
+    ) {
+        for (idx, tri_group) in sector.tri_groups.iter().enumerate() {
+            self.draw_tri_group(tri_group, transform, &sector_colors[idx]);
         }
     }
 }

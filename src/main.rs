@@ -370,10 +370,9 @@ unsafe fn print_square_dish_mesh() {
     let mut md = MonoData::default();
     md.init(MAS1_MONO_DATA.as_ptr());
 
-    let md = &md.props.get(867).unwrap().clone();
+    let md = &md.props.get(1297).unwrap().clone();
     let mesh = &md.collision_mesh.clone().unwrap();
-    // let mesh = md.props.get(867).as_ref().unwrap().collision_mesh.unwrap().as_ref();
-    println!("square dish:\n{}", mesh);
+    println!("bookstand:\n{}", mesh);
 }
 
 fn main() {
