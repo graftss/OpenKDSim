@@ -108,7 +108,7 @@ impl Player {
 pub type PlayersState = [Player; MAX_PLAYERS];
 
 impl GameState {
-    /// Update the prince and katamari controlled by the given `player`.    
+    /// Update the prince and katamari controlled by the given `player`.
     /// offset: 0x25be0
     pub fn update_prince_and_kat(&mut self, player_idx: usize) {
         let mission_state = &mut self.mission_state;

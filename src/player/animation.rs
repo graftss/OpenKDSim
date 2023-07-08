@@ -146,7 +146,7 @@ pub struct Animation {
     pub id: AnimationId,
 
     /// (??)
-    /// offset: 0xf    
+    /// offset: 0xf
     pub unknown_0xf: u8,
 
     /// (??)

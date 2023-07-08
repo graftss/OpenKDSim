@@ -2,13 +2,14 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use gl_matrix::{
     common::{Mat4, Vec3},
-    mat4, vec3,
+    mat4::{self},
+    vec3,
 };
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log},
-    math::{acos_f32, change_bounded_angle, normalize_bounded_angle},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y},
+    math::{acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_normalize},
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
         camera::{mode::CameraMode, Camera},
@@ -144,9 +145,16 @@ pub struct Prince {
     /// offset: 0x1c
     last_pos: Vec3,
 
-    /// The prince's offset from the katamari at the start of a flip.
+    /// The offset of the prince from the bottom of the katamari, in prince local space.
+    /// When not flipping this is a copy of `base_kat_offset`, but flipping results in
+    /// this offset deviating from the base offset as the prince jumps over the katamari
+    /// in a semicircle.
+    /// offset: 0x3c
+    kat_offset: Vec3,
+
+    /// The prince's unit lateral offset from the katamari at the start of a flip.
     /// offset: 0x5c
-    flip_init_kat_offset: Vec3,
+    flip_lateral_kat_offset_unit: Vec3,
 
     /// The prince's angle around the katamari.
     /// offset: 0x6c
@@ -214,10 +222,11 @@ pub struct Prince {
     transform_rot: Mat4,
 
     /// The default offset of the prince from the katamari center in local katamari space.
-    /// Since the prince is always facing the z+ axis, this vector is therefore always
-    /// a multiple of the z- axis (since the prince is behind the katamari center)
+    /// The prince-katamari distance scales with the katamari size.
+    /// Since the prince is always facing the z+ axis, this vector is therefore usually
+    /// a multiple of the z- axis (since the prince is behind the katamari center).
     /// offset: 0x24c
-    kat_offset_vec: Vec3,
+    base_kat_offset: Vec3,
 
     /// The threshold on the angle between the two analog sticks that differentiates
     /// "rolling fowards/backwards" and "rolling sideways". Whatever that means.
@@ -266,7 +275,7 @@ pub struct Prince {
 
     /// The number of ticks it takes to complete the flip animation.
     /// offset: 0x2d0
-    flip_duration_ticks: u32,
+    flip_duration: u16,
 
     /// The
     /// offset: 0x2d4
@@ -384,7 +393,7 @@ pub struct Prince {
 
     /// The number of ticks remaining in the current flip animation.
     /// offset: 0x44c
-    flip_remaining_ticks: u16,
+    flip_timer: u16,
 
     /// Input push directions which just changed this tick.
     /// offset: 0x470
@@ -582,7 +591,7 @@ impl Prince {
         vec3::copy(&mut self.pos, &VEC3_ZERO);
         self.auto_rotate_right_speed = 0.0;
         self.angle = init_angle;
-        self.kat_offset_vec[2] = kat.get_prince_offset();
+        self.base_kat_offset[2] = kat.get_prince_offset();
         self.push_dir = None;
         self.angle_speed = 0.0;
         mat4::identity(&mut self.nonboost_push_yaw_rot);
@@ -673,7 +682,14 @@ impl Prince {
 
 impl Prince {
     /// Read player input from the `GameState`.
-    pub fn read_input(&mut self, input: &Input) {
+    /// offset: 0x54160
+    pub fn read_input(
+        &mut self,
+        input: &Input,
+        mission_state: &mut MissionState,
+        katamari: &Katamari,
+        camera: &mut Camera,
+    ) {
         // update whether the sticks are being pushed at all
         self.sticks_pushed = 0;
         if input.ls_x != 0 || input.ls_y != 0 {
@@ -692,11 +708,67 @@ impl Prince {
             self.input_rs.clear();
         }
 
-        // TODO: `prince_read_player_input:112-145` (try to start a flip)
+        if self.should_init_flip(input) {
+            // TODO_FX: play flip sound
+
+            if mission_state.is_tutorial() {
+                if let Some(tutorial_state) = &mut mission_state.tutorial {
+                    tutorial_state.set_move_held(TutorialMove::Flip);
+                }
+            }
+
+            self.oujistate.jump_180 = true;
+            self.view_mode = PrinceViewMode::Normal;
+            self.ignore_input_timer = 0;
+            camera.set_mode(CameraMode::Normal);
+            self.flip_timer = self.flip_duration;
+
+            let kat_center = katamari.get_center();
+            vec3::subtract(
+                &mut self.flip_lateral_kat_offset_unit,
+                kat_center,
+                &self.pos,
+            );
+            set_y!(self.flip_lateral_kat_offset_unit, 0.0);
+            vec3_inplace_normalize(&mut self.flip_lateral_kat_offset_unit);
+        }
 
         // update absolute analog input
         self.input_ls.absolute(&mut self.input_ls_abs);
         self.input_rs.absolute(&mut self.input_rs_abs);
+    }
+
+    /// Returns `true` if the prince should begin a flip by checking if both
+    /// analog sticks are pressed.
+    /// offset: 0x544b0
+    fn should_init_flip(&mut self, input: &Input) -> bool {
+        // TODO: more early returns
+        // if katamari.physics_flags.vs_mode_state == 2 { return false; }
+        // if katamari.hysics_flags.airborne { return false; }
+        // if gamemode == 3 || gamemode == 4 { return false; }
+        // if gamemode == Tutorial && tutorial_flags.page == 0 { return false; }
+
+        if self.view_mode == PrinceViewMode::R1Jump || self.oujistate.jump_180 {
+            return false;
+        }
+        // this is apparently an airborne flag
+        if self.flags & 0x100 == 0 {
+            return false;
+        }
+
+        // both sticks are considered down if one stick was already held
+        let both_sticks_down = (input.l3_held && input.r3_down) || (input.r3_held && input.l3_down);
+        if !both_sticks_down {
+            return false;
+        }
+
+        // once both sticks are down, we check the analog magnitudes to make sure they're within
+        // the maximum magnitude allowing a flip
+        let max = self.max_analog_allowing_flip;
+        let ls_ok = self.input_ls.axes[0].abs() <= max && self.input_ls.axes[1].abs() <= max;
+        let rs_ok = self.input_rs.axes[0].abs() <= max && self.input_rs.axes[1].abs() <= max;
+
+        ls_ok && rs_ok
     }
 
     /// Update the prince's huff state.
@@ -1300,11 +1372,11 @@ impl Prince {
     pub fn update_transform(&mut self, katamari: &Katamari) {
         let kat_offset = -katamari.get_prince_offset();
         self.last_pos = self.pos;
-        self.kat_offset_vec[2] = kat_offset;
+        self.base_kat_offset[2] = kat_offset;
 
         // update transform differently depending on if the prince is flipping
         if self.oujistate.jump_180 {
-            self.update_flip_transform(kat_offset);
+            self.update_flip_transform(katamari);
         } else {
             self.update_nonflip_transform(kat_offset, katamari.get_bottom());
         }
@@ -1312,9 +1384,51 @@ impl Prince {
         self.flags |= 0x100;
     }
 
-    /// TODO
+    /// Update the prince's transform while flipping.
     /// offset: 0x55480
-    fn update_flip_transform(&mut self, _kat_offset: f32) {}
+    fn update_flip_transform(&mut self, katamari: &Katamari) {
+        self.flip_timer -= 1;
+        self.turn_type = PrinceTurnType::Flip;
+
+        let flip_progress =
+            (self.flip_duration - self.flip_timer) as f32 / self.flip_duration as f32;
+        self.falling_from_flip = flip_progress <= 0.5;
+        self.oujistate.jump_180_leap =
+            ((self.flip_timer as f32 / self.flip_duration as f32) * 128.0) as u8;
+
+        let base_offset_z = self.base_kat_offset[2];
+        let unit_flip_height = (flip_progress * PI).sin();
+
+        self.kat_offset[0] = 0.0;
+        self.kat_offset[1] = katamari.get_radius() * unit_flip_height;
+        self.kat_offset[2] = base_offset_z + 2.0 * flip_progress * base_offset_z.abs();
+
+        // compute the katamari offset in world space using the vector in prince space
+        let id = mat4::create();
+        let mut prince_angle_rot = mat4::create();
+        mat4::rotate_y(&mut prince_angle_rot, &id, self.angle);
+
+        let mut world_kat_offset = vec3::create();
+        vec3::transform_mat4(&mut world_kat_offset, &self.kat_offset, &prince_angle_rot);
+        vec3::add(&mut self.pos, &world_kat_offset, katamari.get_bottom());
+
+        mat4::rotate_y(
+            &mut self.transform_rot,
+            &prince_angle_rot,
+            flip_progress * PI,
+        );
+
+        if self.flip_timer == 0 {
+            // end the current flip once the timer reaches 0
+
+            self.oujistate.jump_180 = false;
+            self.ignore_input_timer = 0;
+
+            // add pi to the prince angle, signifying that it has rotated 180 degrees around the
+            // katamari at the end of the flip
+            change_bounded_angle(&mut self.angle, PI);
+        }
+    }
 
     /// Update the prince's transform matrix while not flipping.
     /// offset: 0x53650
@@ -1355,10 +1469,9 @@ impl Player {
 
         prince.last_oujistate = prince.oujistate;
 
-        // TODO_OPT: only compute this when the prince actually flips
-        prince.flip_duration_ticks = stage_config.get_flip_duration(katamari.get_diam_cm());
+        prince.flip_duration = stage_config.get_flip_duration(katamari.get_diam_cm()) as u16;
 
-        prince.read_input(input);
+        prince.read_input(input, mission_state, katamari, camera);
         prince.update_huff();
         prince.try_end_view_mode(camera);
         prince.update_boost_recharge();
