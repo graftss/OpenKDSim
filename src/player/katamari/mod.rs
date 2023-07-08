@@ -808,6 +808,10 @@ impl Katamari {
         self.cam_relative_dir
     }
 
+    pub fn get_water_surface_hit(&self) -> &Vec3 {
+        &self.water_surface_hit
+    }
+
     /// Computes the ratio of the katamari's current speed to its "max" speed,
     /// which varies with the prince's push direction.
     pub fn get_speed_ratio(&self, push_dir: PushDir) -> f32 {

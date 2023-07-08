@@ -988,7 +988,7 @@ impl Prince {
 
             if just_did_gacha && self.gacha_count == gachas_for_boost {
                 // if initiating a boost:
-                // TODO: `prince_update_gachas:234-241` (play boost sfx and vfx)
+                // TODO_FX: `prince_update_gachas:234-241` (play boost sfx and vfx)
                 return;
             }
 
@@ -999,7 +999,7 @@ impl Prince {
 
             if self.gacha_count >= gachas_for_spin && self.gacha_count < gachas_for_boost {
                 // if spinning, but not yet enough gachas for a boost:
-                // TODO: `prince_update_gachas:249-253` (play spin sfx)
+                // TODO_FX: `prince_update_gachas:249-253` (play spin sfx)
                 self.oujistate.dash = true;
                 self.oujistate.wheel_spin = true;
             } else if self.gacha_count > gachas_for_boost {

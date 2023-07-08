@@ -7,7 +7,7 @@ use crate::{
     collision::raycast_state::{RaycastCallType, RaycastState},
     constants::{FRAC_PI_2, UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     delegates::DelegatesRef,
-    macros::{max, min, set_y, vec3_from},
+    macros::{max, min, set_y, temp_debug_log, vec3_from, vec3_unit_xz},
     math::{
         acos_f32, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_times_mat4,
@@ -318,7 +318,10 @@ impl CameraState {
                 vec3::zero(&mut self.r1_jump_last_translation);
             }
             CameraMode::L1Look => {
-                // TODO: `camera_set_mode:98-113`
+                self.l1_look_y_angle = 0.0;
+                // TODO: `katamari.is_looking_l1 = true`
+                self.l1_look_init_pos_to_target =
+                    vec3_from!(-, cam_transform.target, cam_transform.pos);
             }
             CameraMode::HitByProp => {
                 // TODO: `camera_set_mode: 114-129`
@@ -424,7 +427,13 @@ impl CameraState {
         mission_state: &MissionState,
         cam_transform: &mut CameraTransform,
     ) {
-        self.update_pos_and_target_main(prince, katamari, is_normal_mode, mission_state);
+        self.update_pos_and_target_main(
+            cam_transform,
+            prince,
+            katamari,
+            is_normal_mode,
+            mission_state,
+        );
         cam_transform.pos = self.pos;
         cam_transform.target = self.target;
     }
@@ -432,6 +441,7 @@ impl CameraState {
     /// Update this state's camera position and target points.
     fn update_pos_and_target_main(
         &mut self,
+        cam_transform: &CameraTransform,
         prince: &Prince,
         katamari: &Katamari,
         is_normal_mode: bool,
@@ -467,7 +477,13 @@ impl CameraState {
                     // in the ending mission or normal mode:
                     self.compute_normal_pos_and_target(&mut pos, &mut target, katamari, prince);
                 } else {
-                    self.compute_abnormal_pos_and_target(&mut pos, &mut target);
+                    self.compute_abnormal_pos_and_target(
+                        cam_transform,
+                        &mut pos,
+                        &mut target,
+                        katamari,
+                        prince,
+                    );
 
                     // increase easing speed when falling
                     let moved_y = katamari.get_center()[1] - katamari.get_last_center()[1];
@@ -548,8 +564,65 @@ impl CameraState {
     /// Writes the camera position and target points during abnormal camera movement
     /// to the vectors `pos` and `target`.
     /// offset: 0xdc80
-    fn compute_abnormal_pos_and_target(&mut self, _pos: &mut Vec3, _target: &mut Vec3) {
-        // TODO
+    fn compute_abnormal_pos_and_target(
+        &mut self,
+        cam_transform: &CameraTransform,
+        pos: &mut Vec3,
+        target: &mut Vec3,
+        katamari: &Katamari,
+        prince: &Prince,
+    ) {
+        // TODO_PARAM
+        let SPECIAL_CAMERA_CAM_Y_OFFSET_SCALE = 0.5;
+        let HIT_FLAG_0x5_CAM_Y_OFFSET = 400.0;
+        let NORMAL_CAM_Y_OFFSET_SCALE = 1.3;
+
+        static ROTATE_Y_90: Mat4 = [
+            0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+
+        let kat_center = katamari.get_center();
+        let kat_radius = katamari.get_radius();
+        let prince_pos = prince.get_pos();
+
+        if katamari.physics_flags.under_water {
+            *pos = *katamari.get_water_surface_hit();
+            // TODO_PARAM
+            let UNDERWATER_CAM_POS_Y_OFFSET = 10.0;
+            pos[1] += UNDERWATER_CAM_POS_Y_OFFSET;
+        } else {
+            *pos = *kat_center;
+
+            if katamari.hit_flags.special_camera {
+                pos[1] += kat_radius * SPECIAL_CAMERA_CAM_Y_OFFSET_SCALE;
+            } else if katamari.hit_flags.flag_0x5 {
+                pos[1] += HIT_FLAG_0x5_CAM_Y_OFFSET;
+            } else {
+                pos[1] += kat_radius * NORMAL_CAM_Y_OFFSET_SCALE;
+            }
+        }
+
+        let prince_to_kat_lateral_unit = vec3_unit_xz!(vec3_from!(-, kat_center, prince_pos));
+
+        let mut axis = vec3::create();
+        vec3::transform_mat4(&mut axis, &prince_to_kat_lateral_unit, &ROTATE_Y_90);
+
+        let mut l1_look_rot = mat4::create();
+        mat4::from_rotation(&mut l1_look_rot, -self.l1_look_y_angle, &axis);
+
+        let mut target_to_pos_unit = vec3::create();
+        vec3::transform_mat4(
+            &mut target_to_pos_unit,
+            &prince_to_kat_lateral_unit,
+            &l1_look_rot,
+        );
+
+        vec3::scale_and_add(
+            target,
+            pos,
+            &target_to_pos_unit,
+            cam_transform.target_to_pos_len(),
+        );
     }
 
     // TODO_DOC: most of the variable names in this function are unclear or made up, it needs work
@@ -862,6 +935,11 @@ impl CameraTransform {
         //       this is a separate function in the simulation, but it's always called immediately
         //       after the 0x57fd0 function, so they should probably just be combined
     }
+
+    pub fn target_to_pos_len(&self) -> f32 {
+        let target_to_pos = vec3_from!(-, self.pos, self.target);
+        vec3::len(&target_to_pos)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -985,12 +1063,20 @@ impl Camera {
         let min_y = self.params.l1_look_min_y;
         let max_y = self.params.l1_look_max_y;
 
+        temp_debug_log!("update_l1_look");
+        temp_debug_log!("  y_angle_before={}", self.state.l1_look_y_angle);
         // update y angle
         if ls_y > 0.0 {
-            self.state.l1_look_y_angle = max!(self.state.l1_look_y_angle - speed_y * ls_y, max_y);
+            self.state.l1_look_y_angle = max!(self.state.l1_look_y_angle - speed_y * ls_y, min_y);
         } else if ls_y < 0.0 {
-            self.state.l1_look_y_angle = min!(self.state.l1_look_y_angle - speed_y * ls_y, min_y);
+            self.state.l1_look_y_angle = min!(self.state.l1_look_y_angle - speed_y * ls_y, max_y);
         }
+
+        temp_debug_log!("  speed_x={speed_x}, speed_y={speed_y}, min_y={min_y}, max_y={max_y}");
+        temp_debug_log!(
+            "  ls_x={ls_x}, ls_y={ls_y}, prince_angle={prince_angle}, y_angle={}",
+            self.state.l1_look_y_angle
+        );
 
         // update x angle, which is written directly to the prince
         change_bounded_angle(prince_angle, ls_x * speed_x);
@@ -1023,7 +1109,7 @@ impl Camera {
         vec3_inplace_normalize(&mut prince_to_kat);
 
         if katamari.physics_flags.under_water {
-            // TODO: `camera_compute_normal_pos_and_target:63-150`
+            // TODO_WATER: `camera_compute_normal_pos_and_target:63-150`
         } else {
             if self.state.clear_is_rotating {
                 // if doing the mission clear rotation, apply the angle from that
