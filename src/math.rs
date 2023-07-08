@@ -100,6 +100,16 @@ pub fn vec3_reflection(u_reflect_v: &mut Vec3, u: &Vec3, v: &Vec3) {
     vec3::scale_and_add(u_reflect_v, u, v, -2.0 * dot);
 }
 
+/// This performs the matrix multiplication `v * m`, which is the opposite muliplication
+/// order of `vec3::transform_mat4` in the `gl_matrix` crate.
+/// We have the same assumptions on `v` and `m` that let us ignore the fourth coordinate
+/// of `v` that is mathematically required to make the dimensions agree.
+pub fn vec3_times_mat4(out: &mut Vec3, v: &Vec3, m: &Mat4) {
+    out[0] = v[0] * m[0] + v[1] * m[1] + v[2] * m[2];
+    out[1] = v[0] * m[4] + v[1] * m[5] + v[2] * m[6];
+    out[2] = v[0] * m[8] + v[1] * m[9] + v[2] * m[10];
+}
+
 /// Writes the yaw rotation matrix of `mat` to `out`.
 pub fn mat4_compute_yaw_rot(out: &mut Mat4, mat: &Mat4) {
     let mut left_unit = vec3::create();

@@ -8,8 +8,8 @@ use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     macros::{max, min, set_y, vec3_from},
     math::{
-        change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
-        vec3_inplace_scale,
+        acos_f32, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
+        vec3_inplace_scale, vec3_times_mat4,
     },
     mission::{
         config::{CamScaledCtrlPt, MissionConfig},
@@ -325,7 +325,7 @@ impl CameraState {
 
         if prince.oujistate.jump_180 {
             // if flipping, defer to the flip subroutine and bail
-            self.compute_flip_pos_and_target(&mut pos, &mut target);
+            self.compute_flip_pos_and_target(&mut pos, &mut target, prince, katamari);
             self.pos = pos;
             self.target = target;
             return;
@@ -429,11 +429,68 @@ impl CameraState {
         // TODO
     }
 
+    // TODO_DOC: most of the variable names in this function are unclear or made up, it needs work
     /// Writes the camera position and target points during a flip ("jump 180")
     /// to the vectors `pos` and `target`.
     /// offset: 0xf5c0
-    fn compute_flip_pos_and_target(&mut self, _pos: &mut Vec3, _target: &mut Vec3) {
-        // TODO
+    fn compute_flip_pos_and_target(
+        &mut self,
+        mut pos: &mut Vec3,
+        target: &mut Vec3,
+        prince: &Prince,
+        katamari: &Katamari,
+    ) {
+        let kat_center = katamari.get_center();
+
+        let mut pos_to_kat_unit = vec3::create();
+        vec3::scale(&mut pos_to_kat_unit, &self.kat_to_pos, -1.0);
+        vec3_inplace_normalize(&mut pos_to_kat_unit);
+
+        let mut kat_to_yrefl_pos_unit = self.kat_to_pos;
+        kat_to_yrefl_pos_unit[1] *= -1.0;
+        vec3_inplace_normalize(&mut kat_to_yrefl_pos_unit);
+
+        let similarity = vec3::dot(&pos_to_kat_unit, &kat_to_yrefl_pos_unit);
+        let base_angle = acos_f32(similarity);
+
+        let mut rotation_axis_unit = [1.0, 0.2, 0.0];
+        vec3_inplace_normalize(&mut rotation_axis_unit);
+
+        let rotation_angle = base_angle * prince.get_flip_progress();
+        let mut transform = mat4::create();
+        mat4::from_rotation(&mut transform, rotation_angle, &rotation_axis_unit);
+
+        let flip_offset = prince.get_flip_lateral_kat_offset_unit();
+        let flip_offset_angle = f32::atan2(flip_offset[0], flip_offset[2]);
+
+        if !katamari.physics_flags.under_water {
+            let mut world_kat_to_pos = vec3::create();
+            vec3_times_mat4(&mut world_kat_to_pos, &self.kat_to_pos, &transform);
+
+            let mut flip_angle_rot = mat4::create();
+            mat4::from_rotation(&mut flip_angle_rot, -flip_offset_angle, &VEC3_Y_POS);
+
+            let mut vec1 = vec3::create();
+            vec3_times_mat4(&mut vec1, &world_kat_to_pos, &flip_angle_rot);
+            vec1[1] *= -1.0;
+            vec1[1] = max!(vec1[1], self.kat_to_pos[1]);
+
+            vec3::add(&mut pos, kat_center, &vec1);
+
+            let mut world_kat_to_target: [f32; 3] = vec3::create();
+            vec3_times_mat4(&mut world_kat_to_target, &self.kat_to_target, &transform);
+
+            let mut kat_to_target = vec3::create();
+            vec3_times_mat4(&mut kat_to_target, &world_kat_to_target, &flip_angle_rot);
+
+            *target = [
+                kat_center[0] + kat_to_target[0],
+                kat_center[1] - kat_to_target[1],
+                kat_center[2] + kat_to_target[2],
+            ];
+        } else {
+            // TODO_WATER: `camera_compute_flip_pos_and_target:207-255`
+        }
     }
 
     /// Check if the camera would look through any walls, and adjust its position if it would.
@@ -468,7 +525,7 @@ impl CameraState {
             katamari.physics_flags.under_water = under_water;
             katamari.physics_flags.in_water = in_water;
         } else {
-            self.compute_flip_pos_and_target(&mut noclip_pos, &mut noclip_target);
+            self.compute_flip_pos_and_target(&mut noclip_pos, &mut noclip_target, prince, katamari);
         }
 
         // TODO: `camera_update_normal:103-173` (check if noclip camera clipped)

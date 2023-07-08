@@ -7,7 +7,10 @@ use std::cell::RefCell;
 use collision::raycast_state::ray_hits_aabb;
 use constants::{FRAC_PI_2, FRAC_PI_90, PI};
 use gamestate::GameState;
-use gl_matrix::{common::Vec3, mat3, mat4, quat, vec3};
+use gl_matrix::{
+    common::{Mat4, Vec3},
+    mat3, mat4, quat, vec3,
+};
 use macros::{inv_lerp_clamp, lerp};
 use math::{
     acos_f32, vec3_inplace_normalize, vec3_inplace_scale, vec3_projection, vec3_reflection,
@@ -18,8 +21,8 @@ use props::prop::AddPropArgs;
 use crate::{
     collision::raycast_state::RaycastState,
     constants::VEC3_ZERO,
-    macros::{set_translation, temp_debug_log, vec3_from},
-    math::vec3_inplace_zero_small,
+    macros::{max, min, set_translation, temp_debug_log, vec3_from},
+    math::{vec3_inplace_zero_small, vec3_times_mat4},
 };
 
 // reference this first so it's available to all other modules
@@ -366,6 +369,98 @@ fn replicate_triangle_hit() {
     println!("normal_unit: {:?}", normal_unit);
 }
 
+fn replicate_flip_camera() {
+    let kat_center = [-22.700000762939, -24.060358047485, 28.0];
+    let kat_to_pos = [0.0, 7.1999998092651, -22.39999961853];
+    let kat_to_target = [0.0, 0.0, 8.1999998092651];
+    let flip_timer = 11;
+    let flip_duration = 15;
+    let flip_lateral_kat_offset_unit = [0.64278769493103, 0.0, -0.76604443788528];
+
+    let mut pos = vec3::create();
+    let target;
+
+    let flip_progress = (flip_duration as f32 - flip_timer as f32) / flip_duration as f32;
+    let VEC3_Y_POS = [0.0, 1.0, 0.0];
+
+    let mut pos_to_kat_unit = vec3::create();
+    vec3::scale(&mut pos_to_kat_unit, &kat_to_pos, -1.0);
+    vec3_inplace_normalize(&mut pos_to_kat_unit);
+
+    println!("++pos_to_kat_unit: {pos_to_kat_unit:?}");
+
+    let mut kat_to_yrefl_pos_unit = kat_to_pos;
+    kat_to_yrefl_pos_unit[1] *= -1.0;
+    vec3_inplace_normalize(&mut kat_to_yrefl_pos_unit);
+
+    println!("++kat_to_yrefl_pos_unit: {kat_to_yrefl_pos_unit:?}");
+
+    let similarity = vec3::dot(&pos_to_kat_unit, &kat_to_yrefl_pos_unit);
+    let base_angle = acos_f32(similarity);
+
+    println!("++similarity: {similarity:?}");
+    println!("++base_angle: {base_angle:?}");
+
+    let mut rotation_axis_unit = [1.0, 0.2, 0.0];
+    vec3_inplace_normalize(&mut rotation_axis_unit);
+
+    println!("++rotation_axis_unit: {rotation_axis_unit:?}");
+
+    let rotation_angle = base_angle * flip_progress;
+    println!("++rotation_angle: {rotation_angle:?}");
+
+    let mut transform = mat4::create();
+    mat4::from_rotation(&mut transform, rotation_angle, &rotation_axis_unit);
+
+    println!("++transform: {transform:?}");
+
+    let flip_offset = flip_lateral_kat_offset_unit;
+
+    // FIX: sometimes add pi to `flip_offset_angle` (when flip_offset[0] is negative?)
+
+    let flip_offset_angle = (flip_offset[0] as f32).atan2(flip_offset[2]); //f32::atan2(flip_offset[0], flip_offset[2]);
+    println!("flip_offset_angle: {flip_offset_angle:?}");
+
+    ///////////////// if not underwater
+    let mut world_kat_to_pos = vec3::create();
+    vec3_times_mat4(&mut world_kat_to_pos, &kat_to_pos, &transform);
+    println!("++ world_kat_to_pos: {world_kat_to_pos:?}");
+
+    let mut flip_angle_rotation = mat4::create();
+    mat4::from_rotation(&mut flip_angle_rotation, -flip_offset_angle, &VEC3_Y_POS);
+    println!("++ mat2: {flip_angle_rotation:?}");
+
+    let mut vec1 = vec3::create();
+    vec3_times_mat4(&mut vec1, &world_kat_to_pos, &flip_angle_rotation);
+    vec1[1] *= -1.0;
+    vec1[1] = max!(vec1[1], kat_to_pos[1]);
+
+    println!("++ vec1 final: {vec1:?}");
+
+    vec3::add(&mut pos, &kat_center, &vec1);
+    println!("++ final pos: {pos:?}");
+
+    let mut world_kat_to_target = vec3::create();
+    vec3_times_mat4(&mut world_kat_to_target, &kat_to_target, &transform);
+    println!("world_kat_to_target: {world_kat_to_target:?}");
+
+    let mut kat_to_target = vec3::create();
+    vec3_times_mat4(
+        &mut kat_to_target,
+        &world_kat_to_target,
+        &flip_angle_rotation,
+    );
+    println!("kat_to_target: {kat_to_target:?}");
+
+    target = [
+        kat_center[0] + kat_to_target[0],
+        kat_center[1] - kat_to_target[1],
+        kat_center[2] + kat_to_target[2],
+    ];
+
+    println!("final target: {target:?}");
+}
+
 unsafe fn print_square_dish_mesh() {
     let mut md = MonoData::default();
     md.init(MAS1_MONO_DATA.as_ptr());
@@ -383,7 +478,7 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
-    unsafe {
-        print_square_dish_mesh();
+    {
+        replicate_flip_camera();
     }
 }

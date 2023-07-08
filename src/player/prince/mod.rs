@@ -535,6 +535,10 @@ impl Prince {
         &self.input_sum_unit
     }
 
+    pub fn get_flip_lateral_kat_offset_unit(&self) -> &Vec3 {
+        &self.flip_lateral_kat_offset_unit
+    }
+
     /// Returns `true` if the current input state admits a wallclimb.
     /// (independently of all other things that could influence whether a wallclimb is allowed,
     /// up to and including whether the katamari even contacts a wall in the first place)
@@ -1384,14 +1388,19 @@ impl Prince {
         self.flags |= 0x100;
     }
 
+    /// Compute the ratio of the current flip that has been completed.
+    /// The value is 0 when the flip starts, and 1 when the flip ends.
+    pub fn get_flip_progress(&self) -> f32 {
+        (self.flip_duration - self.flip_timer) as f32 / self.flip_duration as f32
+    }
+
     /// Update the prince's transform while flipping.
     /// offset: 0x55480
     fn update_flip_transform(&mut self, katamari: &Katamari) {
         self.flip_timer -= 1;
         self.turn_type = PrinceTurnType::Flip;
 
-        let flip_progress =
-            (self.flip_duration - self.flip_timer) as f32 / self.flip_duration as f32;
+        let flip_progress = self.get_flip_progress();
         self.falling_from_flip = flip_progress <= 0.5;
         self.oujistate.jump_180_leap =
             ((self.flip_timer as f32 / self.flip_duration as f32) * 128.0) as u8;
