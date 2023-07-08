@@ -37,7 +37,10 @@ pub struct OujiState {
     pub dash_effect: bool,
     pub hit_water: bool,
     pub submerge: bool,
+
+    /// A copy of the camera's R1 jump state.
     pub camera_state: u8,
+
     pub jump_180_leap: u8,
     pub brake: bool,
     pub tutorial_flag_1: u8,
@@ -537,6 +540,10 @@ impl Prince {
 
     pub fn get_flip_lateral_kat_offset_unit(&self) -> &Vec3 {
         &self.flip_lateral_kat_offset_unit
+    }
+
+    pub fn get_sticks_pushed(&self) -> u8 {
+        self.sticks_pushed
     }
 
     /// Returns `true` if the current input state admits a wallclimb.

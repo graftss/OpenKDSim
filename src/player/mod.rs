@@ -59,7 +59,7 @@ impl Player {
 
     pub fn update_camera(&mut self, mission_state: &MissionState) {
         self.camera
-            .update(&self.prince, &mut self.katamari, mission_state);
+            .update(&self.prince, &mut self.katamari, mission_state, &self.input);
     }
 
     /// Check if the player needs to royal warp, and if so, perform the warp.

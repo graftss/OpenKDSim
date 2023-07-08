@@ -395,7 +395,7 @@ impl Katamari {
         prince.oujistate.climb_wall = self.physics_flags.climbing;
         prince.oujistate.hit_water = self.physics_flags.in_water;
         prince.oujistate.submerge = self.physics_flags.under_water;
-        prince.oujistate.camera_state = camera.get_r1_jump_state().map_or(0, |s| s.into());
+        prince.oujistate.camera_state = camera.get_r1_jump_state().into();
         prince.oujistate.vs_attack = self.physics_flags.vs_attack;
 
         if mission_state.is_tutorial() {

@@ -4,12 +4,13 @@ use gl_matrix::{
 };
 
 use crate::{
-    collision::raycast_state::RaycastState,
-    constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
+    collision::raycast_state::{RaycastCallType, RaycastState},
+    constants::{FRAC_PI_2, UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
+    delegates::{DelegatesRef},
     macros::{max, min, set_y, vec3_from},
     math::{
-        acos_f32, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_normalize,
-        vec3_inplace_scale, vec3_times_mat4,
+        acos_f32, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_add_vec,
+        vec3_inplace_normalize, vec3_inplace_scale, vec3_times_mat4,
     },
     mission::{
         config::{CamScaledCtrlPt, MissionConfig},
@@ -20,7 +21,7 @@ use crate::{
 
 use self::{mode::CameraMode, params::CameraParams, preclear::PreclearState};
 
-use super::{katamari::Katamari, prince::Prince};
+use super::{input::Input, katamari::Katamari, prince::Prince};
 
 pub mod mode;
 pub mod params;
@@ -55,6 +56,12 @@ impl Into<u8> for CamR1JumpState {
     }
 }
 
+impl Default for CamR1JumpState {
+    fn default() -> Self {
+        Self::Rising
+    }
+}
+
 /// General camera state.
 /// offset: 0x192ee0
 /// width: 0x980
@@ -67,6 +74,8 @@ pub struct CameraState {
     override_type: Option<CamOverrideType>,
 
     raycast_state: RaycastState,
+
+    delegates: Option<DelegatesRef>,
 
     // END extra fields not in the original simulation
     /// The camera position's offset from the katamari center position.
@@ -99,9 +108,9 @@ pub struct CameraState {
     /// offset: 0x50
     target_velocity: Vec3,
 
-    /// The current mission's camera control points.
+    /// The current mission's camera control point.
     /// offset: 0x60
-    pub kat_offset_ctrl_pts: Vec<CamScaledCtrlPt>,
+    pub kat_offset_ctrl_pt: CamScaledCtrlPt,
 
     /// (??) A timer counting down to when the camera will finish scaling up.
     /// offset: 0x68
@@ -154,14 +163,17 @@ pub struct CameraState {
     /// offset: 0x854
     r1_jump_target: Vec3,
 
+    /// The extra translation applied to the camera during an R1 jump. In practice, this
+    /// is always exclusively a y-translation, since the camera only moves up and down.
     /// offset: 0x864
-    r1_jump_extra_height: Vec3,
+    r1_jump_translation: Vec3,
 
     /// offset: 0x874
     r1_jump_last_extra_height: Vec3,
 
+    /// Counts the number of frames spent airborne in the current R1 jump.
     /// offset: 0x884
-    r1_jump_timer: u16,
+    r1_jump_counter: u16,
 
     /// offset: 0x888
     r1_jump_duration: u16,
@@ -173,7 +185,7 @@ pub struct CameraState {
     r1_jump_height_ratio: f32,
 
     /// offset: 0x894
-    r1_jump_state: Option<CamR1JumpState>,
+    r1_jump_state: CamR1JumpState,
 
     /// (??)
     /// offset: 0x8a8
@@ -234,16 +246,63 @@ pub struct CameraState {
 }
 
 impl CameraState {
+    /// Set the camera mode.
+    /// offset: 0xad40
+    pub fn set_mode(&mut self, mode: CameraMode, cam_transform: &mut CameraTransform) {
+        // if self.state.mode == CameraMode::LookL1 {
+        //     kat.set_look_l1(true);
+        // }
+
+        self.mode = mode;
+        self.update_ending_callback = None;
+
+        match mode {
+            CameraMode::R1Jump => {
+                // TODO: `camera_set_mode:40-97`
+            }
+            CameraMode::L1Look => {
+                // TODO: `camera_set_mode:98-113`
+            }
+            CameraMode::HitByProp => {
+                // TODO: `camera_set_mode: 114-129`
+            }
+            CameraMode::Clear => {
+                // TODO: `camera_set_mode: 129-160`
+            }
+            CameraMode::Shoot => {
+                // TODO_PARAM
+                // self.shoot_timer = self.params.shoot_timer_init;
+                self.shoot_pos = cam_transform.pos;
+            }
+            CameraMode::ShootRet => {
+                // TODO_PARAM
+                // self.shoot_timer = self.params.shoot_ret_timer_init;
+            }
+            CameraMode::AreaChange => {
+                // TODO `camera_set_mode:171-188` (but this seems to be unused in reroll??)
+            }
+            CameraMode::ClearGoalProp => {
+                self.clear_goal_prop_rot = 0.0;
+            }
+            CameraMode::VsResult => {
+                self.clear_rot = 0.0;
+            }
+            _ => (),
+        };
+    }
+
     /// Main function to update the camera state. Computes the next camera position and target,
     /// and writes that data to the transform.
     /// TODO_REFACTOR: those two steps should be separated once everything is working
     /// offset: 0xb7d0
     pub fn update(
         &mut self,
+        cam_transform: &mut CameraTransform,
+        preclear: &PreclearState,
         prince: &Prince,
         katamari: &mut Katamari,
         mission_state: &MissionState,
-        cam_transform: &mut CameraTransform,
+        input: &Input,
     ) {
         self.last_pos = self.pos;
         self.last_target = self.target;
@@ -254,7 +313,14 @@ impl CameraState {
                 // TODO: self.update_clip_pos(prince, katamari);
             }
             CameraMode::R1Jump => {
-                self.update_r1_jump(prince, katamari);
+                self.update_r1_jump(
+                    cam_transform,
+                    preclear,
+                    prince,
+                    katamari,
+                    mission_state,
+                    input,
+                );
             }
             CameraMode::L1Look => {
                 self.update_main(prince, katamari, false, mission_state, cam_transform);
@@ -540,7 +606,109 @@ impl CameraState {
 
     /// The camera update function for `R1Jump` mode.
     /// offset: 0xbe60
-    fn update_r1_jump(&mut self, _prince: &Prince, _katamari: &Katamari) {}
+    fn update_r1_jump(
+        &mut self,
+        cam_transform: &mut CameraTransform,
+        preclear: &PreclearState,
+        prince: &Prince,
+        katamari: &Katamari,
+        mission_state: &MissionState,
+        input: &Input,
+    ) {
+        self.r1_jump_last_extra_height = self.r1_jump_translation;
+        self.update_area_params(&mission_state.mission_config, katamari.get_diam_cm());
+
+        if self.scale_up_in_progress {
+            return self.set_mode(CameraMode::Normal, cam_transform);
+        }
+
+        match self.r1_jump_state {
+            CamR1JumpState::Rising => {
+                let jump_progress = self.r1_jump_counter as f32 / self.r1_jump_duration as f32;
+                self.r1_jump_height_ratio = f32::sin(jump_progress * FRAC_PI_2);
+
+                self.r1_jump_counter += 1;
+                if self.r1_jump_counter >= self.r1_jump_duration {
+                    self.r1_jump_state = CamR1JumpState::AtPeak;
+                }
+            }
+
+            CamR1JumpState::AtPeak => {
+                let init_pos = self.r1_jump_init_pos;
+                let kat_center = katamari.get_center();
+
+                let mut ray_start = init_pos;
+                // TODO_DOC: what does this value mean
+                let ray_start_delta_y = init_pos[1] - kat_center[1];
+                ray_start[1] += ray_start_delta_y;
+
+                let mut ray_end = init_pos;
+                ray_end[1] += self.kat_offset_ctrl_pt.r1_jump_height;
+
+                self.r1_jump_peak_height = if let Some(delegates) = &self.delegates {
+                    let found_hits = delegates.borrow().call_do_hit(
+                        &ray_start,
+                        &ray_end,
+                        RaycastCallType::Stage,
+                        true,
+                    );
+
+                    if found_hits == 0 {
+                        self.kat_offset_ctrl_pt.r1_jump_height
+                    } else {
+                        let closest_hit = self.raycast_state.get_closest_hit().unwrap();
+                        let peak_height = closest_hit.impact_point[1] - ray_start[1];
+                        peak_height.abs() + ray_start_delta_y
+                    }
+                } else {
+                    self.kat_offset_ctrl_pt.r1_jump_height
+                };
+
+                let should_end_jump =
+                    input.r1_down || input.cross_click || prince.get_sticks_pushed() != 0;
+                self.r1_jump_height_ratio = 1.0;
+
+                if should_end_jump || preclear.get_enabled() {
+                    // TODO_FX: play r1 jump end sfx
+                    self.r1_jump_counter = 0;
+                    self.r1_jump_state = CamR1JumpState::Falling;
+                }
+            }
+
+            CamR1JumpState::Falling => {
+                self.r1_jump_counter += 1;
+                let jump_progress =
+                    1.0 - (self.r1_jump_counter as f32 / self.r1_jump_duration as f32);
+                self.r1_jump_height_ratio = f32::sin(jump_progress * FRAC_PI_2);
+
+                if self.r1_jump_counter >= self.r1_jump_duration {
+                    self.set_mode(CameraMode::Normal, cam_transform);
+                    self.last_pos = cam_transform.pos;
+                    self.last_target = cam_transform.target;
+                    self.pos = cam_transform.pos;
+                    self.target = cam_transform.target;
+                    return;
+                }
+            }
+        }
+
+        self.r1_jump_translation[1] = self.r1_jump_height_ratio * self.r1_jump_peak_height;
+
+        // update the initial jump position and target position to follow the katamari, in case the
+        // katamari moved since the jump started
+        let kat_moved = vec3_from!(-, katamari.get_center(), katamari.get_last_center());
+        vec3_inplace_add_vec(&mut self.r1_jump_init_pos, &kat_moved);
+        vec3_inplace_add_vec(&mut self.r1_jump_target, &kat_moved);
+
+        vec3::add(
+            &mut self.pos,
+            &self.r1_jump_init_pos,
+            &self.r1_jump_translation,
+        );
+
+        cam_transform.pos = self.pos;
+        cam_transform.target = self.r1_jump_target;
+    }
 
     /// TODO: `camera_update_clear_goal_prop`
     /// offset: 0xebf0
@@ -647,7 +815,7 @@ impl Camera {
         self.state.scale_up_in_progress
     }
 
-    pub fn get_r1_jump_state(&self) -> Option<CamR1JumpState> {
+    pub fn get_r1_jump_state(&self) -> CamR1JumpState {
         self.state.r1_jump_state
     }
 
@@ -710,11 +878,18 @@ impl Camera {
         prince: &Prince,
         katamari: &mut Katamari,
         mission_state: &MissionState,
+        input: &Input,
     ) {
         // TODO_REFACTOR: is it really necessary to propagate the pos and target twice?
         self.transform.update();
-        self.state
-            .update(prince, katamari, mission_state, &mut self.transform);
+        self.state.update(
+            &mut self.transform,
+            &self.preclear,
+            prince,
+            katamari,
+            mission_state,
+            input,
+        );
         self.transform.update();
     }
 
@@ -823,44 +998,7 @@ impl Camera {
     }
 
     pub fn set_mode(&mut self, mode: CameraMode) {
-        // if self.state.mode == CameraMode::LookL1 {
-        //     kat.set_look_l1(true);
-        // }
-
-        self.state.mode = mode;
-        self.state.update_ending_callback = None;
-
-        match mode {
-            CameraMode::R1Jump => {
-                // TODO: `camera_set_mode:40-97`
-            }
-            CameraMode::L1Look => {
-                // TODO: `camera_set_mode:98-113`
-            }
-            CameraMode::HitByProp => {
-                // TODO: `camera_set_mode: 114-129`
-            }
-            CameraMode::Clear => {
-                // TODO: `camera_set_mode: 129-160`
-            }
-            CameraMode::Shoot => {
-                self.state.shoot_timer = self.params.shoot_timer_init;
-                self.state.shoot_pos = self.transform.pos;
-            }
-            CameraMode::ShootRet => {
-                self.state.shoot_timer = self.params.shoot_ret_timer_init;
-            }
-            CameraMode::AreaChange => {
-                // TODO `camera_set_mode:171-188` (but this seems to be unused in reroll??)
-            }
-            CameraMode::ClearGoalProp => {
-                self.state.clear_goal_prop_rot = 0.0;
-            }
-            CameraMode::VsResult => {
-                self.state.clear_rot = 0.0;
-            }
-            _ => (),
-        };
+        self.state.set_mode(mode, &mut self.transform);
     }
 
     pub fn check_scale_up(&mut self, _flag: bool) {

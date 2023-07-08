@@ -1,6 +1,11 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::debug::draw::{DebugDrawBus, DebugDrawType};
+use gl_matrix::common::Vec3;
+
+use crate::{
+    collision::raycast_state::RaycastCallType,
+    debug::draw::{DebugDrawBus, DebugDrawType},
+};
 
 pub type MonoGenerateDelegate = extern "C" fn(ctrl_idx: i32, name_idx: i32) -> ();
 pub type MotionEndDelegate = extern "C" fn(player: i32) -> ();
@@ -86,5 +91,33 @@ impl core::fmt::Debug for Delegates {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // don't bother writing any delegates here for now
         f.debug_struct("Delegates").finish()
+    }
+}
+
+impl Delegates {
+    /// Convenience wrapper around the `do_hit` delegate that allows vector inputs.
+    /// offset: 0x6070
+    pub fn call_do_hit(
+        &self,
+        point0: &Vec3,
+        point1: &Vec3,
+        call_type: RaycastCallType,
+        include_objects: bool,
+    ) -> i32 {
+        if let Some(do_hit) = self.do_hit {
+            do_hit(
+                point0[0],
+                point0[1],
+                point0[2],
+                point1[0],
+                point1[1],
+                point1[2],
+                include_objects.into(),
+                0,
+                call_type.into(),
+            )
+        } else {
+            0
+        }
     }
 }

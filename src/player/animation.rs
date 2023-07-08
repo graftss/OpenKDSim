@@ -178,7 +178,7 @@ impl Animation {
             // case 1: play r1 jump animation
             let height_ratio = camera.get_r1_jump_height_ratio();
             match camera.get_r1_jump_state() {
-                Some(CamR1JumpState::Rising) if height_ratio < 0.5 => {
+                CamR1JumpState::Rising if height_ratio < 0.5 => {
                     (AnimationId::Flip, 1.0, false, None)
                 }
                 _ => (AnimationId::R1Jump, 1.0, height_ratio <= 0.0, None),

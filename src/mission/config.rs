@@ -184,7 +184,7 @@ pub struct CamScaledCtrlPt {
     pub kat_to_target: Vec3,
 
     /// The max height that the prince reaches after an R1 jump.
-    pub jump_r1_height: f32,
+    pub r1_jump_height: f32,
 }
 
 impl CamScaledCtrlPt {
@@ -217,7 +217,7 @@ impl CamScaledCtrlPt {
                         read_f32!(chunk, 0x18),
                         read_f32!(chunk, 0x1c),
                     ],
-                    jump_r1_height: read_f32!(chunk, 0x24),
+                    r1_jump_height: read_f32!(chunk, 0x24),
                 });
             }
         }
@@ -237,7 +237,7 @@ pub struct MissionConfig {
     /// change as the katamari grows in size.
     pub scaled_params_ctrl_pts: Option<Vec<KatScaledParamsCtrlPt>>,
 
-    /// The katamari size at which scaled params stop growing.    
+    /// The katamari size at which scaled params stop growing.
     pub scaled_params_max_size: f32,
 
     /// List of control points describing how the camera should be positioned
