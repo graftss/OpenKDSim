@@ -9,7 +9,10 @@ use gl_matrix::{
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
     macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y},
-    math::{acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_normalize},
+    math::{
+        acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_add_vec,
+        vec3_inplace_normalize,
+    },
     mission::{state::MissionState, tutorial::TutorialMove, GameMode},
     player::{
         camera::{mode::CameraMode, Camera},
@@ -595,7 +598,7 @@ impl Prince {
 
 impl Prince {
     /// Initialize the prince at the start of a mission.
-    pub fn init(&mut self, player: u8, init_angle: f32, kat: &Katamari) {
+    pub fn init(&mut self, player: u8, init_angle: f32, kat: &Katamari, camera: &Camera) {
         self.player = player;
         self.no_dash_ticks = 0;
         self.huff_timer = 0;
@@ -631,7 +634,7 @@ impl Prince {
         self.angle_btwn_sticks_for_fastest_turn = 0.75;
         self.push_sideways_angle_threshold = 0.363474;
 
-        self.update_transform(kat);
+        self.update_transform(kat, camera);
 
         self.boost_energy = self.boost_max_energy;
         self.push_uphill_strength = self.max_push_uphill_strength;
@@ -731,7 +734,7 @@ impl Prince {
             self.oujistate.jump_180 = true;
             self.view_mode = PrinceViewMode::Normal;
             self.ignore_input_timer = 0;
-            camera.set_mode(CameraMode::Normal);
+            camera.set_mode_normal();
             self.flip_timer = self.flip_duration;
 
             let kat_center = katamari.get_center();
@@ -834,7 +837,7 @@ impl Prince {
     fn end_view_mode(&mut self, camera: Option<&mut Camera>) {
         self.view_mode = PrinceViewMode::Normal;
         self.ignore_input_timer = 0;
-        camera.map(|camera| camera.set_mode(CameraMode::Normal));
+        camera.map(|camera| camera.set_mode_normal());
     }
 
     fn update_boost_recharge(&mut self) {
@@ -1333,7 +1336,7 @@ impl Prince {
                                 self.end_spin_and_boost(katamari);
                                 katamari.set_immobile(mission_state);
                                 self.view_mode = PrinceViewMode::L1Look;
-                                camera.set_mode(CameraMode::L1Look);
+                                camera.set_mode(CameraMode::L1Look, Some(katamari), Some(&self));
                             } else if input.r1_down && !input.l1_down {
                                 // initiate an R1 jump
                                 held_tut_move = Some(TutorialMove::JumpR1);
@@ -1341,7 +1344,7 @@ impl Prince {
                                 // TODO: play R1_JUMP sfx
                                 katamari.set_immobile(mission_state);
                                 self.view_mode = PrinceViewMode::R1Jump;
-                                camera.set_mode(CameraMode::R1Jump);
+                                camera.set_mode(CameraMode::R1Jump, Some(katamari), Some(&self));
                             }
                         }
                     }
@@ -1354,7 +1357,7 @@ impl Prince {
                 if camera.is_scaling_up() {
                     self.view_mode = PrinceViewMode::Normal;
                     self.ignore_input_timer = 0;
-                    camera.set_mode(CameraMode::Normal);
+                    camera.set_mode_normal();
                     return None;
                 }
 
@@ -1374,13 +1377,13 @@ impl Prince {
     fn update_impact_lock(&mut self) {}
 
     /// Update the prince after a royal warp.
-    pub fn update_royal_warp(&mut self, katamari: &Katamari, angle: f32) {
+    pub fn update_royal_warp(&mut self, katamari: &Katamari, camera: &Camera, angle: f32) {
         self.angle = angle;
-        self.update_transform(katamari);
+        self.update_transform(katamari, camera);
     }
 
     /// The main function to update the prince's transform matrix each tick.
-    pub fn update_transform(&mut self, katamari: &Katamari) {
+    pub fn update_transform(&mut self, katamari: &Katamari, camera: &Camera) {
         let kat_offset = -katamari.get_prince_offset();
         self.last_pos = self.pos;
         self.base_kat_offset[2] = kat_offset;
@@ -1389,7 +1392,9 @@ impl Prince {
         if self.oujistate.jump_180 {
             self.update_flip_transform(katamari);
         } else {
-            self.update_nonflip_transform(kat_offset, katamari.get_bottom());
+            let mut base_kat_offset = self.base_kat_offset;
+            self.update_nonflip_transform(camera, &mut base_kat_offset, katamari.get_bottom());
+            self.base_kat_offset = base_kat_offset;
         }
 
         self.flags |= 0x100;
@@ -1448,7 +1453,12 @@ impl Prince {
 
     /// Update the prince's transform matrix while not flipping.
     /// offset: 0x53650
-    fn update_nonflip_transform(&mut self, kat_offset: f32, kat_bottom: &Vec3) {
+    fn update_nonflip_transform(
+        &mut self,
+        camera: &Camera,
+        mut kat_offset: &mut Vec3,
+        kat_bottom: &Vec3,
+    ) {
         self.angle = normalize_bounded_angle(self.angle);
         self.angle += self.extra_flat_angle_speed;
         self.angle = normalize_bounded_angle(self.angle);
@@ -1462,13 +1472,19 @@ impl Prince {
             &id,
             self.angle + self.auto_rotate_right_speed,
         );
-        vec3::transform_mat4(&mut local_pos, &[0.0, 0.0, kat_offset], &rotation_mat);
+        vec3::transform_mat4(&mut local_pos, &[0.0, 0.0, kat_offset[2]], &rotation_mat);
 
-        // TODO: `prince_update_nonflip_transform:141-243` (vs mode crap)
+        // TODO_VS: `prince_update_nonflip_transform:141-243`
 
         vec3::add(&mut self.pos, &local_pos, &kat_bottom);
 
-        // TODO: `prince_update_nonclip_transform:251-268` (handle r1 jump)
+        if self.view_mode == PrinceViewMode::R1Jump {
+            // TODO_PARAM
+            let R1_JUMP_TRANSLATION_CAM_MULT = 0.6;
+            let translation = camera.get_r1_jump_translation().clone();
+            vec3::scale(&mut kat_offset, &translation, R1_JUMP_TRANSLATION_CAM_MULT);
+            vec3_inplace_add_vec(&mut self.pos, &kat_offset);
+        }
 
         mat4::copy(&mut self.transform_rot, &rotation_mat);
     }

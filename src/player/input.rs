@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use gl_matrix::{common::Vec2, vec2};
 
 use crate::math::acos_f32;
@@ -202,7 +204,7 @@ impl Input {
         l3_held: bool,
         r3_held: bool,
     ) {
-        // this is where the input is quantized from [-1, 1] to [-128, 127] (or whatever the endpoints are)
+        // this is where the input is quantized from [-1, 1] to [-128, 127]
         self.ls_x = (ls_x * 127.0) as i8;
         self.ls_y = (ls_y * 127.0) as i8;
         self.rs_x = (rs_x * 127.0) as i8;
@@ -246,5 +248,23 @@ impl Input {
             || self.r1_held
             || self.r2_down
             || self.r2_held
+    }
+}
+
+impl Display for Input {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Input(L1d={}, L1h={}, L2d={}, L2d={}, L2h={}, R1d={}, R1h={}, R2d={}, R2h={}",
+            self.l1_down,
+            self.l1_held,
+            self.l2_held,
+            self.l2_down,
+            self.l2_held,
+            self.r1_down,
+            self.r1_held,
+            self.r2_down,
+            self.r2_held
+        )
     }
 }

@@ -488,28 +488,15 @@ pub unsafe extern "C" fn SetStickState(
 pub unsafe extern "C" fn SetTriggerState(
     player_idx: i32,
     l1_down: u8,
-    l1_held: u8,
     l2_down: u8,
-    l2_held: u8,
     r1_down: u8,
-    r1_held: u8,
     r2_down: u8,
+    l1_held: u8,
+    r1_held: u8,
+    l2_held: u8,
     r2_held: u8,
     cross_click: bool,
 ) {
-    if l1_down + l1_held + l2_down + l2_held + r1_down + r1_held + r2_down + r2_held > 0 {
-        log!(
-            "set trigger state {}, {}, {}, {}, {}, {}, {}, {}",
-            l1_down,
-            l1_held,
-            l2_down,
-            l2_held,
-            r1_down,
-            r1_held,
-            r2_down,
-            r2_held
-        );
-    }
     STATE.with(|state| {
         state
             .borrow_mut()
@@ -833,8 +820,7 @@ pub unsafe extern "C" fn SetCameraMode(player_idx: i32, mode: i32) {
         state
             .borrow_mut()
             .get_mut_player(player_idx as usize)
-            .camera
-            .set_mode(mode.into())
+            .set_camera_mode(mode.into());
     });
 }
 

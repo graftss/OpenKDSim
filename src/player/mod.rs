@@ -47,11 +47,16 @@ impl Player {
 
         // then initialize the prince
         let init_angle = mission_state.mission_config.init_prince_angle[player as usize];
-        self.prince.init(player, init_angle, &self.katamari);
+        self.prince
+            .init(player, init_angle, &self.katamari, &self.camera);
 
         // then initialize the camera
-        self.camera
-            .init(&self.katamari, &self.prince, &mission_state.mission_config);
+        self.camera.init(
+            delegates,
+            &self.katamari,
+            &self.prince,
+            &mission_state.mission_config,
+        );
 
         // then initialize the animation state
         self.animation.set_delegates(delegates);
@@ -60,6 +65,11 @@ impl Player {
     pub fn update_camera(&mut self, mission_state: &MissionState) {
         self.camera
             .update(&self.prince, &mut self.katamari, mission_state, &self.input);
+    }
+
+    pub fn set_camera_mode(&mut self, mode: CameraMode) {
+        self.camera
+            .set_mode(mode, Some(&self.katamari), Some(&self.prince));
     }
 
     /// Check if the player needs to royal warp, and if so, perform the warp.
@@ -86,7 +96,7 @@ impl Player {
 
         // update the warped player's katamari, prince, and camera.
         katamari.update_royal_warp(&dest.unwrap().kat_pos, mission_state);
-        prince.update_royal_warp(katamari, dest.unwrap().prince_angle);
+        prince.update_royal_warp(katamari, camera, dest.unwrap().prince_angle);
         camera.reset_state(katamari, prince);
 
         // TODO_VS: call `vs_volume_diff_callback` delegate
@@ -100,7 +110,7 @@ impl Player {
         if reset {
             self.prince.set_view_mode(PrinceViewMode::Normal);
             self.prince.set_ignore_input_timer(0);
-            self.camera.set_mode(CameraMode::Normal);
+            self.camera.set_mode_normal();
         }
     }
 }
@@ -131,7 +141,9 @@ impl GameState {
             );
 
             // update the prince's transform now that the katamari is updated
-            player.prince.update_transform(&player.katamari);
+            player
+                .prince
+                .update_transform(&player.katamari, &player.camera);
             player.animation.update(
                 &player.prince,
                 &player.katamari,
