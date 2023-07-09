@@ -4,6 +4,7 @@ use crate::{
     collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
     constants::{FRAC_PI_2, FRAC_PI_90, PI, VEC3_Y_NEG, VEC3_ZERO},
     debug::DEBUG_CONFIG,
+    delegates::has_delegates::HasDelegates,
     global::GlobalState,
     macros::{
         inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, modify_translation,
@@ -785,6 +786,12 @@ impl Katamari {
 
             // TODO_LOW: the rest of this block should only be run if gamemode isn't 4
             // TODO_FX: `kat_process_collected_props:41-67` (play the object collected sfx)
+            let base_sound_id = mission_state
+                .stage_config
+                .get_base_collect_object_sound_id(self.diam_trunc_mm as u32);
+            let rng2 = global.rng.get_rng2() as u16;
+            let sound_id = base_sound_id + (rng2 % 3);
+            self.play_sound_fx(sound_id.into(), 1.0, 0);
         }
 
         let mut collected_props = self.new_collected_props.clone();

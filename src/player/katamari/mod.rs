@@ -19,7 +19,7 @@ use crate::{
         FRAC_4PI_3, PI, TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE,
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
-    delegates::{Delegates, DelegatesRef},
+    delegates::{has_delegates::HasDelegates, Delegates, DelegatesRef},
     global::GlobalState,
     macros::{inv_lerp, mark_address, min, panic_log, set_translation, vec3_from},
     math::{
@@ -747,6 +747,16 @@ pub struct Katamari {
     alarm_type: Option<AlarmType>,
 }
 
+impl HasDelegates for Katamari {
+    fn get_delegates_ref(&self) -> Option<&DelegatesRef> {
+        self.delegates.as_ref()
+    }
+
+    fn set_delegates_ref(&mut self, delegates_ref: &DelegatesRef) {
+        self.delegates = Some(delegates_ref.clone());
+    }
+}
+
 impl Katamari {
     pub fn get_init_radius(&self) -> f32 {
         self.init_diam_cm / 2.0
@@ -919,13 +929,13 @@ impl Katamari {
         player: u8,
         init_diam: f32,
         init_pos: &Vec3,
-        delegates: &Rc<RefCell<Delegates>>,
+        delegates_ref: &Rc<RefCell<Delegates>>,
         mission_state: &MissionState,
     ) {
         // extra stuff not in the original simulation
         self.max_prop_rays = self.params.max_prop_collision_rays;
-        self.raycast_state.set_delegates(delegates);
-        self.delegates = Some(delegates.clone());
+        self.raycast_state.set_delegates(delegates_ref);
+        self.set_delegates_ref(delegates_ref);
         // end extra stuff
 
         self.player = player;
@@ -1115,8 +1125,17 @@ impl Katamari {
         self.dist_to_cam = vec3::len(&kat_to_cam);
         self.update_cam_relative_dir(camera);
 
-        // TODO_FX: `kat_update:390-415` (self.update_dust_cloud_vfx())
-        // TODO_LOW: `kat_update:416-447` (self.update_prop_combo())
+        if !self.physics_flags.airborne && !self.physics_flags.in_water {
+            // TODO_PARAM
+            let MIN_DIAM_FOR_DUST_VFX = 1200.0;
+            let MIN_SPEED_RATIO_FOR_DUST_VFX = 0.8;
+
+            let _big_enough = self.diam_cm >= MIN_DIAM_FOR_DUST_VFX;
+            let _fast_enough = self.base_speed_ratio >= MIN_SPEED_RATIO_FOR_DUST_VFX;
+            // TODO_DUST: `kat_update:390-415` (self.update_dust_cloud_vfx())
+        }
+
+        // TODO_COMBO: `kat_update:416-447` (self.update_prop_combo())
 
         if !camera.preclear.get_enabled() {
             // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)

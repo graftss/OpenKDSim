@@ -271,12 +271,90 @@ impl StageAirbornePropGravity {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct StageSizeSoundIds {
+    pub cutoff_diam_mm: u32,
+    pub base_collect_object_sound_id: u16,
+    pub map_size_sound_id: u16,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct StageSoundIds {
+    pub ctrl_pts: Vec<StageSizeSoundIds>,
+}
+
+impl StageSoundIds {
+    fn find_size_idx(&self, kat_diam_mm: u32) -> Option<usize> {
+        for (idx, ctrl_pt) in self.ctrl_pts.iter().enumerate() {
+            if kat_diam_mm > ctrl_pt.cutoff_diam_mm {
+                return Some(idx);
+            }
+        }
+
+        None
+    }
+
+    fn get_base_collect_object_sound_id(&self, kat_diam_mm: u32) -> u16 {
+        // fall back to small sounds if all else fails
+        static DEFAULT_RESULT: u16 = 4;
+
+        self.find_size_idx(kat_diam_mm)
+            .map_or(DEFAULT_RESULT, |idx| {
+                self.ctrl_pts[idx].base_collect_object_sound_id
+            })
+    }
+
+    fn get_map_size_sound_id(&self, kat_diam_mm: u32) -> u16 {
+        // fall back to small sounds if all else fails
+        static DEFAULT_RESULT: u16 = 1;
+
+        self.find_size_idx(kat_diam_mm)
+            .map_or(DEFAULT_RESULT, |idx| self.ctrl_pts[idx].map_size_sound_id)
+    }
+}
+
+lazy_static! {
+    static ref STAGE_SOUND_IDS: [StageSoundIds; 3] = [
+        // house sound ids
+        StageSoundIds {
+            ctrl_pts: vec![
+                StageSizeSoundIds { cutoff_diam_mm: 500, base_collect_object_sound_id: 7, map_size_sound_id: 23 },
+                StageSizeSoundIds { cutoff_diam_mm: 200, base_collect_object_sound_id: 4, map_size_sound_id: 22 },
+                StageSizeSoundIds { cutoff_diam_mm: 0, base_collect_object_sound_id: 1, map_size_sound_id: 21 },
+            ]
+        },
+
+        // town sound ids
+        StageSoundIds {
+            ctrl_pts: vec![
+                StageSizeSoundIds { cutoff_diam_mm: 6000, base_collect_object_sound_id: 10, map_size_sound_id: 24 },
+                StageSizeSoundIds { cutoff_diam_mm: 1500, base_collect_object_sound_id: 7, map_size_sound_id: 23 },
+                StageSizeSoundIds { cutoff_diam_mm: 450, base_collect_object_sound_id: 4, map_size_sound_id: 22 },
+                StageSizeSoundIds { cutoff_diam_mm: 0, base_collect_object_sound_id: 1, map_size_sound_id: 21 },
+            ]
+        },
+
+        // world sound ids
+        StageSoundIds {
+            ctrl_pts: vec![
+                StageSizeSoundIds { cutoff_diam_mm: 61000, base_collect_object_sound_id: 13, map_size_sound_id: 25 },
+                StageSizeSoundIds { cutoff_diam_mm: 12000, base_collect_object_sound_id: 10, map_size_sound_id: 24 },
+                StageSizeSoundIds { cutoff_diam_mm: 3000, base_collect_object_sound_id: 7, map_size_sound_id: 23 },
+                StageSizeSoundIds { cutoff_diam_mm: 0, base_collect_object_sound_id: 4, map_size_sound_id: 22 },
+            ]
+        },
+
+        // TODO: vs mode royal warps
+    ];
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct StageConfig {
     stage_idx: u8,
     flip_params: Option<StageFlipParams>,
     royal_warps: Option<&'static StageRoyalWarps>,
     elasticity: Option<StageKatElasticity>,
     airborne_prop_gravity: Option<StageAirbornePropGravity>,
+    sound_ids: Option<&'static StageSoundIds>,
 }
 
 impl StageConfig {
@@ -323,6 +401,28 @@ impl StageConfig {
             })
             .get_airborne_prop_gravity(diam_cm)
     }
+
+    pub fn get_base_collect_object_sound_id(&self, kat_diam_mm: u32) -> u16 {
+        self.sound_ids
+            .unwrap_or_else(|| {
+                panic_log!(
+                    "error reading base collect object sound id: stage {}",
+                    self.stage_idx
+                );
+            })
+            .get_base_collect_object_sound_id(kat_diam_mm)
+    }
+
+    pub fn get_map_size_sound_id(&self, kat_diam_mm: u32) -> u16 {
+        self.sound_ids
+            .unwrap_or_else(|| {
+                panic_log!(
+                    "error reading base collect object sound id: stage {}",
+                    self.stage_idx
+                );
+            })
+            .get_map_size_sound_id(kat_diam_mm)
+    }
 }
 
 impl StageConfig {
@@ -336,6 +436,7 @@ impl StageConfig {
         Self::read_royal_warps(configs);
         Self::read_elasticity(configs);
         Self::read_airborne_prop_gravity(configs);
+        Self::read_sound_ids(configs);
 
         for (stage_idx, config) in configs.iter_mut().enumerate() {
             config.stage_idx = stage_idx as u8;
@@ -383,6 +484,12 @@ impl StageConfig {
         for (config, gravity) in configs.iter_mut().zip(table) {
             config.airborne_prop_gravity = Some(gravity);
         }
+    }
+
+    fn read_sound_ids(configs: &mut StageConfigTable) {
+        configs[1].sound_ids = Some(&STAGE_SOUND_IDS[0]);
+        configs[2].sound_ids = Some(&STAGE_SOUND_IDS[1]);
+        configs[3].sound_ids = Some(&STAGE_SOUND_IDS[2]);
     }
 }
 
