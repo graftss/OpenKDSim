@@ -10,7 +10,6 @@ mod collision;
 mod constants;
 mod debug;
 mod delegates;
-mod fx_ids;
 mod gamestate;
 mod global;
 mod math;
@@ -575,7 +574,7 @@ pub unsafe extern "C" fn GetPropMatrices(out: *mut f32) -> i32 {
 
 #[no_mangle]
 pub unsafe extern "C" fn GetMonoDataConstScreamSeType(name_idx: i32) -> i32 {
-    with_prop_config(name_idx as usize, |config| config.scream_sfx_idx.into())
+    with_prop_config(name_idx as usize, |config| config.scream_sfx_kind.into())
 }
 
 #[no_mangle]

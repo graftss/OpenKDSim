@@ -69,7 +69,7 @@ pub struct NamePropConfig {
 
     /// The prop's scream SFX index.
     /// offset: 0x21
-    pub scream_sfx_idx: u8,
+    pub scream_sfx_kind: u8,
 
     /// (??) the name index of a constant parent prop
     /// offset: 0x22
@@ -77,7 +77,7 @@ pub struct NamePropConfig {
 
     /// If true, plays the "treasure" FX on collection (e.g. the crown and trophy props)
     /// offset: 0x24
-    pub has_treasure_fx: bool,
+    pub has_treasure_vfx: bool,
 
     /// If true, the prop is a "dummy hit" object.
     /// offset: 0x25
@@ -135,9 +135,9 @@ impl NamePropConfig {
             config.kat_proximity_aware = read_bool!(table, base + 0x1e);
             config.is_fish = read_bool!(table, base + 0x1f);
             config.can_be_airborne = read_bool!(table, base + 0x20);
-            config.scream_sfx_idx = read_u8!(table, base + 0x21);
+            config.scream_sfx_kind = read_u8!(table, base + 0x21);
             config.const_parent_name_idx = read_u16!(table, base + 0x22);
-            config.has_treasure_fx = read_bool!(table, base + 0x24);
+            config.has_treasure_vfx = read_bool!(table, base + 0x24);
             config.is_dummy_hit = read_bool!(table, base + 0x25);
             config.easier_to_collect = read_bool!(table, base + 0x26);
             config.is_unhatched_egg = read_bool!(table, base + 0x27);

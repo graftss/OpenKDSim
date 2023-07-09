@@ -2,9 +2,9 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
-    constants::{FRAC_PI_2, FRAC_PI_90, PI, VEC3_Y_NEG, VEC3_ZERO},
+    constants::{FRAC_PI_2, FRAC_PI_90, PI, UNITY_TO_SIM_SCALE, VEC3_Y_NEG, VEC3_ZERO},
     debug::DEBUG_CONFIG,
-    delegates::has_delegates::HasDelegates,
+    delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
     global::GlobalState,
     macros::{
         inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, modify_translation,
@@ -303,8 +303,11 @@ impl Katamari {
             let scream_off_cooldown = prop.get_scream_cooldown_timer() == 0;
 
             if fast_enough_for_scream && big_enough_for_scream && scream_off_cooldown {
-                let _sfx_idx = NamePropConfig::get(prop.get_name_idx()).scream_sfx_idx;
-                // TODO_FX: play scream sfx
+                let scream_kind = NamePropConfig::get(prop.get_name_idx()).scream_sfx_kind;
+                if scream_kind > 0 {
+                    let sound_id = SoundId::PropBonk(scream_kind);
+                    self.play_sound_fx(sound_id, 1.0, 0);
+                }
             }
 
             prop.reset_scream_cooldown_timer();
@@ -785,7 +788,6 @@ impl Katamari {
             }
 
             // TODO_LOW: the rest of this block should only be run if gamemode isn't 4
-            // TODO_FX: `kat_process_collected_props:41-67` (play the object collected sfx)
             let base_sound_id = mission_state
                 .stage_config
                 .get_base_collect_object_sound_id(self.diam_trunc_mm as u32);
@@ -800,6 +802,8 @@ impl Katamari {
             // TODO_LOW: early exit from this loop if we reached the gametype c goal
             //           (which is a fixed # of collected props)
             let mut prop = prop_ref.borrow_mut();
+            let name_idx = prop.get_name_idx();
+            let prop_config = NamePropConfig::get(name_idx);
 
             if prop.global_state == PropGlobalState::Attached {
                 continue;
@@ -811,16 +815,40 @@ impl Katamari {
             self.attach_prop(props, prop_ref, &mut prop, mission_state, global);
             // TODO_LINK: `attach_prop_with_children(prop)`
             prop.get_flags2_mut().remove(PropFlags2::Flee);
-            // TODO_FX: `kat_process_collected_props:96-104` (play scream sound)
+
+            // if the object has a scream type, play its collection scream sfx
+            let sfx_kind = prop_config.scream_sfx_kind;
+            if sfx_kind > 0 {
+                let sound_id = SoundId::PropCollect(sfx_kind);
+                self.play_sound_fx(sound_id, 1.0, 0);
+            }
 
             // TODO: check that this (meaning `collection_idx == 0`) actually hits the last iteration
             // of this loop
             if collection_idx == 0 {
-                self.last_attached_prop_name_idx = prop.get_name_idx();
+                self.last_attached_prop_name_idx = name_idx;
                 self.last_attached_prop = Some(prop_ref.clone());
             }
+
             // TODO_COMBO: `kat_process_collected_props:111-164` (update collection combo)
-            // TODO_FX: `kat_process_collected_props:165-179` (play shiny fx for e.g. trophies/crowns)
+
+            if prop_config.has_treasure_vfx {
+                static VFX_DIR: Vec3 = [0.0, 0.0, 0.0];
+
+                let mut pos = prop.get_position().clone();
+                vec3_inplace_scale(&mut pos, 1.0 / UNITY_TO_SIM_SCALE);
+
+                let scale = prop.get_aabb_size()[1];
+
+                self.play_vfx(
+                    VfxId::Treasure,
+                    &pos,
+                    &VFX_DIR,
+                    scale,
+                    -1,
+                    self.player as i32,
+                );
+            }
         }
     }
 
@@ -1646,7 +1674,7 @@ impl Katamari {
             && !self.last_physics_flags.in_water
             && self.physics_flags.airborne
         {
-            // TODO_FX: `kat_update_vault_and_climb:44` (play enter water sfx)
+            self.play_sound_fx(SoundId::EnterWater, 1.0, 0);
         }
 
         if self.physics_flags.grounded_ray_type != Some(KatCollisionRayType::Bottom) {
@@ -1779,7 +1807,7 @@ impl Katamari {
                             .unwrap();
                         let ray_len_t = inv_lerp!(ray.ray_len, self.radius_cm, self.max_ray_len);
                         if 0.3 <= ray_len_t {
-                            // TODO_FX: play VAULTING sfx with volume `ray_len_t`
+                            self.play_sound_fx(SoundId::Vault, ray_len_t, 0);
                         }
                     }
 
@@ -1834,8 +1862,10 @@ impl Katamari {
                     None => false,
                 };
 
+                temp_debug_log!("  play_hit_ground:{play_hit_ground_sfx}");
+
                 if play_hit_ground_sfx {
-                    // TODO_FX: `kat_update_vault_and_climb:307` (play HIT_GROUND_FROM_FALL sfx)
+                    self.play_sound_fx(SoundId::HitGround, 1.0, 0);
                 }
             }
         }
@@ -2267,7 +2297,16 @@ impl Katamari {
         self.climb_ticks += 1;
 
         if self.climb_ticks == WALLCLIMB_VFX_DELAY_FRAMES {
-            // TODO_FX: play lightning vfx below prince while climbing for >1 second
+            static VFX_DIR: Vec3 = [0.0, 0.0, 0.0];
+            // TODO_PARAM
+            let CLIMB_VFX_SCALE = 0.01;
+
+            let mut pos = self.center.clone();
+            vec3_inplace_scale(&mut pos, 1.0 / UNITY_TO_SIM_SCALE);
+
+            let scale = self.diam_cm * CLIMB_VFX_SCALE;
+
+            self.play_vfx(VfxId::Climb, &pos, &VFX_DIR, scale, -1, 0);
         }
 
         let max_wallclimb_speed = self.diam_cm * MAX_WALLCLIMB_SPEED_DIAMS;

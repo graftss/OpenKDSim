@@ -29,4 +29,7 @@ random things that shouldn't be forgotten:
   - i.e. where min != -max
   - not clear whether the min/max vec3's should be multiplied by -1 in `PropMonoData::parse_aabbs`
 
-- `Prince::update_gachas` is definitely buggy
+bugs
+  - `Prince::update_gachas` is definitely buggy
+    - spin sfx is spammed every frame of spin
+  - `SoundId::HitGround` not playing in `update_vault_and_climb`

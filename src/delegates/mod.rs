@@ -1,4 +1,6 @@
 pub mod has_delegates;
+pub mod sound_id;
+pub mod vfx_id;
 
 use std::{cell::RefCell, rc::Rc};
 

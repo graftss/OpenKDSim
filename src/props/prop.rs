@@ -1008,6 +1008,10 @@ impl Prop {
         self.compare_vol_m3
     }
 
+    pub fn get_aabb_size(&self) -> &Vec3 {
+        &self.aabb_size
+    }
+
     pub fn get_aabb_radius(&self) -> f32 {
         self.aabb_radius
     }

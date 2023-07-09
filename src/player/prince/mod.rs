@@ -8,8 +8,7 @@ use gl_matrix::{
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
-    delegates::{has_delegates::HasDelegates, DelegatesRef},
-    fx_ids::SoundId,
+    delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
     macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y},
     math::{
         acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_add_vec,
@@ -1002,7 +1001,7 @@ impl Prince {
             if just_did_gacha && self.gacha_count == gachas_for_boost {
                 // if initiating a boost:
                 self.play_sound_fx(SoundId::Boost, 1.0, 0);
-                self.play_boost_vfx();
+                katamari.play_boost_vfx();
                 return;
             }
 
@@ -1042,12 +1041,6 @@ impl Prince {
             self.oujistate.dash = false;
             self.oujistate.wheel_spin = false;
         }
-    }
-
-    /// Play the VFX associated to the start of a boost.
-    /// offset: 0x6f70
-    fn play_boost_vfx(&self) {
-        // TODO_FX
     }
 
     /// Exit spin/boost state and reset gachas.

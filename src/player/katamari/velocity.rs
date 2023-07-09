@@ -4,7 +4,8 @@ use gl_matrix::{
 };
 
 use crate::{
-    constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
+    constants::{FRAC_PI_2, PI, TAU, UNITY_TO_SIM_SCALE, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
+    delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
     macros::{inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, vec3_from},
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
@@ -628,7 +629,21 @@ impl Katamari {
         );
         self.sw_speed_disp_timer = SW_SPEED_DISP_DURATION;
 
-        // TODO_FX: `kat_init_boost:28-33` (play boost sfx/vfx)
+        self.play_sound_fx(SoundId::Boost, 1.0, 0);
+        self.play_boost_vfx();
+    }
+
+    /// Play the VFX associated to the start of a boost.
+    /// offset: 0x6f70
+    pub fn play_boost_vfx(&self) {
+        static DIR: Vec3 = [0.0, 0.0, 0.0];
+        // TODO_PARAM
+        let BOOST_VFX_SCALE = 0.01;
+
+        let mut pos = self.center.clone();
+        vec3_inplace_scale(&mut pos, 1.0 / UNITY_TO_SIM_SCALE);
+        let scale = self.diam_cm * BOOST_VFX_SCALE;
+        self.play_vfx(VfxId::Boost, &pos, &DIR, scale, 1, 0);
     }
 
     fn compute_brake_state(&mut self, prince: &mut Prince, camera: &Camera) -> BrakeState {
