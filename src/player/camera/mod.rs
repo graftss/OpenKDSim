@@ -6,7 +6,7 @@ use gl_matrix::{
 use crate::{
     collision::raycast_state::{RaycastCallType, RaycastState},
     constants::{FRAC_PI_2, UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
-    delegates::DelegatesRef,
+    delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
     macros::{max, min, set_y, temp_debug_log, vec3_from, vec3_unit_xz},
     math::{
         acos_f32, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_add_vec,
@@ -76,7 +76,7 @@ pub struct CameraState {
 
     raycast_state: RaycastState,
 
-    delegates: Option<DelegatesRef>,
+    delegates_ref: Option<DelegatesRef>,
 
     // END extra fields not in the original simulation
     /// The camera position's offset from the katamari center position.
@@ -246,6 +246,16 @@ pub struct CameraState {
     pub changing_special_camera: bool,
 }
 
+impl HasDelegates for CameraState {
+    fn get_delegates_ref(&self) -> Option<&DelegatesRef> {
+        self.delegates_ref.as_ref()
+    }
+
+    fn set_delegates_ref(&mut self, delegates_ref: &DelegatesRef) {
+        self.delegates_ref = Some(delegates_ref.clone());
+    }
+}
+
 impl CameraState {
     /// Set the camera mode.
     /// TODO_DOC: `katamari` and `prince` only need to be passed in when setting a mode that uses
@@ -292,7 +302,7 @@ impl CameraState {
                 ray_end[1] += r1_jump_height;
 
                 self.raycast_state.load_ray(&ray_start, &ray_end);
-                let delegates = self.delegates.as_ref().unwrap();
+                let delegates = self.delegates_ref.as_ref().unwrap();
                 let hits = delegates.borrow().call_do_hit(
                     &ray_start,
                     &ray_end,
@@ -781,7 +791,7 @@ impl CameraState {
                 ray_end[1] += self.kat_offset_ctrl_pt.r1_jump_height;
 
                 self.raycast_state.load_ray(&ray_start, &ray_end);
-                self.r1_jump_peak_height = if let Some(delegates) = &self.delegates {
+                self.r1_jump_peak_height = if let Some(delegates) = &self.delegates_ref {
                     let found_hits = delegates.borrow().call_do_hit(
                         &ray_start,
                         &ray_end,
@@ -805,9 +815,9 @@ impl CameraState {
                 self.r1_jump_height_ratio = 1.0;
 
                 if should_end_jump || preclear.get_enabled() {
-                    // TODO_FX: play r1 jump end sfx
                     self.r1_jump_counter = 0;
                     self.r1_jump_state = CamR1JumpState::Falling;
+                    self.play_sound_fx(SoundId::R1JumpEnd, 1.0, 0);
                 }
             }
 
@@ -990,7 +1000,7 @@ impl Camera {
         prince: &Prince,
         mission_config: &MissionConfig,
     ) {
-        self.state.delegates = Some(delegates.clone());
+        self.state.delegates_ref = Some(delegates.clone());
 
         self.init_state(katamari, prince);
         self.set_mode(CameraMode::Normal, Some(katamari), Some(prince));
