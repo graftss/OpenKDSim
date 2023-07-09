@@ -124,7 +124,7 @@ pub struct Katamari {
     /// offset: 0xd54be0
     last_rot_vel_unit: Vec3,
 
-    /// The number of props lost during a bonk. The value is updated
+    /// The number of props lost during a bonk.
     /// offset: 0xd34c4c
     props_lost_from_bonks: u32,
 

@@ -486,7 +486,7 @@ pub struct Prop {
     /// offset: 0x91c
     compare_vol_m3: f32,
 
-    /// The *base* volume added to the katamari when this prop is attached (in m^3).
+    /// The base volume added to the katamari when this prop is attached (in m^3).
     /// This value will still be scaled by the mission's penalty.
     /// offset: 0x920
     attach_vol_m3: f32,
@@ -567,7 +567,7 @@ pub struct Prop {
     /// The remaining "bonk force" needed to detach this prop from the katamari.
     /// Initialized to the prop's unscaled volume when the prop is attached.
     /// offset: 0xa18
-    remain_knockoff_volume: f32,
+    attach_life: f32,
 
     /// (??) True if the prop is near a player
     /// offset: 0xa20
@@ -754,7 +754,7 @@ impl Prop {
             last_dist_to_p1: 0.0,
             dist_to_p0: 0.0,
             dist_to_p1: 0.0,
-            remain_knockoff_volume: 0.0,
+            attach_life: 0.0,
             has_twin: args.twin_id != u16::MAX,
             twin_id: max_to_none!(u16, args.twin_id),
             nearest_kat_ray_idx: None,
@@ -1131,6 +1131,14 @@ impl Prop {
         self.disabled
     }
 
+    pub fn get_attach_life(&self) -> f32 {
+        self.attach_life
+    }
+
+    pub fn set_attach_life(&mut self, attach_life: f32) {
+        self.attach_life = attach_life;
+    }
+
     pub fn set_no_parent(&mut self) {
         self.flags.remove(PropFlags1::HasParent);
         self.parent = None;
@@ -1268,7 +1276,7 @@ impl Prop {
     /// Contains most the behavior of `Katamari::attach_prop` that writes to the attached prop.
     /// offset: 0x28fe4 (mid-function)
     pub fn attach_to_kat(&mut self, kat: &Katamari) {
-        self.remain_knockoff_volume = self.compare_vol_m3;
+        self.attach_life = self.compare_vol_m3;
 
         // TODO_LOW: fix these two fields
         self.onattach_remain_ticks = 0;
@@ -1305,13 +1313,18 @@ impl Prop {
         // compute the prop's position from the computed attached transform
         mat4::get_translation(&mut self.pos, &self.attached_transform);
     }
-}
 
-impl Prop {
     /// Computes the highest point (in local space) on this prop's AABB
     /// after transforming the AABB with its current rotation matrix.
     pub fn max_aabb_y(&self) -> f32 {
         max_transformed_y(&self.aabb_vertices, &self.rotation_mat)
+    }
+
+    pub fn detach_from_katamari(&mut self) {
+        self.attach_life = 0.0;
+        self.is_attached = false;
+        // all that remains of `prop_remove_refs_from_kat`
+        self.intangible_timer = 5;
     }
 }
 

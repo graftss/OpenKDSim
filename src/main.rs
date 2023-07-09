@@ -2,7 +2,7 @@
 #![feature(vec_into_raw_parts)]
 #![allow(non_snake_case, dead_code, unused_imports)]
 
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc, ops::Range};
 
 use collision::raycast_state::ray_hits_aabb;
 use constants::{FRAC_PI_2, FRAC_PI_90, PI};
@@ -130,12 +130,6 @@ const SIB_PROP_ARGS: AddPropArgs = AddPropArgs {
     twin_id: u16::MAX,
     shake_off_flag: 1,
 };
-
-#[derive(Debug, Clone, Copy)]
-struct Test {
-    x: [f32; 4],
-    y: [i32; 4],
-}
 
 unsafe fn test() {
     use mission::stage::*;
@@ -470,6 +464,32 @@ unsafe fn print_square_dish_mesh() {
     println!("bookstand:\n{}", mesh);
 }
 
+struct Test {
+    pub x: u32,
+    pub y: u32,
+}
+
+fn rc_test() {
+    let mut data = vec![];
+    for i in 1..10 {
+        data.push(Rc::new(RefCell::new(Test { x: i, y: i * 2})));
+    }
+
+    for test_ref in data.iter_mut() {
+        {
+            let mut test = test_ref.borrow_mut();
+            test.x = 9999;
+        }
+        process_test(test_ref);
+    }
+
+}
+
+fn process_test(test_ref: &Rc<RefCell<Test>>) {
+    let test = test_ref.borrow_mut();
+    println!("processing test: {:?}", test.x);
+}
+
 fn main() {
     println!("start");
 
@@ -479,6 +499,6 @@ fn main() {
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
     {
-        replicate_flip_camera();
+        rc_test();
     }
 }

@@ -132,17 +132,18 @@ impl Katamari {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
         } else {
             // TODO: `kat_update_water_contact()`
-
             mark_address!("0x1302a");
+
             self.compute_surface_contacts();
-
             mark_address!("0x1303a");
-            self.process_surface_contacts();
 
+            self.process_surface_contacts();
             mark_address!("0x13042");
+
             self.resolve_being_stuck();
             mark_address!("0x1304a");
-            self.update_vault_and_climb(prince, camera, global);
+
+            self.update_vault_and_climb(prince, camera, global, mission_state);
             mark_address!("0x13052");
 
             if self.physics_flags.airborne && self.raycast_state.closest_hit_idx.is_some() {
@@ -1644,9 +1645,67 @@ impl Katamari {
     /// offset: 0x17790
     fn lose_props_when_stuck(&mut self) {}
 
-    /// TODO
+    /// Detach props, starting from the most recently attached, by "damaging" the
+    /// attach life of props until `lost_life` is exhausted.
     /// offset: 0x26f10
-    fn detach_props(&mut self, _vol: f32, _prop_speed: f32) {}
+    fn detach_props(&mut self, lost_life: f32, detach_speed: f32) {
+        // TODO_PARAM
+        let MAX_PROPS_LOST_FROM_BONK = 5;
+
+        let mut remaining_life = lost_life;
+        let mut remaining_props = MAX_PROPS_LOST_FROM_BONK;
+
+        // TODO_PERF: don't clone this
+        let mut attached_props = self.attached_props.clone();
+        let mut detached_ctrl_idxs = vec![];
+
+        for prop_ref in attached_props.iter_mut().rev() {
+            let should_detach;
+            let prop_vol;
+            let ctrl_idx;
+            {
+                let mut prop = prop_ref.borrow_mut();
+                let prop_attach_life = prop.get_attach_life();
+                prop_vol = prop.get_compare_vol_m3();
+                ctrl_idx = prop.get_ctrl_idx();
+
+                if prop.is_disabled() {
+                    continue;
+                }
+
+                should_detach = prop_attach_life > remaining_life;
+                if !should_detach {
+                    prop.set_attach_life(prop_attach_life - remaining_life);
+                }
+            }
+
+            if should_detach {
+                self.detach_prop(prop_ref, detach_speed);
+                detached_ctrl_idxs.push(ctrl_idx);
+                remaining_life -= prop_vol;
+                if remaining_life <= 0.0 {
+                    return;
+                }
+            }
+
+            remaining_props -= 1;
+            if remaining_props < 1 {
+                return;
+            }
+        }
+    }
+
+    /// Detach a prop from the katamari with the speed `detach_speed`.
+    /// offset: 0x27000
+    fn detach_prop(&mut self, prop_ref: &mut PropRef, _detach_speed: f32) {
+        let mut prop = prop_ref.borrow_mut();
+
+        // TODO_COMMENT: update `mono_comment_group`
+        // TODO_THEME: update `catch_count_b`
+
+        prop.detach_from_katamari();
+        self.props_lost_from_bonks += 1;
+    }
 
     /// Update the katamari's vault and climbing state.
     /// offset: 0x14c80
@@ -1655,6 +1714,7 @@ impl Katamari {
         prince: &mut Prince,
         camera: &Camera,
         global: &GlobalState,
+        mission_state: &MissionState,
     ) {
         mark_call!("update_vault_and_climb", self.debug_should_log());
 
@@ -1736,7 +1796,7 @@ impl Katamari {
             } else {
                 // if contacting at least one surface:
                 self.physics_flags.unknown_0x20 = false;
-                self.update_wall_contacts(prince, camera, global);
+                self.update_wall_contacts(prince, camera, global, mission_state);
 
                 if !self.physics_flags.contacts_floor
                     && self.physics_flags.contacts_wall
@@ -1872,7 +1932,7 @@ impl Katamari {
     }
 
     /// offset: 0x15950
-    fn update_wall_contacts(&mut self, prince: &mut Prince, camera: &Camera, global: &GlobalState) {
+    fn update_wall_contacts(&mut self, prince: &mut Prince, camera: &Camera, global: &GlobalState, mission_state: &MissionState) {
         mark_call!("update_wall_contacts", self.debug_should_log());
 
         if self.physics_flags.climbing {
@@ -2095,18 +2155,28 @@ impl Katamari {
         // TODO_PARAM
         // 166ms cooldown on bonks, which is 1/6 of a second
         let BONK_COOLDOWN_MS = 0xa6;
-        if global.game_time_ms - self.last_bonk_game_time_ms >= BONK_COOLDOWN_MS {
-            // the katamari bonks and loses props
-            self.last_bonk_game_time_ms = global.game_time_ms;
-            self.props_lost_from_bonks = 0;
 
-            let not_climbing = !self.physics_flags.climbing && !self.last_physics_flags.climbing;
+        // if it's been too soon since we bonked, play the FX but don't actually lose any props
+        if global.game_time_ms - self.last_bonk_game_time_ms < BONK_COOLDOWN_MS {
+            return self.play_bonk_fx(false);
+        }
 
-            if not_climbing && impact_force > 0.0 {
-                // TODO_LOW: `kat_begin_screen_shake()`
-                let _can_lose_props = !camera.state.cam_eff_1P && !global.map_change_mode;
-                // TODO_PROPS: `kat_update_wall_contacts:380-409` (lose props from collision, play bonk sfx)
+        // the katamari bonks and loses props
+        self.last_bonk_game_time_ms = global.game_time_ms;
+        self.props_lost_from_bonks = 0;
+
+        let not_climbing = !self.physics_flags.climbing && !self.last_physics_flags.climbing;
+
+        if not_climbing && impact_force > 0.0 {
+            // TODO_LOW: `kat_begin_screen_shake()`
+            let can_lose_props = !camera.state.cam_eff_1P && !global.map_change_mode;
+
+            if can_lose_props {
+                self.lose_props_from_bonk(impact_volume, mission_state);
+
             }
+
+            // TODO_PROPS: `kat_update_wall_contacts:380-409` (lose props from collision, play bonk sfx)
         }
 
         if _play_map_sound {
@@ -2114,6 +2184,37 @@ impl Katamari {
         }
 
         self.play_bonk_fx(false);
+    }
+
+    fn lose_props_from_bonk(&mut self, impact_volume: f32, mission_state: &MissionState) {
+        // TODO_PARAM
+        let MIN_IMPACT_VOLUME_TO_LOSE_PROPS = 0.28;
+        let MAX_PROPS_LOST_FROM_BONK = 5;
+        let MAX_IMPACT_SPEED_SCALE = 0.98;
+        let LOST_LIFE_SCALE = 0.03;
+
+        if impact_volume <= MIN_IMPACT_VOLUME_TO_LOSE_PROPS {
+            return;
+        }
+
+        self.physics_flags.detaching_props = true;
+
+        let min_impact_speed = self.base_speed * MAX_IMPACT_SPEED_SCALE;
+        let impact_speed = min!(min_impact_speed, self.speed);
+        let extra_speed = (impact_speed - min_impact_speed) / (self.base_speed - min_impact_speed);
+
+        if  impact_speed <= min_impact_speed {
+            return;
+        }
+
+        let impact_volume_t = inv_lerp!(impact_volume, MIN_IMPACT_VOLUME_TO_LOSE_PROPS, 1.0);
+        let lost_life = LOST_LIFE_SCALE * self.vol_m3 * impact_volume_t * extra_speed;
+
+        if mission_state.mission_config.game_type == GameType::NumThemeProps {
+            // TODO_THEME: `kat_lose_props_from_bonk:44-87`
+        } else {
+            self.detach_props(lost_life, impact_volume_t);
+        }
     }
 
     /// Returns `true` if the katamari can climb its current wall contact (which could be either
