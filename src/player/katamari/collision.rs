@@ -2,7 +2,9 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
-    constants::{FRAC_PI_2, FRAC_PI_90, PI, UNITY_TO_SIM_SCALE, VEC3_Y_NEG, VEC3_ZERO},
+    constants::{
+        FRAC_5PI_12, FRAC_PI_2, FRAC_PI_90, PI, UNITY_TO_SIM_SCALE, VEC3_Y_NEG, VEC3_ZERO,
+    },
     debug::DEBUG_CONFIG,
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
     global::GlobalState,
@@ -19,7 +21,10 @@ use crate::{
     player::{camera::Camera, prince::Prince},
     props::{
         config::{NamePropConfig, NAME_PROP_CONFIGS},
-        prop::{Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, PropUnattachedState},
+        prop::{
+            Prop, PropFlags1, PropFlags2, PropGlobalState, PropRef, PropTrajectoryType,
+            PropUnattachedState,
+        },
         PropsState,
     },
 };
@@ -140,7 +145,7 @@ impl Katamari {
             self.process_surface_contacts();
             mark_address!("0x13042");
 
-            self.resolve_being_stuck();
+            self.resolve_being_stuck(mission_state, global);
             mark_address!("0x1304a");
 
             self.update_vault_and_climb(prince, camera, global, mission_state);
@@ -1551,7 +1556,7 @@ impl Katamari {
         vec3_inplace_zero_small(&mut self.contact_wall_clip, 0.0001);
     }
 
-    fn resolve_being_stuck(&mut self) {
+    fn resolve_being_stuck(&mut self, mission_state: &MissionState, global: &mut GlobalState) {
         self.hit_history.push(
             self.num_wall_contacts,
             self.num_floor_contacts,
@@ -1626,7 +1631,7 @@ impl Katamari {
                     if self.can_detach_props {
                         let lost_vol_mult = self.params.base_detached_prop_vol_mult * 0.5;
                         self.physics_flags.detaching_props = true;
-                        self.detach_props(lost_vol_mult * self.vol_m3, 0.5);
+                        self.detach_props(mission_state, global, lost_vol_mult * self.vol_m3, 0.5);
                     }
                     self.static_detaching_props = false;
                 }
@@ -1648,7 +1653,13 @@ impl Katamari {
     /// Detach props, starting from the most recently attached, by "damaging" the
     /// attach life of props until `lost_life` is exhausted.
     /// offset: 0x26f10
-    fn detach_props(&mut self, lost_life: f32, detach_speed: f32) {
+    fn detach_props(
+        &mut self,
+        mission_state: &MissionState,
+        global: &mut GlobalState,
+        lost_life: f32,
+        detach_speed: f32,
+    ) {
         // TODO_PARAM
         let MAX_PROPS_LOST_FROM_BONK = 5;
 
@@ -1680,7 +1691,7 @@ impl Katamari {
             }
 
             if should_detach {
-                self.detach_prop(prop_ref, detach_speed);
+                self.detach_prop(mission_state, global, prop_ref, detach_speed);
                 detached_ctrl_idxs.push(ctrl_idx);
                 remaining_life -= prop_vol;
                 if remaining_life <= 0.0 {
@@ -1697,14 +1708,61 @@ impl Katamari {
 
     /// Detach a prop from the katamari with the speed `detach_speed`.
     /// offset: 0x27000
-    fn detach_prop(&mut self, prop_ref: &mut PropRef, _detach_speed: f32) {
+    fn detach_prop(
+        &mut self,
+        mission_state: &MissionState,
+        global: &mut GlobalState,
+        prop_ref: &mut PropRef,
+        detach_speed: f32,
+    ) {
+        prop_ref
+            .borrow_mut()
+            .detach_from_katamari(mission_state, global);
+
+        let mut prop_init_vel = vec3::create();
+        self.compute_detached_prop_init_vel(&mut prop_init_vel, prop_ref, detach_speed);
+
+        prop_ref.borrow_mut().apply_trajectory(
+            &prop_init_vel,
+            PropTrajectoryType::Normal,
+            self.airborne_prop_gravity,
+        );
+
+        self.props_lost_from_bonks += 1;
+    }
+
+    /// Compute the initial velocity of a prop when it is detached from the katamari.
+    /// offset: 0x27170
+    fn compute_detached_prop_init_vel(
+        &self,
+        out_prop_init_vel: &mut Vec3,
+        prop_ref: &mut PropRef,
+        detach_speed: f32,
+    ) {
         let mut prop = prop_ref.borrow_mut();
 
-        // TODO_COMMENT: update `mono_comment_group`
-        // TODO_THEME: update `catch_count_b`
+        let kat_to_prop_lateral_unit = vec3_unit_xz!(&vec3_from!(-, prop.pos, self.center));
 
-        prop.detach_from_katamari();
-        self.props_lost_from_bonks += 1;
+        // TODO_PARAM: these three constants
+        let prop_speed = (detach_speed * 0.4 + 0.6) * self.max_forwards_speed * 1.63;
+
+        let id = mat4::create();
+        let mut rot_mat = mat4::create();
+        // TODO_PARAM: this angle
+        mat4::rotate_x(&mut rot_mat, &id, FRAC_5PI_12);
+
+        let mut local_vel_unit = vec3::create();
+        vec3::transform_mat4(&mut local_vel_unit, &[0.0, 0.0, 1.0], &rot_mat);
+
+        *out_prop_init_vel = [
+            local_vel_unit[0] * kat_to_prop_lateral_unit[0],
+            -local_vel_unit[1],
+            local_vel_unit[2] * kat_to_prop_lateral_unit[2],
+        ];
+        vec3_inplace_scale(out_prop_init_vel, prop_speed);
+
+        // TODO_PARAM
+        prop.intangible_timer = 10;
     }
 
     /// Update the katamari's vault and climbing state.
@@ -1713,7 +1771,7 @@ impl Katamari {
         &mut self,
         prince: &mut Prince,
         camera: &Camera,
-        global: &GlobalState,
+        global: &mut GlobalState,
         mission_state: &MissionState,
     ) {
         mark_call!("update_vault_and_climb", self.debug_should_log());
@@ -1932,7 +1990,13 @@ impl Katamari {
     }
 
     /// offset: 0x15950
-    fn update_wall_contacts(&mut self, prince: &mut Prince, camera: &Camera, global: &GlobalState, mission_state: &MissionState) {
+    fn update_wall_contacts(
+        &mut self,
+        prince: &mut Prince,
+        camera: &Camera,
+        global: &mut GlobalState,
+        mission_state: &MissionState,
+    ) {
         mark_call!("update_wall_contacts", self.debug_should_log());
 
         if self.physics_flags.climbing {
@@ -2172,8 +2236,7 @@ impl Katamari {
             let can_lose_props = !camera.state.cam_eff_1P && !global.map_change_mode;
 
             if can_lose_props {
-                self.lose_props_from_bonk(impact_volume, mission_state);
-
+                self.lose_props_from_bonk(mission_state, global, impact_volume);
             }
 
             // TODO_PROPS: `kat_update_wall_contacts:380-409` (lose props from collision, play bonk sfx)
@@ -2186,10 +2249,15 @@ impl Katamari {
         self.play_bonk_fx(false);
     }
 
-    fn lose_props_from_bonk(&mut self, impact_volume: f32, mission_state: &MissionState) {
+    fn lose_props_from_bonk(
+        &mut self,
+        mission_state: &MissionState,
+        global: &mut GlobalState,
+        impact_volume: f32,
+    ) {
         // TODO_PARAM
         let MIN_IMPACT_VOLUME_TO_LOSE_PROPS = 0.28;
-        let MAX_PROPS_LOST_FROM_BONK = 5;
+        let _MAX_PROPS_LOST_FROM_BONK = 5;
         let MAX_IMPACT_SPEED_SCALE = 0.98;
         let LOST_LIFE_SCALE = 0.03;
 
@@ -2203,7 +2271,7 @@ impl Katamari {
         let impact_speed = min!(min_impact_speed, self.speed);
         let extra_speed = (impact_speed - min_impact_speed) / (self.base_speed - min_impact_speed);
 
-        if  impact_speed <= min_impact_speed {
+        if impact_speed <= min_impact_speed {
             return;
         }
 
@@ -2213,7 +2281,7 @@ impl Katamari {
         if mission_state.mission_config.game_type == GameType::NumThemeProps {
             // TODO_THEME: `kat_lose_props_from_bonk:44-87`
         } else {
-            self.detach_props(lost_life, impact_volume_t);
+            self.detach_props(mission_state, global, lost_life, impact_volume_t);
         }
     }
 

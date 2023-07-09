@@ -297,7 +297,7 @@ impl GameState {
 
         // TODO: `init_simulation_subroutine_1`: 0x263c0
 
-        self.global.detaching_props_from_kat = false;
+        self.global.detaching_props_from_stuck_kat = false;
         self.global.store_flag = false;
 
         // TODO: `init_simulation_subroutine_2`: 0x6740

@@ -229,6 +229,8 @@ impl CamScaledCtrlPt {
 /// Constant, mission-specific data.
 #[derive(Debug, Default, Clone)]
 pub struct MissionConfig {
+    pub id: Mission,
+
     /// List of control points describing how the katamari's `attach_vol_penalty`
     /// changes as the katamari grows in size in the mission.
     pub vol_penalty_ctrl_pts: Option<Vec<VolPenaltyCtrlPt>>,
@@ -364,15 +366,35 @@ impl MissionConfig {
             camera_state.set_kat_offsets(&ctrl_pts[used_idx]);
         }
     }
+
+    pub fn is_theme_object(&self, name_idx: u16) -> bool {
+        if let Some(names) = &self.theme_prop_names {
+            names.contains(&name_idx)
+        } else if self.id == Mission::Cygnus {
+            // the cygnus config doesn't have `theme_prop_names` defined, apparently because
+            // the only theme object is "swan egg".
+            // TODO_REFACTOR: probably just add `vec![0x41f]` to the cygnus config.
+            name_idx == 0x41f
+        } else {
+            false
+        }
+    }
 }
 
 /// Initialize the `MissionConfig` table `configs`.
 fn read_from_data(configs: &mut [MissionConfig; NUM_MISSIONS]) {
+    add_mission_ids(configs);
     read_mission_config_0x60_table(configs);
     read_vol_penalty_ctrl_pts(configs);
     read_scaled_params_ctrl_pts(configs);
     read_scaled_max_sizes(configs);
     read_camera_params_ctrl_pts(configs);
+}
+
+fn add_mission_ids(configs: &mut [MissionConfig; NUM_MISSIONS]) {
+    for (mission_idx, config) in configs.iter_mut().enumerate() {
+        config.id = (mission_idx as u8).into();
+    }
 }
 
 /// Read the binary "mission config 0x60" table from the simulation into

@@ -13,17 +13,22 @@ use gl_matrix::{
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
+    global::GlobalState,
     macros::{
         max_to_none, modify_translation, new_mat4_copy, scale_translation, set_translation,
         vec3_from,
     },
+    mission::state::MissionState,
     mono_data::{PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
     util::scale_sim_transform,
 };
 
-use super::{motion::behavior::PropBehavior, PropsState};
+use super::{
+    motion::{behavior::PropBehavior, RotationAxis},
+    PropsState,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropGlobalState {
@@ -107,7 +112,7 @@ pub enum PropUnattachedState {
     /// The default state that most props are in most of the time.
     Normal = 0,
 
-    State1 = 1,
+    InTrajectory = 1,
     State2 = 2,
     State3 = 3,
 
@@ -224,13 +229,13 @@ bitflags::bitflags! {
         const AirborneFlag_0x10 = 0x10;
 
         /// (??) probably related to intangible airborne props
-        const AirborneFlag_0x20 = 0x20;
+        const AirborneWithReactiveChild = 0x20;
 
         /// (??) True when the prop (1) has the "hop" motion action and (2) is mid-hop in the air.
         const Hop = 0x40;
 
         /// (??) probably related to intangible airborne props
-        const AirborneFlag_0x80 = 0x80;
+        const DetachedWhileKatamariStuck = 0x80;
     }
 }
 
@@ -244,6 +249,9 @@ bitflags::bitflags! {
         // True if the prop is wobbling after being hit by the katamari
         const Wobble = 0x2;
 
+        /// (??) set in `apply_trajectory`
+        const UnderTrajectory = 0x4;
+
         /// True if the prop is fleeing from the katamari.
         const Flee = 0x8;
 
@@ -254,6 +262,18 @@ bitflags::bitflags! {
         /// (??) Seems like something to do with parent/child links.
         const Unknown0x80 = 0x80;
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropTrajectoryType {
+    Normal,
+
+    /// The trajectory taken by unattached props which are hit by the katamari and sent flying into
+    /// the "airborne intangible" state.
+    HitAirborne,
+
+    /// The trajectory taken by drinks ejected from bonked vending machines.
+    VendingMachine,
 }
 
 #[derive(Debug, Default)]
@@ -368,6 +388,12 @@ pub struct Prop {
     /// The prop's rotation as Euler angles on the previous tick.
     /// offset: 0xd0
     last_rotation_vec: Vec3,
+
+    /// The prop's velocity while under a trajectory, which can be imparted either
+    /// by the katamari (when hit by the katamari or detached from the katamari),
+    /// or by a prop behavior (e.g. launched from a vending machine or russian doll).
+    /// offset: 0xe0
+    trajectory_velocity: Vec3,
 
     /// The prop's transform matrix while unattached from the katamari.
     /// offset: 0x110
@@ -794,6 +820,7 @@ impl Prop {
             is_attached: false,
             attached_transform: [0.0; 16],
             collision_mesh,
+            trajectory_velocity: [0.0; 3],
         };
 
         if let Some(aabbs) = &mono_data.aabbs {
@@ -1320,11 +1347,74 @@ impl Prop {
         max_transformed_y(&self.aabb_vertices, &self.rotation_mat)
     }
 
-    pub fn detach_from_katamari(&mut self) {
+    pub fn detach_from_katamari(&mut self, mission_state: &MissionState, global: &mut GlobalState) {
         self.attach_life = 0.0;
         self.is_attached = false;
         // all that remains of `prop_remove_refs_from_kat`
         self.intangible_timer = 5;
+
+        if mission_state.mission_config.is_theme_object(self.name_idx) {
+            global.catch_count_b -= 1;
+        }
+    }
+
+    pub fn apply_trajectory(
+        &mut self,
+        init_vel: &Vec3,
+        trajectory: PropTrajectoryType,
+        _gravity: f32,
+    ) {
+        match trajectory {
+            PropTrajectoryType::HitAirborne => {
+                // TODO_AIRBORNE
+            }
+            PropTrajectoryType::Normal | PropTrajectoryType::VendingMachine => {
+                // TODO_LINK
+                if false
+                /*self.first_child.is_some() && child_prop.link_action == ParentCollectedReaction */
+                {
+                    self.flags.insert(PropFlags1::AirborneWithReactiveChild)
+                }
+                self.global_state = PropGlobalState::Unattached;
+                self.unattached_state = PropUnattachedState::InTrajectory;
+                // TODO
+                if false
+                /* global.detaching_props_from_stuck_kat*/
+                {
+                    self.flags.insert(PropFlags1::DetachedWhileKatamariStuck);
+                }
+            }
+        }
+
+        self.trajectory_velocity = *init_vel;
+        // TODO_MOTION:
+        /*  (prop->motionData).numAirborneBounces = 0;
+        (prop->motionData).field14_0x19 = 0;
+        (prop->motionData).landed = false;
+        (prop->motionData).fishHopState = STATE0 */
+        // TODO: `global.airborne_prop_gravity = gravity`
+
+        if self.global_state == PropGlobalState::AirborneIntangible {
+            // TODO_AIRBORNE
+        } else {
+            if trajectory != PropTrajectoryType::VendingMachine {
+                mat4::identity(&mut self.rotation_mat);
+                vec3::zero(&mut self.rotation_vec);
+            }
+
+            let _rot_axis = if self.trajectory_velocity[0] <= self.trajectory_velocity[2] {
+                RotationAxis::X
+            } else {
+                RotationAxis::Z
+            };
+
+            // TODO_MOTION:
+            /*  (prop->motionData).rotationAxis = AVar5;
+            (prop->motionData).field17_0x1c = 0.2;
+            (prop->motionData).field18_0x20 = 0.0 */
+
+            self.flags2.insert(PropFlags2::UnderTrajectory);
+        }
     }
 }
 
@@ -1403,7 +1493,7 @@ impl Prop {
     /// Update logic for a prop that's attached to the katamari.
     /// offset: 0x50f30
     fn update_attached(&mut self) {
-        self.flags.remove(PropFlags1::AirborneFlag_0x20);
+        self.flags.remove(PropFlags1::AirborneWithReactiveChild);
         self.flags2.remove(PropFlags2::FollowParent);
         self.move_type = None;
         self.has_motion = false;

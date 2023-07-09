@@ -95,6 +95,8 @@ pub const FRAC_PI_750: f32 = f32::from_bits(0x1f42893b);
 /// offset: 0x7b20c
 pub const FRAC_PI_90: f32 = f32::from_bits(0x3d0f190d);
 
+pub const FRAC_5PI_12: f32 = f32::from_bits(0x3fa78d36);
+
 /// The triangulation of AABB's used in the original simulation.
 /// An AABB is triangulated into 12 triangles (= 6 faces * 2 triangles/face),
 /// and each triangle is encoded as a triple of vertex indices.

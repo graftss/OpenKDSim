@@ -55,10 +55,9 @@ pub struct GlobalState {
     pub store_flag: bool,
 
     /// If true, the simulation is currently in the process of detaching
-    /// props from the katamari. (It's set to true while happening, and set back
-    /// to false after everything has been detached.)
+    /// props from the katamari *while it is "stuck" between walls*.
     /// offset: 0x10eadb
-    pub detaching_props_from_kat: bool,
+    pub detaching_props_from_stuck_kat: bool,
 
     /// Props with a diameter ratio to the player less
     /// than this value will be destroyed when they reach an alpha of 0.

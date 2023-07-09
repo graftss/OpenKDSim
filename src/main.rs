@@ -2,7 +2,7 @@
 #![feature(vec_into_raw_parts)]
 #![allow(non_snake_case, dead_code, unused_imports)]
 
-use std::{cell::RefCell, rc::Rc, ops::Range};
+use std::{cell::RefCell, ops::Range, rc::Rc};
 
 use collision::raycast_state::ray_hits_aabb;
 use constants::{FRAC_PI_2, FRAC_PI_90, PI};
@@ -15,6 +15,7 @@ use macros::{inv_lerp_clamp, lerp};
 use math::{
     acos_f32, vec3_inplace_normalize, vec3_inplace_scale, vec3_projection, vec3_reflection,
 };
+use mission::{config::MissionConfig, Mission};
 use mono_data::MonoData;
 use props::prop::AddPropArgs;
 
@@ -472,22 +473,31 @@ struct Test {
 fn rc_test() {
     let mut data = vec![];
     for i in 1..10 {
-        data.push(Rc::new(RefCell::new(Test { x: i, y: i * 2})));
+        data.push(Rc::new(RefCell::new(Test { x: i, y: i * 2 })));
     }
 
     for test_ref in data.iter_mut() {
         {
-            let mut test = test_ref.borrow_mut();
-            test.x = 9999;
+            test_ref.borrow_mut().x = 3;
+            process_test(test_ref)
         }
-        process_test(test_ref);
     }
-
 }
 
 fn process_test(test_ref: &Rc<RefCell<Test>>) {
     let test = test_ref.borrow_mut();
     println!("processing test: {:?}", test.x);
+}
+
+fn cygnus_test() {
+    let mut mission_config = MissionConfig::default();
+    MissionConfig::get(&mut mission_config, 12);
+
+    println!(
+        "cygnus config: ({:?}) {:?}",
+        mission_config.id, mission_config.theme_prop_names
+    );
+    println!("theme: {}", mission_config.is_theme_object(0x41f));
 }
 
 fn main() {
@@ -499,6 +509,6 @@ fn main() {
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
     {
-        rc_test();
+        cygnus_test();
     }
 }

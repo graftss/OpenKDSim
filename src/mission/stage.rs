@@ -299,9 +299,7 @@ impl StageSoundIds {
         static DEFAULT_RESULT: u16 = 4;
 
         self.find_size_idx(kat_diam_mm)
-            .map_or(DEFAULT_RESULT, |idx| {
-                self.ctrl_pts[idx].collect_prop
-            })
+            .map_or(DEFAULT_RESULT, |idx| self.ctrl_pts[idx].collect_prop)
     }
 
     fn get_lose_prop_sound_id(&self, kat_diam_mm: u32) -> u16 {
@@ -309,9 +307,7 @@ impl StageSoundIds {
         static DEFAULT_RESULT: u16 = 16;
 
         self.find_size_idx(kat_diam_mm)
-            .map_or(DEFAULT_RESULT, |idx| {
-                self.ctrl_pts[idx].lose_prop
-            })
+            .map_or(DEFAULT_RESULT, |idx| self.ctrl_pts[idx].lose_prop)
     }
 
     fn get_map_size_sound_id(&self, kat_diam_mm: u32) -> u16 {
