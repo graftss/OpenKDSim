@@ -8,6 +8,8 @@ use gl_matrix::{
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
+    delegates::{has_delegates::HasDelegates, DelegatesRef},
+    fx_ids::SoundId,
     macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y},
     math::{
         acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_add_vec,
@@ -134,6 +136,8 @@ impl Default for PrinceTurnType {
 #[derive(Debug, Default)]
 pub struct Prince {
     params: PrinceParams,
+
+    delegates: Option<DelegatesRef>,
 
     /// The player index controlling this prince.
     /// offset: 0x0
@@ -598,7 +602,16 @@ impl Prince {
 
 impl Prince {
     /// Initialize the prince at the start of a mission.
-    pub fn init(&mut self, player: u8, init_angle: f32, kat: &Katamari, camera: &Camera) {
+    pub fn init(
+        &mut self,
+        delegates_ref: &DelegatesRef,
+        player: u8,
+        init_angle: f32,
+        kat: &Katamari,
+        camera: &Camera,
+    ) {
+        self.set_delegates_ref(delegates_ref);
+
         self.player = player;
         self.no_dash_ticks = 0;
         self.huff_timer = 0;
@@ -723,7 +736,7 @@ impl Prince {
         }
 
         if self.should_init_flip(input) {
-            // TODO_FX: play flip sound
+            self.play_sound_fx(SoundId::Flip, 1.0, 0);
 
             if mission_state.is_tutorial() {
                 if let Some(tutorial_state) = &mut mission_state.tutorial {
@@ -988,7 +1001,8 @@ impl Prince {
 
             if just_did_gacha && self.gacha_count == gachas_for_boost {
                 // if initiating a boost:
-                // TODO_FX: `prince_update_gachas:234-241` (play boost sfx and vfx)
+                self.play_sound_fx(SoundId::Boost, 1.0, 0);
+                self.play_boost_vfx();
                 return;
             }
 
@@ -999,7 +1013,7 @@ impl Prince {
 
             if self.gacha_count >= gachas_for_spin && self.gacha_count < gachas_for_boost {
                 // if spinning, but not yet enough gachas for a boost:
-                // TODO_FX: `prince_update_gachas:249-253` (play spin sfx)
+                self.play_sound_fx(SoundId::Spin, 1.0, 0);
                 self.oujistate.dash = true;
                 self.oujistate.wheel_spin = true;
             } else if self.gacha_count > gachas_for_boost {
@@ -1028,6 +1042,12 @@ impl Prince {
             self.oujistate.dash = false;
             self.oujistate.wheel_spin = false;
         }
+    }
+
+    /// Play the VFX associated to the start of a boost.
+    /// offset: 0x6f70
+    fn play_boost_vfx(&self) {
+        // TODO_FX
     }
 
     /// Exit spin/boost state and reset gachas.
@@ -1537,5 +1557,15 @@ impl Player {
                     .map(|tut| tut.set_move_held(tut_move));
             }
         }
+    }
+}
+
+impl HasDelegates for Prince {
+    fn get_delegates_ref(&self) -> Option<&DelegatesRef> {
+        self.delegates.as_ref()
+    }
+
+    fn set_delegates_ref(&mut self, delegates_ref: &DelegatesRef) {
+        self.delegates = Some(delegates_ref.clone());
     }
 }

@@ -10,9 +10,11 @@ random things that shouldn't be forgotten:
 - when entering a pinch input from consistent non-pinch push inputs, the katamari
   will orbit around in a circle for some reason
 
-- `Resettable` interface to reset attempt-specific bits of game state
+- `Reset` interface to reset attempt-specific bits of game state
   - implement it on all parts of `GameState`
   - `derive` it on structs for which all fields are `Resettable`? sounds like a good exercise
+
+- `Serialize` interface for save/loading savestates
 
 - rename `ticks` -> `frames` everywhere
 - refactor `ray_idx` into an enum: { CollisionRay(i16), ShellRay(i16) }
@@ -25,3 +27,5 @@ random things that shouldn't be forgotten:
 - do a search for prop AABB's that aren't symmetrical about the origin
   - i.e. where min != -max
   - not clear whether the min/max vec3's should be multiplied by -1 in `PropMonoData::parse_aabbs`
+
+- `Prince::update_gachas` is definitely buggy

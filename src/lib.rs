@@ -10,6 +10,7 @@ mod collision;
 mod constants;
 mod debug;
 mod delegates;
+mod fx_ids;
 mod gamestate;
 mod global;
 mod math;

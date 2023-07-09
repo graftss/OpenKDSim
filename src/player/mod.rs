@@ -48,7 +48,7 @@ impl Player {
         // then initialize the prince
         let init_angle = mission_state.mission_config.init_prince_angle[player as usize];
         self.prince
-            .init(player, init_angle, &self.katamari, &self.camera);
+            .init(delegates, player, init_angle, &self.katamari, &self.camera);
 
         // then initialize the camera
         self.camera.init(
