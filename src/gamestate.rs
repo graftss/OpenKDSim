@@ -4,7 +4,7 @@ use crate::{
     debug::DEBUG_CONFIG,
     delegates::Delegates,
     global::GlobalState,
-    macros::{panic_log, temp_debug_log},
+    macros::{debug_log, panic_log},
     mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
@@ -334,7 +334,7 @@ impl GameState {
 
         if mission_state.is_vs_mode {
             // TODO_VS: initialize the vs mode state, presumably
-            self.mission_state.vsmode = Some(VsModeState { timer_0x10bf10: 0 });
+            self.mission_state.vsmode = VsModeState { timer_0x10bf10: 0 };
         } else {
             // TODO: `init_simulation`:333-366, initialize somethings coming callbacks?
         }
@@ -346,7 +346,7 @@ impl GameState {
     /// Mimicks the `Tick` API function.
     pub fn tick(&mut self, _delta: f32) {
         if DEBUG_CONFIG.log_tick {
-            temp_debug_log!("tick");
+            debug_log!("tick");
         }
 
         let is_vs_mode = self.mission_state.is_vs_mode;

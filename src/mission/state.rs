@@ -16,13 +16,13 @@ pub struct MissionState {
     pub stage_config: StageConfig,
 
     /// Ending-specific state.
-    pub ending: Option<EndingState>,
+    pub ending: EndingState,
 
     /// Tutorial-specific state.
-    pub tutorial: Option<TutorialState>,
+    pub tutorial: TutorialState,
 
     /// VS mode-specific state.
-    pub vsmode: Option<VsModeState>,
+    pub vsmode: VsModeState,
 
     /// The current mission.
     /// offset: 0xff104
@@ -81,9 +81,7 @@ impl MissionState {
     /// Set the tutorial move `tut_move` as being held.
     pub fn set_tutorial_move_held(&mut self, tut_move: TutorialMove) {
         if self.is_tutorial() {
-            if let Some(tutorial) = &mut self.tutorial {
-                tutorial.set_move_held(tut_move);
-            }
+            self.tutorial.set_move_held(tut_move);
         }
     }
 }

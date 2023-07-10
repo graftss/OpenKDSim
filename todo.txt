@@ -9,6 +9,10 @@ features
   savestates
     - `Serialize` interface for save/loading savestates, implemented on all
       relevant game state structs
+  resetting
+    - `Reset` interface to reset attempt-specific bits of game state
+      - implement it on all parts of `GameState`
+      - `derive` it on structs for which all fields are `Resettable`? sounds like a good exercise
 
 refactoring
   - rename `ticks` -> `frames` everywhere
@@ -19,10 +23,6 @@ refactoring
   - change argments of `vec3_from!` so that it's `u op v`
   - rename `vec3_unit_xz` -> `vec3_lateral_unit`
   - fix signedness of everything; anything that can never be negative should be unsigned
-  - `ending`, `tutorial`, and `vsmode` fields of `MissionState` shouldn't be options.
-  - `Reset` interface to reset attempt-specific bits of game state
-    - implement it on all parts of `GameState`
-    - `derive` it on structs for which all fields are `Resettable`? sounds like a good exercise
 
 perf
   - is it possible to drop the static `include_bytes!` data after

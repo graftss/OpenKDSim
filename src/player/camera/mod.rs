@@ -7,7 +7,7 @@ use crate::{
     collision::raycast_state::{RaycastCallType, RaycastState},
     constants::{FRAC_PI_2, UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
-    macros::{max, min, set_y, temp_debug_log, vec3_from, vec3_unit_xz},
+    macros::{max, min, set_y, vec3_from, vec3_unit_xz},
     math::{
         acos_f32, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_times_mat4,
@@ -1073,20 +1073,12 @@ impl Camera {
         let min_y = self.params.l1_look_min_y;
         let max_y = self.params.l1_look_max_y;
 
-        temp_debug_log!("update_l1_look");
-        temp_debug_log!("  y_angle_before={}", self.state.l1_look_y_angle);
         // update y angle
         if ls_y > 0.0 {
             self.state.l1_look_y_angle = max!(self.state.l1_look_y_angle - speed_y * ls_y, min_y);
         } else if ls_y < 0.0 {
             self.state.l1_look_y_angle = min!(self.state.l1_look_y_angle - speed_y * ls_y, max_y);
         }
-
-        temp_debug_log!("  speed_x={speed_x}, speed_y={speed_y}, min_y={min_y}, max_y={max_y}");
-        temp_debug_log!(
-            "  ls_x={ls_x}, ls_y={ls_y}, prince_angle={prince_angle}, y_angle={}",
-            self.state.l1_look_y_angle
-        );
 
         // update x angle, which is written directly to the prince
         change_bounded_angle(prince_angle, ls_x * speed_x);

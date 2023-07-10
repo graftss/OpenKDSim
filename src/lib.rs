@@ -233,8 +233,6 @@ pub unsafe extern "C" fn GetMapRollMatrix(
             .borrow_mut()
             .mission_state
             .ending
-            .as_mut()
-            .unwrap()
             .get_map_roll_matrix(xx, xy, xz, yx, yy, yz, zx, zy, zz);
     })
 }
@@ -864,8 +862,6 @@ pub unsafe extern "C" fn SetTutorialA(page: i32, page_step: i32) {
             .borrow_mut()
             .mission_state
             .tutorial
-            .as_mut()
-            .unwrap()
             .set_page(page, page_step)
     });
 }

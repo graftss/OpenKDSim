@@ -1,4 +1,4 @@
-use crate::{collision::hit_attribute::HitAttribute, debug::DEBUG_CONFIG, macros::temp_debug_log};
+use crate::{collision::hit_attribute::HitAttribute, debug::DEBUG_CONFIG, macros::debug_log};
 
 use super::collision::ray::{KatCollisionRayType, ShellRay};
 
@@ -250,7 +250,7 @@ impl KatHitFlags {
     /// offset: 0x16d10
     pub fn apply_hit_attr(&mut self, attr: HitAttribute) {
         if DEBUG_CONFIG.log_nonzero_hit_attribute_hits && attr != HitAttribute::None {
-            temp_debug_log!("  contacted hit attribute: {attr:?}");
+            debug_log!("  contacted hit attribute: {attr:?}");
         }
 
         match attr {

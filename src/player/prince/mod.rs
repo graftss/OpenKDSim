@@ -742,9 +742,7 @@ impl Prince {
             self.play_sound_fx(SoundId::Flip, 1.0, 0);
 
             if mission_state.is_tutorial() {
-                if let Some(tutorial_state) = &mut mission_state.tutorial {
-                    tutorial_state.set_move_held(TutorialMove::Flip);
-                }
+                mission_state.tutorial.set_move_held(TutorialMove::Flip);
             }
 
             self.oujistate.jump_180 = true;
@@ -788,7 +786,7 @@ impl Prince {
                 return false;
             }
             GameMode::Tutorial => {
-                if mission_state.tutorial.as_ref().unwrap().get_page() == 0 {
+                if mission_state.tutorial.get_page() == 0 {
                     return false;
                 }
             }
@@ -947,10 +945,7 @@ impl Prince {
             let angle_tut_move = self.update_angle(katamari);
 
             if let Some(tut_move) = angle_tut_move {
-                mission_state
-                    .tutorial
-                    .as_mut()
-                    .map(|tut| tut.set_move_held(tut_move));
+                mission_state.tutorial.set_move_held(tut_move);
             }
         }
     }
@@ -989,7 +984,7 @@ impl Prince {
 
             // gachas are blocked in `Tutorial` gamemode on the *first page* of the moveset
             // (which is before the boost move is unlocked)
-            GameMode::Tutorial => mission_state.tutorial.as_ref().unwrap().get_page() == 0,
+            GameMode::Tutorial => mission_state.tutorial.get_page() == 0,
 
             // gachas are blocked in all other gamemodes
             _ => true,
@@ -1081,11 +1076,7 @@ impl Prince {
                 && self.oujistate.dash
                 && mission_state.gamemode == GameMode::Tutorial
             {
-                mission_state
-                    .tutorial
-                    .as_mut()
-                    .unwrap()
-                    .set_move_held(TutorialMove::Boost);
+                mission_state.tutorial.set_move_held(TutorialMove::Boost);
             }
             return;
         } else {
@@ -1392,11 +1383,10 @@ impl Prince {
                             false
                         };
 
-                        let tutorial = &mission_state.tutorial;
+                        let tutorial_locked =
+                            mission_state.is_tutorial() && mission_state.tutorial.get_page() == 0;
                         let can_view_mode =
-                            tutorial.as_ref().map_or(true, |tut| tut.get_page() > 0)
-                                && under_speed_threshold
-                                && !self.oujistate.jump_180;
+                            !tutorial_locked && under_speed_threshold && !self.oujistate.jump_180;
 
                         if can_view_mode {
                             if input.l1_down && !input.r1_down {
@@ -1589,10 +1579,7 @@ impl Player {
                 prince.update_view_mode(camera, katamari, input, mission_state);
 
             if let Some(tut_move) = view_mode_tut_move {
-                mission_state
-                    .tutorial
-                    .as_mut()
-                    .map(|tut| tut.set_move_held(tut_move));
+                mission_state.tutorial.set_move_held(tut_move);
             }
         }
     }
