@@ -33,5 +33,8 @@ bugs
     continues moving away from them
     - it's possible that this is just those props getting disabled, but this code doesn't set their
       alpha to 0 to they remain visible.
+      - it's not that though, since it can happen with very few props attached
   - when entering a pinch input from consistent non-pinch push inputs, the katamari
     will orbit around in a circle for some reason
+    - e.g. pinch, pump right stick up, then go back to pinch
+  - playing the original sim, then playing open sim, results in earthquake glitch in open sim

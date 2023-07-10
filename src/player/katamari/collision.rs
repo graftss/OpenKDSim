@@ -2,9 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 
 use crate::{
     collision::{hit_attribute::HitAttribute, raycast_state::RaycastCallType},
-    constants::{
-        FRAC_5PI_12, FRAC_PI_2, FRAC_PI_90, PI, UNITY_TO_SIM_SCALE, VEC3_Y_NEG, VEC3_ZERO,
-    },
+    constants::{FRAC_5PI_12, FRAC_PI_2, FRAC_PI_90, PI, VEC3_Y_NEG, VEC3_ZERO},
     debug::DEBUG_CONFIG,
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
     global::GlobalState,
@@ -365,9 +363,16 @@ impl Katamari {
         // TODO_PERF: refactor code to only keep one mesh for each prop type.
         // (store it in `NamePropConfig`). then we wouldn't need to clone the mesh here
         let prop_mesh = match NamePropConfig::get(prop.get_name_idx()).use_aabb_for_collision {
-            true => prop.get_aabb_mesh().unwrap(),
-            false => prop.get_collision_mesh().unwrap(),
-        };
+            true => prop.get_aabb_mesh(),
+            false => prop.get_collision_mesh(),
+        }.unwrap_or_else(|| {
+            panic_log!(
+                "failed to find prop collision mesh (name_idx={}): \n\n{:?}\n\n",
+                prop.get_name_idx(),
+                prop
+            );
+        });
+
 
         let mut prop_rot = prop.get_unattached_transform().clone();
         modify_translation!(prop_rot, =, VEC3_ZERO);
@@ -839,18 +844,15 @@ impl Katamari {
             if prop_config.has_treasure_vfx {
                 static VFX_DIR: Vec3 = [0.0, 0.0, 0.0];
 
-                let mut pos = prop.get_position().clone();
-                vec3_inplace_scale(&mut pos, 1.0 / UNITY_TO_SIM_SCALE);
-
                 let scale = prop.get_aabb_size()[1];
 
                 self.play_vfx(
                     VfxId::Treasure,
-                    &pos,
+                    &self.center,
                     &VFX_DIR,
                     scale,
                     -1,
-                    self.player as i32,
+                    self.player,
                 );
             }
         }
@@ -2431,15 +2433,8 @@ impl Katamari {
 
         if self.climb_ticks == WALLCLIMB_VFX_DELAY_FRAMES {
             static VFX_DIR: Vec3 = [0.0, 0.0, 0.0];
-            // TODO_PARAM
-            let CLIMB_VFX_SCALE = 0.01;
 
-            let mut pos = self.center.clone();
-            vec3_inplace_scale(&mut pos, 1.0 / UNITY_TO_SIM_SCALE);
-
-            let scale = self.diam_cm * CLIMB_VFX_SCALE;
-
-            self.play_vfx(VfxId::Climb, &pos, &VFX_DIR, scale, -1, 0);
+            self.play_vfx(VfxId::Climb, &self.center, &VFX_DIR, self.diam_cm, -1, 0);
         }
 
         let max_wallclimb_speed = self.diam_cm * MAX_WALLCLIMB_SPEED_DIAMS;

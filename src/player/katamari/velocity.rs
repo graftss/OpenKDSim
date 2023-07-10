@@ -4,7 +4,7 @@ use gl_matrix::{
 };
 
 use crate::{
-    constants::{FRAC_PI_2, PI, TAU, UNITY_TO_SIM_SCALE, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
+    constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
     macros::{inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, vec3_from},
     math::{
@@ -634,13 +634,8 @@ impl Katamari {
     /// offset: 0x6f70
     pub fn play_boost_vfx(&self) {
         static DIR: Vec3 = [0.0, 0.0, 0.0];
-        // TODO_PARAM
-        let BOOST_VFX_SCALE = 0.01;
 
-        let mut pos = self.center.clone();
-        vec3_inplace_scale(&mut pos, 1.0 / UNITY_TO_SIM_SCALE);
-        let scale = self.diam_cm * BOOST_VFX_SCALE;
-        self.play_vfx(VfxId::Boost, &pos, &DIR, scale, 1, 0);
+        self.play_vfx(VfxId::Boost, &self.center, &DIR, self.diam_cm, 1, 0);
     }
 
     fn compute_brake_state(&mut self, prince: &mut Prince, camera: &Camera) -> BrakeState {
@@ -682,26 +677,36 @@ impl Katamari {
             let angle = prince.push_sideways_angle_threshold;
 
             // compute max speed and brake acceleration based on input push direction
-            let (max_speed, brake_accel) = if prince.oujistate.dash {
+            // TODO_LOW: these conditions are not in the same order as in the original simulation,
+            // which means that if more than one of them is true at the same time, the
+            // branch that gets taken might be different.
+            let (max_speed, brake_accel, brake_vfx_id) = if prince.oujistate.dash {
                 // braking boost movement
-                (self.max_boost_speed, self.scaled_params.brake_boost_force)
+                (
+                    self.max_boost_speed,
+                    self.scaled_params.brake_boost_force,
+                    VfxId::BrakeForward,
+                )
             } else if vel_to_cam_angle >= FRAC_PI_2 + angle {
                 // braking forwards movement with backwards input
                 (
                     self.max_backwards_speed,
                     self.scaled_params.brake_backwards_force,
+                    VfxId::BrakeBackward,
                 )
             } else if vel_to_cam_angle < FRAC_PI_2 - angle {
                 // braking backwards movement with forwards input
                 (
                     self.max_forwards_speed,
                     self.scaled_params.brake_forwards_force,
+                    VfxId::BrakeForward,
                 )
             } else {
                 // braking sideways movement with sideways input
                 (
                     self.max_sideways_speed,
                     self.scaled_params.brake_sideways_force,
+                    VfxId::BrakeSideways,
                 )
             };
 
@@ -720,28 +725,34 @@ impl Katamari {
                         // if we aren't already braking:
                         // begin a new brake
                         if !prince.oujistate.wheel_spin {
-                            // TODO_FX: compute a VFX id in the above `(max_speed, brake_accel)`
-                            // computation, and play that VFX here with the vfx delegate
+                            self.play_vfx_at_bottom(brake_vfx_id);
                         }
 
                         self.brake_push_dir = prince.get_push_dir();
                         self.brake_accel = brake_accel;
-                        // TODO: there's a bunch of random flag checks here, probably no-ops though
-                        // (`kat_compute_brake_state:191-193)
+                        // TODO_LOW: there's a bunch of random flag checks here, probably no-ops though
 
-                        let _brake_volume = match self.brake_push_dir {
-                            Some(PushDir::Forwards) => 0.5,
-                            _ => 0.7,
-                        };
-                        // TODO_FX: play the brake SFX here with volume `brake_volume`
-
-                        // TODO_FX: the simulation sets this timer to 0 here, but does that just mean the brake
-                        // vfx plays twice in a row? should this be the regular cooldown?
-                        self.brake_vfx_timer = 1;
+                        if !self.physics_flags.braking {
+                            // TODO_PARAM
+                            let brake_volume = match self.brake_push_dir {
+                                Some(PushDir::Forwards) => 0.5,
+                                Some(PushDir::Sideways) => 0.7,
+                                Some(PushDir::Backwards) => 1.0,
+                                _ => {
+                                    panic_log!(
+                                        "unexpected brake push dir: {:?}",
+                                        self.brake_push_dir
+                                    );
+                                }
+                            };
+                            self.play_sound_fx(SoundId::Brake, brake_volume, 0);
+                        }
+                        self.brake_vfx_timer = 0;
                     } else {
                         self.brake_vfx_timer -= 1;
-                        if self.brake_vfx_timer == 0 {
-                            self.brake_vfx_timer = self.params.brake_vfx_cooldown as u16;
+                        if self.brake_vfx_timer < 1 {
+                            self.brake_vfx_timer = self.params.brake_vfx_cooldown as i16;
+                            self.play_vfx_at_bottom(brake_vfx_id);
                         }
                     }
 
@@ -765,6 +776,20 @@ impl Katamari {
             prince.oujistate.dash = false;
             BrakeState::PushNoBrake
         }
+    }
+
+    /// Play the vfx `vfx_id` at the bottom of the katamari.
+    /// offset: 0x6a30
+    fn play_vfx_at_bottom(&self, vfx_id: VfxId) {
+        static DIR: Vec3 = [0.0, 0.0, 0.0];
+
+        // I guess there's no point playing vfx at the bottom if the katamari is underwater and
+        // you can't even see it
+        if self.physics_flags.in_water {
+            return;
+        }
+
+        self.play_vfx(vfx_id, &self.bottom, &DIR, self.diam_cm, -1, self.player)
     }
 
     fn update_max_speed_ratio(&mut self, prince: &Prince) {

@@ -736,7 +736,8 @@ pub struct Katamari {
     sw_speed_disp_timer: u16,
 
     /// When braking, acts as a cooldown timer for playing the brake vfx.
-    brake_vfx_timer: u16,
+    /// offset: 0x3b80
+    brake_vfx_timer: i16,
 
     /// Whether or not the "something's coming" alarm is going off.
     /// offset: 0x3b84
