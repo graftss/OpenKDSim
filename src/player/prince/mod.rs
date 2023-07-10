@@ -9,7 +9,7 @@ use gl_matrix::{
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y, temp_debug_log},
     math::{
         acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_add_vec,
         vec3_inplace_normalize,
@@ -196,7 +196,7 @@ pub struct Prince {
 
     /// True if the prince is huffing
     /// offset: 0x9e
-    is_huffing: bool,
+    is_huffing_0x9e: bool,
 
     /// Bit flags: &1=left stick pushed, &2=right stick pushed.
     /// offset: 0x9f
@@ -437,6 +437,10 @@ pub struct Prince {
     /// offset: 0x47e
     boost_energy: u16,
 
+    /// True if the katamari is huffing. This is set to `true` *one frame before* `is_huffing_0x9e`
+    /// is set to true, and so one frame before e.g. the huff animation plays.
+    is_huffing_0x482: bool,
+
     /// The number of ticks since the katamari was spun. Used for boost recharging.
     /// offset: 0x484
     no_dash_ticks: u16,
@@ -513,7 +517,7 @@ impl Prince {
     }
 
     pub fn get_is_huffing(&self) -> bool {
-        self.is_huffing
+        self.is_huffing_0x9e
     }
 
     pub fn get_boost_push_yaw_rot(&self) -> &Mat4 {
@@ -564,7 +568,7 @@ impl Prince {
     /// as the huff progresses, smoothly leading to into no penalty when the huff ends.
     /// offset: 0x226be (in `kat_update_velocity`)
     pub fn get_huff_speed_penalty(&self) -> f32 {
-        if self.is_huffing {
+        if self.is_huffing_0x9e {
             // TODO: this might not be right, double check
             lerp!(self.huff_timer_ratio, 1.0, self.huff_init_speed_penalty)
         } else {
@@ -807,7 +811,7 @@ impl Prince {
             self.huff_timer as f32 / self.huff_duration as f32
         };
 
-        self.is_huffing = self.huff_timer != 0;
+        self.is_huffing_0x9e = self.huff_timer != 0;
         self.oujistate.huff = self.huff_timer != 0;
     }
 
@@ -872,15 +876,24 @@ impl Prince {
 
     /// **After** `read_input`, compute various features of analog input (some of which are
     /// also expressed as analog input, e.g. unit input).
-    /// offset: 0x53cc0 (first half of `prince_update_boost`)
-    fn update_analog_input_features(&mut self) {
+    /// offset: 0x53cc0
+    fn update_analog_input_features(
+        &mut self,
+        katamari: &mut Katamari,
+        camera: &Camera,
+        mission_state: &mut MissionState,
+    ) {
         self.input_ls.normalize(&mut self.input_ls_unit);
         self.input_rs.normalize(&mut self.input_rs_unit);
         StickInput::normalize_sum(&mut self.input_sum_unit, &self.input_ls, &self.input_rs);
 
-        self.input_ls_angle = self.input_ls_unit.angle();
-        self.input_rs_angle = self.input_rs_unit.angle();
-        self.input_angle_btwn_sticks = self.input_ls_unit.angle_with_other(&self.input_rs_unit);
+        // this block covers the behavior of `prince_update_angle_between_sticks`
+        // offset: 0x545f0
+        {
+            self.input_ls_angle = self.input_ls_unit.angle();
+            self.input_rs_angle = self.input_rs_unit.angle();
+            self.input_angle_btwn_sticks = self.input_ls_unit.angle_with_other(&self.input_rs_unit);
+        }
 
         self.input_ls_len = min!(1.0, self.input_ls.len());
         self.input_rs_len = min!(1.0, self.input_rs.len());
@@ -892,7 +905,8 @@ impl Prince {
         if self.view_mode == PrinceViewMode::Normal {
             self.last_push_dirs = self.push_dirs;
 
-            // TODO: extract as sim param, also it's different in vs mode or whatever
+            // TODO_PARAM: extract as sim param
+            // TODO_VS: also it's different in vs mode
             let min_push_len = 0.35;
 
             if !self.vs_mode_huff_related_flag {
@@ -906,6 +920,21 @@ impl Prince {
                 self.push_dirs.clear();
                 self.push_dirs_changed.clear();
             }
+
+            // use a different gacha updating strategy while huffing
+            if self.is_huffing_0x9e {
+                return self.update_gachas_while_huffing(katamari, mission_state.is_vs_mode);
+            }
+            self.update_gachas(katamari, camera, mission_state);
+
+            let angle_tut_move = self.update_angle(katamari);
+
+            if let Some(tut_move) = angle_tut_move {
+                mission_state
+                    .tutorial
+                    .as_mut()
+                    .map(|tut| tut.set_move_held(tut_move));
+            }
         }
     }
 
@@ -918,19 +947,19 @@ impl Prince {
         camera: &Camera,
         mission_state: &mut MissionState,
     ) {
-        // TODO_VS: this whole function only applies to single player. would need to be rewritten for vs mode
-
-        // use a different gacha updating strategy while huffing
-        if self.is_huffing {
-            return self.update_gachas_while_huffing(katamari, mission_state.is_vs_mode);
-        }
+        // TODO_VS: this whole function only applies to single player. it would need to be
+        // rewritten for vs mode.
 
         if self.oujistate.wheel_spin == false && katamari.physics_flags.airborne {
-            self.end_spin_and_boost(katamari);
+            return self.end_spin_and_boost(katamari);
+        } else if katamari.physics_flags.vs_attack {
+            return;
         }
 
         self.oujistate.dash_start = false;
         self.oujistate.wheel_spin_start = false;
+        self.oujistate.power_charge = 0;
+        self.oujistate.fire_to_enemy = 0;
 
         if camera.get_mode() == CameraMode::Shoot {
             return self.oujistate.dash = true;
@@ -938,15 +967,19 @@ impl Prince {
 
         // early check to block gachas based on the gamemode
         let block_gachas = match mission_state.gamemode {
+            // gachas aren't blocked in `Normal` gamemode
             GameMode::Normal => false,
+
+            // gachas are blocked in `Tutorial` gamemode on the *first page* of the moveset
+            // (which is before the boost move is unlocked)
             GameMode::Tutorial => mission_state.tutorial.as_ref().unwrap().get_page() == 0,
+
+            // gachas are blocked in all other gamemodes
             _ => true,
         };
         if block_gachas {
             return;
         }
-
-        let gacha_window = self.gacha_window_duration;
 
         // decrement boost energy, but not in the tutorial
         if self.oujistate.dash && mission_state.gamemode != GameMode::Tutorial {
@@ -954,7 +987,8 @@ impl Prince {
             if self.boost_energy == 0 {
                 self.reset_boost_state(katamari);
                 self.huff_timer = self.huff_duration;
-                self.is_huffing = true;
+                // TODO_VS: `prince->vsmode_huff??_timer = prince->vsmode_huff??_duration`
+                self.is_huffing_0x482 = true;
                 self.vs_mode_huff_related_flag = true;
                 return;
             }
@@ -969,7 +1003,7 @@ impl Prince {
             // right stick push dir just changed to the opposite of the left stick push dir
             (change.right != None && push.left != None && change.right != push.left);
 
-        let new_gacha_dir = if !new_gacha {
+        let new_gacha_direction = if !new_gacha {
             None
         } else if push.right == Some(StickPushDir::Down) {
             Some(GachaDir::Right)
@@ -977,14 +1011,16 @@ impl Prince {
             Some(GachaDir::Left)
         };
 
-        let mut just_did_gacha = false;
-        if let Some(gacha_dir) = new_gacha_dir {
-            // if a gacha just occurred:
-            just_did_gacha = true;
-            self.last_gacha_direction = Some(gacha_dir);
-            self.gacha_window_timer = gacha_window;
+        let did_next_gacha = match (new_gacha_direction, self.last_gacha_direction) {
+            (Some(_), None) => true,
+            (Some(new_dir), Some(old_dir)) if new_dir != old_dir => true,
+            _ => false,
+        };
+
+        if did_next_gacha {
+            self.last_gacha_direction = new_gacha_direction;
+            self.gacha_window_timer = self.gacha_window_duration;
             self.gacha_count += 1;
-            // TODO_VS: check `should_reset_gachas_in_vs_mode()`
         }
 
         // TODO_VS: `prince_update_gachas:154-170`
@@ -998,24 +1034,27 @@ impl Prince {
 
             // TODO_VS: `prince_update_gachas:177-211`
 
-            if just_did_gacha && self.gacha_count == gachas_for_boost {
+            if did_next_gacha && self.gacha_count == gachas_for_boost {
                 // if initiating a boost:
                 self.play_sound_fx(SoundId::Boost, 1.0, 0);
                 katamari.play_boost_vfx();
-                return;
+                self.oujistate.dash_start = true;
             }
 
-            if just_did_gacha && self.gacha_count == gachas_for_spin {
+            if did_next_gacha && self.gacha_count == gachas_for_spin {
                 // if initiating a spin:
                 self.oujistate.wheel_spin_start = true;
             }
 
             if self.gacha_count >= gachas_for_spin && self.gacha_count < gachas_for_boost {
                 // if spinning, but not yet enough gachas for a boost:
-                self.play_sound_fx(SoundId::Spin, 1.0, 0);
+                if !self.oujistate.wheel_spin {
+                    // play the spin sound if it's the start of the spin
+                    self.play_sound_fx(SoundId::Spin, 1.0, 0);
+                }
                 self.oujistate.dash = true;
                 self.oujistate.wheel_spin = true;
-            } else if self.gacha_count > gachas_for_boost {
+            } else if self.gacha_count >= gachas_for_boost {
                 // if enough gachas for a boost:
                 self.oujistate.dash = true;
                 self.oujistate.wheel_spin = false;
@@ -1505,6 +1544,7 @@ impl Prince {
 
 impl Player {
     /// The main function to update the prince each tick.
+    /// offset: 0x254c3e (starts mid-function)
     pub fn update_prince(&mut self, mission_state: &mut MissionState) {
         let prince = &mut self.prince;
         let katamari = &mut self.katamari;
@@ -1520,19 +1560,7 @@ impl Player {
         prince.update_huff();
         prince.try_end_view_mode(camera);
         prince.update_boost_recharge();
-        prince.update_analog_input_features();
-
-        if prince.view_mode == PrinceViewMode::Normal {
-            prince.update_gachas(katamari, camera, mission_state);
-            let angle_tut_move = prince.update_angle(katamari);
-
-            if let Some(tut_move) = angle_tut_move {
-                mission_state
-                    .tutorial
-                    .as_mut()
-                    .map(|tut| tut.set_move_held(tut_move));
-            }
-        }
+        prince.update_analog_input_features(katamari, camera, mission_state);
 
         prince.update_boost_push_rotation_mat(mission_state.is_vs_mode);
 
