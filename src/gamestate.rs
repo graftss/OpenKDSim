@@ -202,10 +202,10 @@ impl GameState {
         self.mission_state.mono_init_start(mission, area, stage);
 
         // read the mission's `MonoData` data from the `mono_data` raw pointer.
-        self.mono_data.init(mono_data);
+        self.mono_data.init_from_raw(mono_data);
 
         // TODO_PROPS: init subobjects
-        // TODO_PROPS: init comment prop groups
+        self.props.comments.reset();
         // TODO_PROPS: init random prop groups
         // TODO_PROPS: init generated props
     }

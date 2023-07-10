@@ -7,6 +7,9 @@ pub struct DebugConfig {
     /// Writes a log whenever a triangle with a nonzero hit attribute contacts the katamari.
     pub log_nonzero_hit_attribute_hits: bool,
 
+    /// Writes a log whenever a prop is destroyed via the `Prop::prop_destroy` method.
+    pub log_destroyed_props: bool,
+
     // TODO_DEBUG: make this distinguish between katamari collision rays and prop rays, once
     // the latter are added.
     /// Draw points where collision rays intersect with the bounding boxes of props.
@@ -25,9 +28,11 @@ pub struct DebugConfig {
     pub kat_draw_shell_rays: bool,
 }
 
+// TODO_DEBUG: this should be made editable mid-execution.
 pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
     log_tick: false,
     log_nonzero_hit_attribute_hits: true,
+    log_destroyed_props: true,
     draw_collided_prop_aabb_hits: false,
     draw_collided_prop_mesh: false,
     draw_collided_prop_tris: true,

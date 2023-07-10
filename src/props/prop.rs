@@ -13,10 +13,11 @@ use gl_matrix::{
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
+    debug::DEBUG_CONFIG,
     global::GlobalState,
     macros::{
         max_to_none, modify_translation, new_mat4_copy, scale_translation, set_translation,
-        vec3_from,
+        temp_debug_log, vec3_from,
     },
     mission::state::MissionState,
     mono_data::{PropAabbs, PropMonoData},
@@ -26,6 +27,7 @@ use crate::{
 };
 
 use super::{
+    comments::KingCommentState,
     motion::{behavior::PropBehavior, RotationAxis},
     PropsState,
 };
@@ -680,9 +682,10 @@ impl Prop {
         args: &AddPropArgs,
         area: u8,
         mono_data: &Rc<PropMonoData>,
+        comments: &mut KingCommentState,
     ) -> PropRef {
         Rc::new(RefCell::new(Prop::new_node(
-            ctrl_idx, args, area, mono_data,
+            ctrl_idx, args, area, mono_data, comments,
         )))
     }
 
@@ -694,6 +697,7 @@ impl Prop {
         args: &AddPropArgs,
         area: u8,
         mono_data: &Rc<PropMonoData>,
+        comments: &mut KingCommentState,
     ) -> Self {
         let name_idx = args.name_idx;
         let config = NamePropConfig::get(name_idx.into());
@@ -713,8 +717,6 @@ impl Prop {
         new_mat4_copy!(unattached_transform, rotation_mat);
         new_mat4_copy!(init_transform, rotation_mat);
 
-        // TODO
-        // lines 104-107 of `prop_init` (init comment)
         // lines 108-149 of `prop_init` (init motion)
         // lines 150-162 of `prop_init` (init random group)
         // lines 163-190 of `prop_init` (init twin)
@@ -835,6 +837,10 @@ impl Prop {
             let y_offset = result.max_aabb_y();
             result.pos[1] += y_offset;
             result.init_pos[1] += y_offset;
+        }
+
+        if let Some(group_idx) = result.comment_group_id {
+            comments.add_to_group(group_idx);
         }
 
         // note the conditional call to `prop_init_tree_links` here in the original sim,
@@ -1290,10 +1296,18 @@ impl Prop {
 
     /// offset: 0x4f8e0
     pub fn destroy(&mut self) {
+        if DEBUG_CONFIG.log_destroyed_props {
+            temp_debug_log!(
+                "  destroying prop: ctrl_idx={}, name_idx={}",
+                self.ctrl_idx,
+                self.name_idx
+            );
+        }
+
         self.disabled = true;
         self.display_on = false;
         // TODO: remove this from the list `Katamari::attached_props`
-        // TODO_LIKS: `prop_remove_refs_from_props()`
+        // TODO_LINKS: `prop_remove_refs_from_props()`
         // TODO_SUBOBJ: `prop_destroy:14-25`
         self.first_subobject = None;
     }

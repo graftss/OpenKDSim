@@ -149,7 +149,7 @@ unsafe fn test() {
 
 unsafe fn test_monodata() {
     let mut md = MonoData::default();
-    md.init(MAS1_MONO_DATA.as_ptr());
+    md.init_from_raw(MAS1_MONO_DATA.as_ptr());
 
     let cherries = md.props.get(995);
 
@@ -425,7 +425,7 @@ fn replicate_flip_camera() {
 
 unsafe fn print_square_dish_mesh() {
     let mut md = MonoData::default();
-    md.init(MAS1_MONO_DATA.as_ptr());
+    md.init_from_raw(MAS1_MONO_DATA.as_ptr());
 
     for (name_idx, prop_md) in md.props.iter().enumerate() {
         let config = NamePropConfig::get(name_idx as u16);
@@ -443,7 +443,5 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
-    unsafe {
-        print_square_dish_mesh();
-    }
+    {}
 }

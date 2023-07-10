@@ -33,7 +33,9 @@ bugs
     continues moving away from them
     - it's possible that this is just those props getting disabled, but this code doesn't set their
       alpha to 0 to they remain visible.
-      - it's not that though, since it can happen with very few props attached
+      - it's not *entirely* that though, since it can happen with very few props attached
+      - but this is definitely happening when props are destroyed near the end
+        of `Katamari::update_collision`
   - when entering a pinch input from consistent non-pinch push inputs, the katamari
     will orbit around in a circle for some reason
     - e.g. pinch, pump right stick up, then go back to pinch

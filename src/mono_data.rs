@@ -209,7 +209,7 @@ pub struct MonoData {
 }
 
 impl MonoData {
-    pub unsafe fn init(&mut self, mono_data: *const u8) {
+    pub unsafe fn init_from_raw(&mut self, mono_data: *const u8) {
         // read zone pointer
         self.zones = Some(md_follow_offset!(mono_data, 0x4) as usize);
 

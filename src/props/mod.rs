@@ -8,12 +8,14 @@ use crate::{
 };
 
 use self::{
+    comments::KingCommentState,
     config::NamePropConfig,
     motion::global_path::GlobalPathState,
     params::PropParams,
     prop::{AddPropArgs, Prop, PropRef},
 };
 
+mod comments;
 pub mod config;
 pub mod debug;
 pub mod motion;
@@ -25,6 +27,13 @@ pub mod prop;
 pub struct PropsState {
     pub props: Vec<PropRef>,
     pub global_paths: GlobalPathState,
+
+    /// NOTE: the simulation sort of tracks comment groups, but they aren't actually
+    /// used since unity also tracks them and doesn't query the simulation's data.
+    /// they also appear to be inaccurately tracked.
+    /// so this field isn't used in this simulation at present.
+    pub comments: KingCommentState,
+
     pub config: Option<&'static Vec<NamePropConfig>>,
     pub params: PropParams,
     pub delegates: Option<DelegatesRef>,
@@ -87,7 +96,7 @@ impl PropsState {
         mono_data: Option<&Rc<PropMonoData>>,
     ) {
         if let Some(md) = mono_data {
-            let prop = Prop::new(ctrl_idx, args, area, md);
+            let prop = Prop::new(ctrl_idx, args, area, md, &mut self.comments);
             self.props.push(prop);
         }
     }
