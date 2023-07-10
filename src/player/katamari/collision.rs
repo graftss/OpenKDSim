@@ -218,7 +218,6 @@ impl Katamari {
         prince: &mut Prince,
         mission_state: &MissionState,
     ) {
-        // temp_debug_log!("tick");
         // TODO_VS: `kat_find_nearby_props:43` (return immediately if vs mode or if other vs condition holds)
 
         // TODO_PARAM: make this a global parameter
@@ -1061,66 +1060,41 @@ impl Katamari {
             // the direction is the katamari's movement vector over the previous frame (`self.delta_pos`).
             let shell_ray_len = self.radius_cm * SHELL_RAY_RADIUS_MULT;
             let shell_initial_base = &self.last_center;
-            let mut shell_final_base = vec3::create();
+            let mut shell_end = vec3::create();
             vec3::scale_and_add(
-                &mut shell_final_base,
+                &mut shell_end,
                 &self.center,
-                &self.delta_pos,
+                &self.delta_pos_unit,
                 shell_ray_len,
             );
 
-            let mut shell_initial_pts: [Vec3; 5] = Default::default();
-            let mut shell_final_pts: [Vec3; 5] = Default::default();
+            let mut shell_inits: [Vec3; 5] = Default::default();
+            let mut shell_ends: [Vec3; 5] = Default::default();
 
+            vec3::add(&mut shell_inits[0], &self.shell_top, shell_initial_base);
+            vec3::add(&mut shell_inits[1], &self.shell_left, shell_initial_base);
+            vec3::add(&mut shell_inits[2], &self.shell_right, shell_initial_base);
             vec3::add(
-                &mut shell_initial_pts[0],
-                &self.shell_top,
-                shell_initial_base,
-            );
-            vec3::add(
-                &mut shell_initial_pts[1],
-                &self.shell_left,
-                shell_initial_base,
-            );
-            vec3::add(
-                &mut shell_initial_pts[2],
-                &self.shell_right,
-                shell_initial_base,
-            );
-            vec3::add(
-                &mut shell_initial_pts[3],
+                &mut shell_inits[3],
                 &self.shell_top_left,
                 shell_initial_base,
             );
             vec3::add(
-                &mut shell_initial_pts[4],
+                &mut shell_inits[4],
                 &self.shell_top_right,
                 shell_initial_base,
             );
 
-            vec3::add(&mut shell_final_pts[0], &self.shell_top, &shell_final_base);
-            vec3::add(&mut shell_final_pts[1], &self.shell_left, &shell_final_base);
-            vec3::add(
-                &mut shell_final_pts[2],
-                &self.shell_right,
-                &shell_final_base,
-            );
-            vec3::add(
-                &mut shell_final_pts[3],
-                &self.shell_top_left,
-                &shell_final_base,
-            );
-            vec3::add(
-                &mut shell_final_pts[4],
-                &self.shell_top_right,
-                &shell_final_base,
-            );
+            vec3::add(&mut shell_ends[0], &self.shell_top, &shell_end);
+            vec3::add(&mut shell_ends[1], &self.shell_left, &shell_end);
+            vec3::add(&mut shell_ends[2], &self.shell_right, &shell_end);
+            vec3::add(&mut shell_ends[3], &self.shell_top_left, &shell_end);
+            vec3::add(&mut shell_ends[4], &self.shell_top_right, &shell_end);
 
-            self.debug_draw_shell_rays(&shell_initial_pts, &shell_final_pts);
+            self.debug_draw_shell_rays(&shell_inits, &shell_ends);
 
             for i in 0..5 {
-                self.raycast_state
-                    .load_ray(&shell_initial_pts[i], &shell_final_pts[i]);
+                self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
                 let found_hit = self
                     .raycast_state
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
@@ -1217,14 +1191,6 @@ impl Katamari {
             self.physics_flags.contacts_wall = true;
             RecordSurfaceContactResult::Wall
         };
-
-        // if prop.is_some() {
-        //     temp_debug_log!("  record_surface_contact (prop):");
-        //     temp_debug_log!(
-        //         "    threshold={}, normal_unit={normal_unit:?}, surface_type={surface_type:?}",
-        //         self.params.surface_normal_y_threshold
-        //     );
-        // }
 
         let dot = vec3::dot(&normal_unit, &self.raycast_state.ray_unit);
         let ray_clip_len = (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant)
@@ -2748,7 +2714,7 @@ impl Katamari {
                 // weird collision edge case where we're not stuck between walls but we are contacting
                 // a down-slanted wall/ceiling. no clue what to make of this
                 if !self.last_physics_flags.contacts_down_slanted_ceiling {
-                    vec3::normalize(&mut self.delta_pos_unit, &self.delta_pos);
+                    vec3::normalize(&mut self.stuck_btwn_walls_clip_maybe, &self.delta_pos_unit);
                 }
                 // TODO_LOW: `kat_apply_clip_translation:125-146` (weird edge case??)
             }

@@ -355,7 +355,7 @@ pub struct Katamari {
 
     /// The vector that the katamari moved over the previous tick.
     /// offset: 0x480
-    delta_pos: Vec3,
+    delta_pos_unit: Vec3,
 
     /// (??) The pitch rotation component of the transform
     /// offset: 0x520
@@ -498,7 +498,7 @@ pub struct Katamari {
 
     /// (??) used in some weird collision edge case, where it's set to the unit of `delta_pos`
     /// offset: 0x7ec
-    delta_pos_unit: Vec3,
+    stuck_btwn_walls_clip_maybe: Vec3,
 
     /// (??) The length of the primary collision ray contacting the floor.
     /// offset: 0x7fc

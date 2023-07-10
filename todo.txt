@@ -33,3 +33,5 @@ bugs
   - `Prince::update_gachas` is definitely buggy
     - spin sfx is spammed every frame of spin
   - `SoundId::HitGround` not playing in `update_vault_and_climb`
+  - sometimes a bunch of attached props stop updating and freeze in place while the katamari
+    continues moving away from them

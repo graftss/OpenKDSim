@@ -963,10 +963,10 @@ impl Katamari {
         vec3::scale(&mut self.shell_top, &VEC3_Y_POS, self.radius_cm);
         vec3::scale(&mut self.shell_bottom, &VEC3_Y_POS, -self.radius_cm);
 
-        // compute `delta_pos` and its length
-        vec3::subtract(&mut self.delta_pos, &self.center, &self.last_center);
-        self.delta_pos_len = vec3::length(&self.delta_pos);
-        vec3::normalize(&mut self.delta_pos_unit, &self.delta_pos);
+        // compute the distance moved and the unit vector in the direction moved
+        vec3::subtract(&mut self.delta_pos_unit, &self.center, &self.last_center);
+        self.delta_pos_len = vec3::length(&self.delta_pos_unit);
+        vec3_inplace_normalize(&mut self.delta_pos_unit);
 
         if self.physics_flags.immobile {
             // if the katamari isn't moving:
@@ -991,7 +991,7 @@ impl Katamari {
             // ultimately just set `left_lateral_unit` to 0 (which it already is)
         } else {
             // if the katamari is moving:
-            let mut move_lateral_unit = self.delta_pos;
+            let mut move_lateral_unit = self.delta_pos_unit;
             set_y!(move_lateral_unit, 0.0);
             vec3_inplace_normalize(&mut move_lateral_unit);
 
@@ -1009,6 +1009,7 @@ impl Katamari {
         // compute top-left/right points by normalizing the sum of the top and the left/right points
         vec3::add(&mut self.shell_top_left, &self.shell_top, &self.shell_left);
         vec3_inplace_normalize(&mut self.shell_top_left);
+        vec3_inplace_scale(&mut self.shell_top_left, self.radius_cm);
 
         vec3::add(
             &mut self.shell_top_right,
@@ -1016,6 +1017,7 @@ impl Katamari {
             &self.shell_right,
         );
         vec3_inplace_normalize(&mut self.shell_top_right);
+        vec3_inplace_scale(&mut self.shell_top_right, self.radius_cm);
     }
 
     pub fn update_rotation_speed(&mut self, velocity: &Vec3) {

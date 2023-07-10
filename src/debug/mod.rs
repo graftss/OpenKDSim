@@ -22,7 +22,7 @@ pub struct DebugConfig {
 }
 
 pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
-    log_tick: false,
+    log_tick: true,
     draw_collided_prop_aabb_hits: false,
     draw_collided_prop_mesh: false,
     draw_collided_prop_tris: false,
