@@ -9,7 +9,7 @@ use gl_matrix::{
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y, temp_debug_log},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y},
     math::{
         acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_add_vec,
         vec3_inplace_normalize,
@@ -431,7 +431,7 @@ pub struct Prince {
 
     /// The number of gachas counted without the gacha timer expiring.
     /// offset: 0x47c
-    gacha_count: u8,
+    pub gacha_count: u8,
 
     /// The amount of remaining boost energy.
     /// offset: 0x47e

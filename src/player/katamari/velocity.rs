@@ -340,56 +340,53 @@ impl Katamari {
 
         prince.oujistate.dash_effect = false;
         if prince.oujistate.dash || prince.oujistate.dash_start {
-            // if dashing:
-            if let Some(state) = self.boost_effect_state {
-                match state {
-                    KatBoostEffectState::Build => {
-                        if !self.physics_flags.in_water || self.boost_effect_timer > 0 {
-                            prince.oujistate.dash_effect = true;
-                            self.boost_effect_timer += 1;
-                            if self.boost_effect_timer > self.params.boost_build_duration {
-                                self.boost_effect_state = Some(KatBoostEffectState::StopBuilding);
-                            }
-                            if self.physics_flags.in_water {
-                                self.boost_effect_state = Some(KatBoostEffectState::Release);
-                                self.boost_effect_timer =
-                                    self.params.boost_release_duration_in_water;
-                            }
-                        }
-                    }
-                    KatBoostEffectState::StopBuilding => {
+            match self.boost_effect_state {
+                Some(KatBoostEffectState::Build) => {
+                    if !self.physics_flags.in_water || self.boost_effect_timer > 0 {
                         prince.oujistate.dash_effect = true;
-                        if self.physics_flags.braking || !prince.oujistate.wheel_spin {
-                            self.boost_effect_state = Some(KatBoostEffectState::Release);
-                            self.boost_effect_timer = self.params.boost_release_duration;
+                        self.boost_effect_timer += 1;
+                        if self.boost_effect_timer > self.params.boost_build_duration {
+                            self.boost_effect_state = Some(KatBoostEffectState::StopBuilding);
                         }
                         if self.physics_flags.in_water {
                             self.boost_effect_state = Some(KatBoostEffectState::Release);
                             self.boost_effect_timer = self.params.boost_release_duration_in_water;
                         }
                     }
-                    KatBoostEffectState::Release => {
-                        prince.oujistate.dash_effect = false;
-                        self.boost_effect_timer -= 1;
-                        if self.boost_effect_timer == 0 {
-                            self.boost_effect_state = Some(KatBoostEffectState::End);
-                        }
+                }
+                Some(KatBoostEffectState::StopBuilding) => {
+                    prince.oujistate.dash_effect = true;
+                    if self.physics_flags.braking || !prince.oujistate.wheel_spin {
+                        self.boost_effect_state = Some(KatBoostEffectState::Release);
+                        self.boost_effect_timer = self.params.boost_release_duration;
                     }
-                    KatBoostEffectState::End => {
-                        prince.oujistate.dash_effect = false;
+                    if self.physics_flags.in_water {
+                        self.boost_effect_state = Some(KatBoostEffectState::Release);
+                        self.boost_effect_timer = self.params.boost_release_duration_in_water;
                     }
                 }
+                Some(KatBoostEffectState::Release) => {
+                    prince.oujistate.dash_effect = false;
+                    self.boost_effect_timer -= 1;
+                    if self.boost_effect_timer == 0 {
+                        self.boost_effect_state = Some(KatBoostEffectState::End);
+                    }
+                }
+                Some(KatBoostEffectState::End) => {
+                    prince.oujistate.dash_effect = false;
+                }
+                None => (),
             }
+        }
 
-            // update `oujistate.sw_speed_disp` and its associated timer
-            if !mission_state.is_vs_mode && prince.oujistate.dash {
-                if !prince.oujistate.wheel_spin && self.sw_speed_disp_timer > 0 {
-                    self.sw_speed_disp_timer -= 1;
-                    prince.oujistate.sw_speed_disp = self.sw_speed_disp_timer > 0;
-                }
-            } else {
-                prince.oujistate.sw_speed_disp = false;
+        // update `oujistate.sw_speed_disp` and its associated timer
+        if !mission_state.is_vs_mode && prince.oujistate.dash {
+            if !prince.oujistate.wheel_spin && self.sw_speed_disp_timer > 0 {
+                self.sw_speed_disp_timer -= 1;
+                prince.oujistate.sw_speed_disp = self.sw_speed_disp_timer > 0;
             }
+        } else {
+            prince.oujistate.sw_speed_disp = false;
         }
 
         prince.oujistate.camera_mode = camera.get_mode().into();

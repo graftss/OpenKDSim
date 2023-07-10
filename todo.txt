@@ -27,8 +27,8 @@ random things that shouldn't be forgotten:
 - `ending`, `tutorial`, and `vsmode` fields of `MissionState` shouldn't be options.
 
 bugs
-  - `Prince::update_gachas` is definitely buggy
-    - spin sfx is spammed every frame of spin
   - `SoundId::HitGround` not playing in `update_vault_and_climb`
   - sometimes a bunch of attached props stop updating and freeze in place while the katamari
     continues moving away from them
+    - it's possible that this is just those props getting disabled, but this code doesn't set their
+      alpha to 0 to they remain visible.
