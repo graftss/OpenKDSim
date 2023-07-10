@@ -365,14 +365,14 @@ impl Katamari {
         let prop_mesh = match NamePropConfig::get(prop.get_name_idx()).use_aabb_for_collision {
             true => prop.get_aabb_mesh(),
             false => prop.get_collision_mesh(),
-        }.unwrap_or_else(|| {
+        }
+        .unwrap_or_else(|| {
             panic_log!(
                 "failed to find prop collision mesh (name_idx={}): \n\n{:?}\n\n",
                 prop.get_name_idx(),
                 prop
             );
         });
-
 
         let mut prop_rot = prop.get_unattached_transform().clone();
         modify_translation!(prop_rot, =, VEC3_ZERO);

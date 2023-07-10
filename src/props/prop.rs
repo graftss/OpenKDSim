@@ -719,8 +719,6 @@ impl Prop {
         // lines 150-162 of `prop_init` (init random group)
         // lines 163-190 of `prop_init` (init twin)
 
-        let collision_mesh = mono_data.collision_mesh.as_ref().map(|m| m.clone());
-
         // lines 348-349 (find first subobject)
         // lines 350-357 (init motion scripts)
         // lines 368-371, 392-401 (init wobble state)
@@ -819,13 +817,18 @@ impl Prop {
             contact_katamari_idx: None,
             is_attached: false,
             attached_transform: [0.0; 16],
-            collision_mesh,
+            collision_mesh: None,
             trajectory_velocity: [0.0; 3],
         };
 
         if let Some(aabbs) = &mono_data.aabbs {
             result.init_aabb_and_volume(aabbs, config);
         }
+
+        result.collision_mesh = match &mono_data.collision_mesh {
+            mesh @ Some(_) => mesh.as_ref().map(|m| m.clone()),
+            None => result.aabb_mesh.as_ref().map(|mesh| mesh.clone()),
+        };
 
         // move random-spawn props vertically so that they're resting on the ground
         if args.loc_pos_type != 0 {

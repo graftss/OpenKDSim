@@ -17,7 +17,7 @@ use math::{
 };
 use mission::{config::MissionConfig, Mission};
 use mono_data::MonoData;
-use props::prop::AddPropArgs;
+use props::{config::NamePropConfig, prop::AddPropArgs};
 
 use crate::{
     collision::raycast_state::RaycastState,
@@ -147,43 +147,13 @@ unsafe fn test() {
     });
 }
 
-fn test_cam_pos(
-    mut pos: &mut Vec3,
-    mut target: &mut Vec3,
-    kat_center: &Vec3,
-    prince_pos: &Vec3,
-    kat_to_pos: &Vec3,
-    kat_to_target: &Vec3,
-) {
-    let mut pri_to_kat_unit = [0.0; 3];
-    vec3::sub(&mut pri_to_kat_unit, &kat_center, &prince_pos);
-    pri_to_kat_unit[1] = 0.0;
-    math::vec3_inplace_normalize(&mut pri_to_kat_unit);
-
-    let mut scaled_pos_offset = [0.0; 3];
-    scaled_pos_offset[0] = pri_to_kat_unit[0] * kat_to_pos[2];
-    scaled_pos_offset[1] = kat_to_pos[1];
-    scaled_pos_offset[2] = pri_to_kat_unit[2] * kat_to_pos[2];
-
-    vec3::add(&mut pos, &kat_center, &scaled_pos_offset);
-
-    let scaled_target_offset = [
-        pri_to_kat_unit[0] * kat_to_target[2],
-        kat_to_target[1],
-        pri_to_kat_unit[2] * kat_to_target[2],
-    ];
-    vec3::add(&mut target, &kat_center, &scaled_target_offset);
-}
-
 unsafe fn test_monodata() {
-    // let mut md = MonoData::default();
-    // md.init(MAS1_MONO_DATA.as_ptr());
+    let mut md = MonoData::default();
+    md.init(MAS1_MONO_DATA.as_ptr());
 
-    // for pd in md.props.iter() {
-    //     if let Some(mesh) = pd.collision_mesh {
-    //         for _sector in mesh.sectors.iter() {}
-    //     }
-    // }
+    let cherries = md.props.get(995);
+
+    println!("cherries: {cherries:?}");
 }
 
 fn replicate_init_vault() {
@@ -457,44 +427,12 @@ unsafe fn print_square_dish_mesh() {
     let mut md = MonoData::default();
     md.init(MAS1_MONO_DATA.as_ptr());
 
-    let md = &md.props.get(1297).unwrap().clone();
-    let mesh = &md.collision_mesh.clone().unwrap();
-    println!("bookstand:\n{}", mesh);
-}
-
-struct Test {
-    pub x: u32,
-    pub y: u32,
-}
-
-fn rc_test() {
-    let mut data = vec![];
-    for i in 1..10 {
-        data.push(Rc::new(RefCell::new(Test { x: i, y: i * 2 })));
-    }
-
-    for test_ref in data.iter_mut() {
-        {
-            test_ref.borrow_mut().x = 3;
-            process_test(test_ref)
+    for (name_idx, prop_md) in md.props.iter().enumerate() {
+        let config = NamePropConfig::get(name_idx as u16);
+        if config.use_aabb_for_collision && prop_md.collision_mesh.is_none() {
+            println!("uhoh: {name_idx}");
         }
     }
-}
-
-fn process_test(test_ref: &Rc<RefCell<Test>>) {
-    let test = test_ref.borrow_mut();
-    println!("processing test: {:?}", test.x);
-}
-
-fn cygnus_test() {
-    let mut mission_config = MissionConfig::default();
-    MissionConfig::get(&mut mission_config, 12);
-
-    println!(
-        "cygnus config: ({:?}) {:?}",
-        mission_config.id, mission_config.theme_prop_names
-    );
-    println!("theme: {}", mission_config.is_theme_object(0x41f));
 }
 
 fn main() {
@@ -505,7 +443,7 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
 
-    {
-        cygnus_test();
+    unsafe {
+        print_square_dish_mesh();
     }
 }
