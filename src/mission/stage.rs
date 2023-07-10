@@ -138,7 +138,7 @@ lazy_static! {
             ]
         },
 
-        // TODO: vs mode royal warps
+        // TODO_VS: vs mode royal warps
     ];
 }
 
@@ -154,7 +154,7 @@ pub struct RoyalWarpDest {
 
 /// All possible royal warp positions in a stage. The royal warp position
 /// varies with the loaded area of the stage.
-/// TODO: in vs mode, the two players have different royal warp destinations,
+/// TODO_VS: in vs mode, the two players have different royal warp destinations,
 /// which can't be encoded in this structure.
 #[derive(Debug)]
 pub struct StageRoyalWarps {
@@ -350,7 +350,7 @@ lazy_static! {
             ]
         },
 
-        // TODO: vs mode royal warps
+        // TODO_VS: vs mode royal warps
     ];
 }
 

@@ -628,9 +628,9 @@ impl Prince {
         mat4::identity(&mut self.boost_push_yaw_rot);
         mat4::identity(&mut self.transform_rot);
 
-        // TODO: make this a `PrinceParams` struct or something
+        // TODO_PARAM: make this a `PrinceParams` struct or something
         self.huff_init_speed_penalty = 0.4;
-        self.huff_duration = 240; // TODO: some weird potential off-by-one issue here.
+        self.huff_duration = 241;
         self.max_push_uphill_strength = 100.0;
         self.uphill_strength_loss = 0.7649993;
         self.forward_push_angle_cutoff = 0.8733223;
@@ -657,7 +657,7 @@ impl Prince {
         self.view_mode = PrinceViewMode::Normal;
         self.ignore_input_timer = 0;
 
-        // TODO: `prince_init:100-123` (vs mode crap)
+        // TODO_VS: `prince_init:100-123`
     }
 
     /// Copy the prince's `OujiState` to the `oujistate` pointer (which is passed from unity).
@@ -738,7 +738,7 @@ impl Prince {
             self.input_rs.clear();
         }
 
-        if self.should_init_flip(input) {
+        if self.should_init_flip(input, katamari, mission_state) {
             self.play_sound_fx(SoundId::Flip, 1.0, 0);
 
             if mission_state.is_tutorial() {
@@ -771,12 +771,29 @@ impl Prince {
     /// Returns `true` if the prince should begin a flip by checking if both
     /// analog sticks are pressed.
     /// offset: 0x544b0
-    fn should_init_flip(&mut self, input: &Input) -> bool {
-        // TODO: more early returns
-        // if katamari.physics_flags.vs_mode_state == 2 { return false; }
-        // if katamari.hysics_flags.airborne { return false; }
-        // if gamemode == 3 || gamemode == 4 { return false; }
-        // if gamemode == Tutorial && tutorial_flags.page == 0 { return false; }
+    fn should_init_flip(
+        &mut self,
+        input: &Input,
+        katamari: &Katamari,
+        mission_state: &MissionState,
+    ) -> bool {
+        if katamari.physics_flags.vs_mode_state == 2 {
+            return false;
+        }
+        if katamari.physics_flags.airborne {
+            return false;
+        }
+        match mission_state.gamemode {
+            GameMode::Ending | GameMode::Load => {
+                return false;
+            }
+            GameMode::Tutorial => {
+                if mission_state.tutorial.as_ref().unwrap().get_page() == 0 {
+                    return false;
+                }
+            }
+            _ => (),
+        }
 
         if self.view_mode == PrinceViewMode::R1Jump || self.oujistate.jump_180 {
             return false;
@@ -1092,7 +1109,7 @@ impl Prince {
 
     /// offset: 0x56650
     fn reset_boost_state(&mut self, katamari: &mut Katamari) {
-        // TODO: vs mode crap; just look at the function
+        // TODO_VS: missing vs mode-specific behavior
         self.end_spin_and_boost(katamari);
         self.boost_energy = self.boost_max_energy;
         self.gacha_window_timer = 0;
@@ -1393,7 +1410,7 @@ impl Prince {
                                 // initiate an R1 jump
                                 held_tut_move = Some(TutorialMove::JumpR1);
                                 self.end_spin_and_boost(katamari);
-                                // TODO: play R1_JUMP sfx
+                                self.play_sound_fx(SoundId::R1JumpStart, 1.0, 0);
                                 katamari.set_immobile(mission_state);
                                 self.view_mode = PrinceViewMode::R1Jump;
                                 camera.set_mode(CameraMode::R1Jump, Some(katamari), Some(&self));

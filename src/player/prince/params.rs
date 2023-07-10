@@ -138,7 +138,7 @@ impl PrinceParams {
             pre_speed * self.run_speed_mult
         } else {
             // case 3: prince is running (`push_mag` in `[self.run_min_push_mag, 1]`)
-            // TODO: translate using an inv lerp macro
+            // TODO_REFACTOR: translate using an inv lerp macro
             let lerped = (1.0
                 - ((push_mag - self.run_min_push_mag) / (1.0 - self.run_min_push_mag))
                     * self.run_speed_mult)

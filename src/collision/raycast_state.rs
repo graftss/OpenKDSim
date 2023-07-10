@@ -50,8 +50,8 @@ pub struct RaycastTriHit {
     pub impact_dist: f32,
 }
 
-/// TODO: Encodes data about a single raycast.
-/// offset: 0x1941e0 (it's allocated in the heap, but this is a pointer to it)
+/// Stores a single ray so that multiple raycasts can be performed on it.
+/// offset: 0x1941e0 (it's allocated in the heap, but this offset holds a pointer to it)
 #[derive(Debug, Default)]
 pub struct RaycastState {
     // BEGIN fields not in the original simulation
@@ -451,8 +451,7 @@ impl RaycastState {
                         };
                         reverse_orientation = !reverse_orientation;
 
-                        // TODO: not sure if this is actually negating the coordinates here?
-                        // TODO: if it is, then this should probably be done when the mono data is parsed??
+                        // TODO_REFACTOR: this negating should probably be done when the mono data is parsed??
                         for i in 0..3 {
                             for j in 0..3 {
                                 triangle[i][j] *= -1.0;
@@ -545,7 +544,7 @@ impl RaycastState {
             hit.impact_dist = impact_dist;
             hit.impact_dist_ratio = impact_dist / self.ray_len;
 
-            // TODO: no clue what this is doing
+            // TODO_DOC: no clue what this is doing
             if ray_in_mesh_coords {
                 hit.impact_point = min_tri_hit_point
             } else {

@@ -845,7 +845,7 @@ impl Prop {
     /// Initialize the prop's AABB and volume
     /// offset: 0x27750
     fn init_aabb_and_volume(&mut self, aabbs: &PropAabbs, config: &NamePropConfig) {
-        // TODO: refactor this as a simulation param
+        // TODO_PARAM: refactor this as a simulation param
         let VOL_RATIO_FOR_PICKUP = 0.1;
 
         if config.is_dummy_hit {
@@ -964,11 +964,6 @@ impl Prop {
 
     pub fn is_attached(&self) -> bool {
         self.global_state == PropGlobalState::Attached
-    }
-
-    // TODO: remove this and replace with `get_position`
-    pub fn get_pos(&self, out: &mut Vec3) {
-        vec3::copy(out, &self.pos);
     }
 
     pub fn get_position(&self) -> &Vec3 {

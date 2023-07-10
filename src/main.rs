@@ -160,15 +160,12 @@ fn test_cam_pos(
     pri_to_kat_unit[1] = 0.0;
     math::vec3_inplace_normalize(&mut pri_to_kat_unit);
 
-    // TODO: `camera_compute_normal_pos_and_target:65-187` (a bunch of unusual cases)
     let mut scaled_pos_offset = [0.0; 3];
     scaled_pos_offset[0] = pri_to_kat_unit[0] * kat_to_pos[2];
     scaled_pos_offset[1] = kat_to_pos[1];
     scaled_pos_offset[2] = pri_to_kat_unit[2] * kat_to_pos[2];
 
     vec3::add(&mut pos, &kat_center, &scaled_pos_offset);
-
-    // TODO: `camera_compute_normal_pos_and_target:198-213` (handle `SpecialCamera` flag)
 
     let scaled_target_offset = [
         pri_to_kat_unit[0] * kat_to_target[2],

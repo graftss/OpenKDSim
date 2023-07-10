@@ -1,7 +1,11 @@
 pub mod draw;
 
 pub struct DebugConfig {
+    /// Writes `tick` to the debug log every frame.
     pub log_tick: bool,
+
+    /// Writes a log whenever a triangle with a nonzero hit attribute contacts the katamari.
+    pub log_nonzero_hit_attribute_hits: bool,
 
     // TODO_DEBUG: make this distinguish between katamari collision rays and prop rays, once
     // the latter are added.
@@ -22,10 +26,11 @@ pub struct DebugConfig {
 }
 
 pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
-    log_tick: true,
+    log_tick: false,
+    log_nonzero_hit_attribute_hits: true,
     draw_collided_prop_aabb_hits: false,
     draw_collided_prop_mesh: false,
-    draw_collided_prop_tris: false,
+    draw_collided_prop_tris: true,
     kat_draw_collision_rays: true,
     kat_draw_shell_rays: true,
 };

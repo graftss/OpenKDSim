@@ -110,6 +110,7 @@ macro_rules! min {
 }
 
 /// Linear map on `$t` induced by `[0, 1] -> [$min, $max]`.
+/// `$min` is allowed to be larger than `$max`.
 macro_rules! lerp {
     ($t: expr, $min: expr, $max: expr) => {
         ($min) + ($t) * ($max - $min)

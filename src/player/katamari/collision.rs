@@ -754,8 +754,7 @@ impl Katamari {
         }
 
         // compute the unit vector from the prop to the katamari
-        let mut prop_pos = vec3::create();
-        prop.get_pos(&mut prop_pos);
+        let prop_pos = prop.get_position().clone();
         let mut prop_to_kat_unit = vec3_from!(-, self.center, prop_pos);
         vec3_inplace_normalize(&mut prop_to_kat_unit);
 
@@ -915,8 +914,7 @@ impl Katamari {
         self.attached_props.push(prop_ref.clone());
 
         // compute the unit vector from this katamari to `prop`
-        let mut prop_pos = vec3::create();
-        prop.get_pos(&mut prop_pos);
+        let prop_pos = prop.get_position().clone();
         let mut kat_to_prop_unit = vec3_from!(-, prop_pos, self.center);
         vec3_inplace_normalize(&mut kat_to_prop_unit);
 

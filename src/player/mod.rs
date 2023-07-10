@@ -128,7 +128,7 @@ impl GameState {
 
         if global.freeze {
             player.katamari.update_collision_rays();
-            // TODO: `player_update:29-31` (probably a no-op, but unclear)
+            // TODO_LOW: `player_update:29-31` (probably a no-op, but unclear)
         } else {
             // update the prince, then the katamari
             player.update_prince(mission_state);

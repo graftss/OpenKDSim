@@ -329,18 +329,18 @@ impl GameState {
 
         let gamemode = mission_state.gamemode;
         if gamemode == GameMode::Tutorial {
-            // TODO: `init_simulation:293-325` (tutorial crap)
+            // TODO_TUTORIAL: `init_simulation:293-325` (tutorial crap)
         }
 
         if mission_state.is_vs_mode {
-            // initialize the vs mode state, presumably
+            // TODO_VS: initialize the vs mode state, presumably
             self.mission_state.vsmode = Some(VsModeState { timer_0x10bf10: 0 });
         } else {
             // TODO: `init_simulation`:333-366, initialize somethings coming callbacks?
         }
 
-        // TODO: `prince_init_animation()`
-        // TODO: `Init`: 21-51, initialize ending stuff
+        // TODO_ANIM: `prince_init_animation()`
+        // TODO_ENDING: `Init`: 21-51, initialize ending stuff
     }
 
     /// Mimicks the `Tick` API function.

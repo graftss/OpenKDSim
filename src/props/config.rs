@@ -38,7 +38,7 @@ pub struct NamePropConfig {
     pub num_vault_pts: u8,
 
     /// The prop's movement speed index, both along paths and when fleeing.
-    /// The value is an index into another table (TODO: where is it)
+    /// The value is an index into another table (TODO_MOTION: where is it)
     /// offset: 0x17
     pub move_speed_idx: u8,
 

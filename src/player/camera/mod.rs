@@ -715,7 +715,7 @@ impl CameraState {
         if !prince.oujistate.jump_180 {
             // temporarily set `under_water` and `in_water` flags to false for
             // the purposes of computing the camera position and target.
-            // TODO: is this necessary?
+            // TODO_DOC: is this necessary?
             let under_water = katamari.physics_flags.under_water;
             let in_water = katamari.physics_flags.in_water;
             katamari.physics_flags.under_water = false;

@@ -213,7 +213,7 @@ pub fn acos_f32(value: f32) -> f32 {
     }
 }
 
-// TODO: this should probably be using the janky `power` function defined in
+// TODO_LOW: this should probably be using the janky `power` function defined in
 // the simulation for true accuracy
 #[inline]
 pub fn vol_to_rad(vol: f32) -> f32 {

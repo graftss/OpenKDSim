@@ -804,7 +804,6 @@ impl Katamari {
                     Some(_) => {
                         let t_inner = match prince.oujistate.dash {
                             true => {
-                                // TODO: could be wrong
                                 1.0 - inv_lerp!(
                                     self.speed,
                                     self.max_forwards_speed,
