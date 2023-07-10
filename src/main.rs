@@ -2,7 +2,7 @@
 #![feature(vec_into_raw_parts)]
 #![allow(non_snake_case, dead_code, unused_imports)]
 
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::{cell::RefCell, num::Wrapping, ops::Range, rc::Rc};
 
 use collision::raycast_state::ray_hits_aabb;
 use constants::{FRAC_PI_2, FRAC_PI_90, PI};
@@ -435,6 +435,14 @@ unsafe fn print_square_dish_mesh() {
     }
 }
 
+fn wrapping_test(b: u8) {
+    let a = 128 as u8;
+    // let b = 129 as u8;
+
+    let c = Wrapping(a) + Wrapping(b);
+    println!("c: {c:?}");
+}
+
 fn main() {
     println!("start");
 
@@ -442,6 +450,7 @@ fn main() {
 
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
-
-    {}
+    {
+        wrapping_test(129);
+    }
 }

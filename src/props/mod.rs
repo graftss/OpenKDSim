@@ -3,16 +3,17 @@ use std::{rc::Rc, slice};
 use gl_matrix::common::Mat4;
 
 use crate::{
-    constants::ZERO, delegates::DelegatesRef, mission::state::MissionState,
+    constants::ZERO, delegates::DelegatesRef, global::GlobalState, mission::state::MissionState,
     mono_data::PropMonoData, player::Player,
 };
 
 use self::{
     comments::KingCommentState,
-    config::NamePropConfig,
+    config::{NamePropConfig, NAME_PROP_CONFIGS},
     motion::global_path::GlobalPathState,
     params::PropParams,
     prop::{AddPropArgs, Prop, PropRef},
+    random::RandomPropsState,
 };
 
 mod comments;
@@ -21,6 +22,7 @@ pub mod debug;
 pub mod motion;
 pub mod params;
 pub mod prop;
+pub mod random;
 
 /// State of all props in the current mission.
 #[derive(Debug, Default)]
@@ -34,6 +36,8 @@ pub struct PropsState {
     /// so this field isn't used in this simulation at present.
     pub comments: KingCommentState,
 
+    pub random: RandomPropsState,
+
     pub config: Option<&'static Vec<NamePropConfig>>,
     pub params: PropParams,
     pub delegates: Option<DelegatesRef>,
@@ -44,6 +48,8 @@ impl PropsState {
     pub fn reset(&mut self) {
         self.props.clear();
         self.global_paths.init();
+        self.random.reset();
+        self.config = Some(&NAME_PROP_CONFIGS);
     }
 }
 
@@ -90,13 +96,33 @@ impl PropsState {
     /// Creates a new prop from the provided arguments and adds it to the `props` list.
     pub fn add_prop(
         &mut self,
+        global: &mut GlobalState,
+        mission_state: &MissionState,
         ctrl_idx: u16,
         args: &AddPropArgs,
         area: u8,
         mono_data: Option<&Rc<PropMonoData>>,
     ) {
         if let Some(md) = mono_data {
-            let prop = Prop::new(ctrl_idx, args, area, md, &mut self.comments);
+            // if the prop belongs to a random group, make sure the random group is initialized
+            // before creating the prop.
+            if args.loc_pos_type != 0 {
+                self.random.record_random_prop(
+                    global,
+                    mission_state.mission as usize,
+                    args.random_group_id as usize,
+                );
+            }
+
+            let prop = Prop::new(
+                ctrl_idx,
+                args,
+                area,
+                md,
+                global,
+                &mut self.comments,
+                &mut self.random,
+            );
             self.props.push(prop);
         }
     }

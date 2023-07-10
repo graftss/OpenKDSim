@@ -29,6 +29,7 @@ use crate::{
 use super::{
     comments::KingCommentState,
     motion::{behavior::PropBehavior, RotationAxis},
+    random::RandomPropsState,
     PropsState,
 };
 
@@ -682,10 +683,12 @@ impl Prop {
         args: &AddPropArgs,
         area: u8,
         mono_data: &Rc<PropMonoData>,
+        global: &mut GlobalState,
         comments: &mut KingCommentState,
+        random: &mut RandomPropsState,
     ) -> PropRef {
         Rc::new(RefCell::new(Prop::new_node(
-            ctrl_idx, args, area, mono_data, comments,
+            ctrl_idx, args, area, mono_data, global, comments, random,
         )))
     }
 
@@ -697,9 +700,20 @@ impl Prop {
         args: &AddPropArgs,
         area: u8,
         mono_data: &Rc<PropMonoData>,
+        global: &mut GlobalState,
         comments: &mut KingCommentState,
+        random: &mut RandomPropsState,
     ) -> Self {
-        let name_idx = args.name_idx;
+        // if the prop belongs to a random group, determine its name index by sampling
+        // the random group
+        let name_idx = if args.loc_pos_type != 0 {
+            let random_name_idx = random.sample_group(global, args.random_group_id as usize);
+            temp_debug_log!("ctrx_idx={ctrl_idx}, random name_idx = {random_name_idx:?}");
+            random_name_idx.unwrap_or(args.name_idx)
+        } else {
+            args.name_idx
+        };
+
         let config = NamePropConfig::get(name_idx.into());
         let mono_data = mono_data.clone();
 
@@ -718,8 +732,7 @@ impl Prop {
         new_mat4_copy!(init_transform, rotation_mat);
 
         // lines 108-149 of `prop_init` (init motion)
-        // lines 150-162 of `prop_init` (init random group)
-        // lines 163-190 of `prop_init` (init twin)
+        // lines 163-190 of `prop_init` (init twin/catch_count_b)
 
         // lines 348-349 (find first subobject)
         // lines 350-357 (init motion scripts)
@@ -839,6 +852,7 @@ impl Prop {
             result.init_pos[1] += y_offset;
         }
 
+        // handle king comment (unused since unity also handles it, apparently)
         if let Some(group_idx) = result.comment_group_id {
             comments.add_to_group(group_idx);
         }

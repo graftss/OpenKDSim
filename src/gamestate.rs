@@ -218,7 +218,14 @@ impl GameState {
         let area = self.mission_state.area;
         let mono_data = self.mono_data.props.get(args.name_idx as usize);
 
-        self.props.add_prop(ctrl_idx, args, area, mono_data);
+        self.props.add_prop(
+            &mut self.global,
+            &self.mission_state,
+            ctrl_idx,
+            args,
+            area,
+            mono_data,
+        );
 
         ctrl_idx as i32
     }

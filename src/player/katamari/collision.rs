@@ -1946,8 +1946,6 @@ impl Katamari {
                     None => false,
                 };
 
-                temp_debug_log!("  play_hit_ground:{play_hit_ground_sfx}");
-
                 if play_hit_ground_sfx {
                     self.play_sound_fx(SoundId::HitGround, 1.0, 0);
                 }

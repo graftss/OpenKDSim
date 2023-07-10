@@ -1,3 +1,5 @@
+use std::num::Wrapping;
+
 /// To advance the `rng1` value, it is multiplied by this number.
 const RNG1_ADVANCE: u32 = 0x19660d;
 
@@ -10,7 +12,7 @@ const RNG2_VALUES: &'static [u8; 256] = include_bytes!("bin/rng2_values.bin");
 pub struct RngState {
     /// RNG1 value. Initial value is 0x10e1 (4321 in decimal).
     /// offset: 0x7bc44
-    pub rng1: u32,
+    pub rng1: Wrapping<u32>,
 
     /// The number of times the `rng1` value has been advanced.
     /// offset: 0x153140
@@ -25,7 +27,7 @@ impl Default for RngState {
     fn default() -> Self {
         // The default RNG values are set in the function at offset 0x5d10.
         Self {
-            rng1: 4321,
+            rng1: Wrapping(4321),
             rng1_calls: 0,
             rng2: 0,
         }
@@ -38,11 +40,11 @@ impl RngState {
         let result = self.rng1;
 
         // update rng1 state
-        self.rng1 = (self.rng1 * RNG1_ADVANCE) as u32;
+        self.rng1 = self.rng1 * Wrapping(RNG1_ADVANCE);
         self.rng1_calls += 1;
 
         // return original rng2 state
-        result
+        result.0
     }
 
     pub fn get_rng2(&mut self) -> u8 {
