@@ -1845,7 +1845,7 @@ impl Katamari {
 
                 match try_init_vault_result {
                     // case 1: the katamari isn't vaulting
-                    TryInitVaultResult::NoVault => return self.set_bottom_ray_contact(),
+                    TryInitVaultResult::NoVault => self.set_bottom_ray_contact(),
 
                     // case 2: the katamari is starting a new vault
                     TryInitVaultResult::InitVault => {
