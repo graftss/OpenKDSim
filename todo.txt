@@ -38,7 +38,4 @@ bugs
       - but this is definitely happening when props are destroyed near the end
         of `Katamari::update_collision`
   - playing the original sim, then playing open sim, results in earthquake glitch in open sim
-  - when holding forward into a wall, you keep bouncing off of it without ever trying to climb it.
-    this is definitely not what happens in the real sim - it's much easier to climb without bonking
   - you get stuck moving over the new year's card on the mas1 table sometimes
-  - huffing is buggy

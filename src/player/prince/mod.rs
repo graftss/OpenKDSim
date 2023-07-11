@@ -9,7 +9,7 @@ use gl_matrix::{
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, max, min, panic_log, set_y},
+    macros::{inv_lerp, inv_lerp_clamp, lerp, mark_address, max, min, panic_log, set_y},
     math::{
         acos_f32, change_bounded_angle, normalize_bounded_angle, vec3_inplace_add_vec,
         vec3_inplace_normalize,
@@ -25,39 +25,91 @@ use crate::{
 
 use self::params::PrinceParams;
 
+mod debug;
 mod params;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OujiState {
+    /// offset: 0x0
     pub dash_start: bool,
+
+    /// offset: 0x1
     pub wheel_spin_start: bool,
+
+    /// offset: 0x2
     pub dash: bool,
+
+    /// offset: 0x3
     pub wheel_spin: bool,
+
+    /// offset: 0x4
     pub jump_180: bool,
+
+    /// offset: 0x5
     pub sw_speed_disp: bool,
+
+    /// offset: 0x6
     pub climb_wall: bool,
+
+    /// offset: 0x7
     pub huff: bool,
+
+    /// offset: 0x8
     pub camera_mode: u8,
+
+    /// offset: 0x9
     pub dash_effect: bool,
+
+    /// offset: 0xa
     pub hit_water: bool,
+
+    /// offset: 0xb
     pub submerge: bool,
 
     /// A copy of the camera's R1 jump state.
+    /// offset: 0xc
     pub camera_state: u8,
 
+    /// offset: 0xd
     pub jump_180_leap: u8,
+
+    /// offset: 0xe
     pub brake: bool,
+
+    /// offset: 0xf
     pub tutorial_flag_1: u8,
+
+    /// offset: 0x10
     pub tutorial_flag_2: u8,
+
+    /// offset: 0x11
     pub tutorial_trigger_1: u8,
+
+    /// offset: 0x12
     pub tutorial_trigger_2: u8,
-    pub power_charge: u8,  // apparently unused
+
+    /// offset: 0x13
+    pub power_charge: u8, // apparently unused
+
+    /// offset: 0x14
     pub fire_to_enemy: u8, // apparently unused
+
+    /// offset: 0x15
     pub search: u8,
+
+    /// offset: 0x16
     pub attack_1: u8,
+
+    /// offset: 0x17
     pub attack_2: u8,
+
+    /// offset: 0x18
     pub tarai: u8,
+
+    /// offset: 0x19
     pub attack_wait: u8,
+
+    /// offset: 0x1a
     pub vs_attack: bool,
 }
 
@@ -190,9 +242,9 @@ pub struct Prince {
     /// offset: 0x9c
     view_mode: PrinceViewMode,
 
-    /// (??) Seems to be a vs-mode flag related to huffing? who cares
+    /// (??) True if the prince is huffing, but different than 0x9e
     /// offset: 0x9d
-    vs_mode_huff_related_flag: bool,
+    is_huffing_0x9d: bool,
 
     /// True if the prince is huffing
     /// offset: 0x9e
@@ -302,6 +354,10 @@ pub struct Prince {
     /// offset: 0x2d4
     boost_max_energy: u16,
 
+    /// (??) The duration of a huff, in ticks.
+    /// offset: 0x2e8
+    huff_duration_0x2e8: u16,
+
     /// The amount of boost energy gained per recharge.
     /// offset: 0x2ec
     boost_recharge: u16,
@@ -313,7 +369,7 @@ pub struct Prince {
 
     /// The duration of a huff, in ticks.
     /// offset: 0x2f4
-    huff_duration: u16,
+    huff_duration_0x2f4: u16,
 
     /// The initial multiplier on katamari speed during a huff (this penalty decays as the
     /// huff gets closer to ending)
@@ -437,6 +493,12 @@ pub struct Prince {
     /// offset: 0x47e
     boost_energy: u16,
 
+    /// Timer for the number of frames remaining of huffing. For some reason, there are two different
+    /// timers tracking the same concept (see `huff_timer_0x486`). While the prince is huffing,
+    /// this value is always 1 less than the other timer at the end of each tick.
+    /// offset: 0x480
+    huff_timer_0x480: u16,
+
     /// True if the katamari is huffing. This is set to `true` *one frame before* `is_huffing_0x9e`
     /// is set to true, and so one frame before e.g. the huff animation plays.
     is_huffing_0x482: bool,
@@ -445,9 +507,9 @@ pub struct Prince {
     /// offset: 0x484
     no_dash_ticks: u16,
 
-    /// The remaining ticks in the current huff.
+    /// The remaining ticks  the current huff.
     /// offset: 0x486
-    huff_timer: u16,
+    huff_timer_0x486: u16,
 
     /// The strength with which the katamari can be pushed uphill. Decreases while
     /// pushing uphill. (Seems to start at 100 and decrease from there, so maybe it's a percentage)
@@ -617,7 +679,7 @@ impl Prince {
 
         self.player = player;
         self.no_dash_ticks = 0;
-        self.huff_timer = 0;
+        self.huff_timer_0x486 = 0;
         vec3::copy(&mut self.pos, &VEC3_ZERO);
         self.auto_rotate_right_speed = 0.0;
         self.angle = init_angle;
@@ -630,7 +692,6 @@ impl Prince {
 
         // TODO_PARAM: make this a `PrinceParams` struct or something
         self.huff_init_speed_penalty = 0.4;
-        self.huff_duration = 241;
         self.max_push_uphill_strength = 100.0;
         self.uphill_strength_loss = 0.7649993;
         self.forward_push_angle_cutoff = 0.8733223;
@@ -643,7 +704,9 @@ impl Prince {
         self.non_backwards_turn_speed = 0.06;
         self.max_analog_allowing_flip = 0.3;
         self.gacha_window_duration = 14;
-        self.boost_max_energy = 0xf0;
+        self.huff_duration_0x2e8 = 160;
+        self.huff_duration_0x2f4 = 161; // 241;
+        self.boost_max_energy = 3; // 0xf0;
         self.gachas_for_spin = 3;
         self.boost_recharge = 18;
         self.boost_recharge_frequency = 100;
@@ -819,15 +882,16 @@ impl Prince {
     /// Update the prince's huff state.
     /// offset: 0x547f0 (first half of the function)
     fn update_huff(&mut self) {
-        self.huff_timer_ratio = if self.huff_timer == 0 {
+        self.huff_timer_ratio = if self.huff_timer_0x486 == 0 {
             0.0
         } else {
-            self.huff_timer -= 1;
-            self.huff_timer as f32 / self.huff_duration as f32
+            self.huff_timer_0x486 -= 1;
+            self.huff_timer_0x486 as f32 / self.huff_duration_0x2f4 as f32
         };
 
-        self.is_huffing_0x9e = self.huff_timer != 0;
-        self.oujistate.huff = self.huff_timer != 0;
+        let is_huffing = self.huff_timer_0x486 != 0;
+        self.is_huffing_0x9e = is_huffing;
+        self.oujistate.huff = is_huffing;
     }
 
     /// Decide if the current non-normal view mode should be ended.
@@ -924,7 +988,7 @@ impl Prince {
             // TODO_VS: also it's different in vs mode
             let min_push_len = 0.35;
 
-            if !self.vs_mode_huff_related_flag {
+            if !self.is_huffing_0x9d {
                 let ls_y = self.input_ls.y();
                 let rs_y = self.input_rs.y();
 
@@ -938,9 +1002,10 @@ impl Prince {
 
             // use a different gacha updating strategy while huffing
             if self.is_huffing_0x9e {
-                return self.update_gachas_while_huffing(katamari, mission_state.is_vs_mode);
+                self.update_gachas_while_huffing(katamari, mission_state.is_vs_mode);
+            } else {
+                self.update_gachas(katamari, camera, mission_state);
             }
-            self.update_gachas(katamari, camera, mission_state);
 
             let angle_tut_move = self.update_angle(katamari);
 
@@ -994,15 +1059,17 @@ impl Prince {
         }
 
         // decrement boost energy, but not in the tutorial
-        if self.oujistate.dash && mission_state.gamemode != GameMode::Tutorial {
-            self.boost_energy -= 1;
-            if self.boost_energy == 0 {
-                self.reset_boost_state(katamari);
-                self.huff_timer = self.huff_duration;
-                // TODO_VS: `prince->vsmode_huff??_timer = prince->vsmode_huff??_duration`
-                self.is_huffing_0x482 = true;
-                self.vs_mode_huff_related_flag = true;
-                return;
+        if self.gacha_count > 0 {
+            if self.oujistate.dash && mission_state.gamemode != GameMode::Tutorial {
+                self.boost_energy -= 1;
+                if self.boost_energy == 0 {
+                    self.reset_boost_state(katamari);
+                    self.huff_timer_0x486 = self.huff_duration_0x2f4;
+                    self.huff_timer_0x480 = self.huff_duration_0x2e8;
+                    self.is_huffing_0x482 = true;
+                    self.is_huffing_0x9d = true;
+                    return;
+                }
             }
         }
 
@@ -1100,9 +1167,11 @@ impl Prince {
 
     /// offset: 0x56650
     fn reset_boost_state(&mut self, katamari: &mut Katamari) {
-        // TODO_VS: missing vs mode-specific behavior
         self.end_spin_and_boost(katamari);
         self.boost_energy = self.boost_max_energy;
+        self.is_huffing_0x9d = false;
+        self.huff_timer_0x480 = 0;
+        self.is_huffing_0x482 = false;
         self.gacha_window_timer = 0;
     }
 
@@ -1114,7 +1183,12 @@ impl Prince {
             self.gacha_count = 0;
             katamari.physics_flags.wheel_spin = false;
         }
-        // TODO_VS: `prince_update_gachas_while_huffing:13-18` (vs mode crap)
+        if self.is_huffing_0x9d {
+            self.huff_timer_0x480 -= 1;
+            if self.huff_timer_0x480 == 0 {
+                self.reset_boost_state(katamari);
+            }
+        }
     }
 
     /// Update the prince's angle around the katamari.
@@ -1566,6 +1640,8 @@ impl Player {
 
         prince.read_input(input, mission_state, katamari, camera);
         prince.update_huff();
+        mark_address!("0x54883");
+
         prince.try_end_view_mode(camera);
         prince.update_boost_recharge();
         prince.update_analog_input_features(katamari, camera, mission_state);
