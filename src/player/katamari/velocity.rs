@@ -7,8 +7,7 @@ use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, panic_log, set_y,
-        temp_debug_log, vec3_from,
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, panic_log, set_y, vec3_from,
     },
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
@@ -462,7 +461,7 @@ impl Katamari {
 
         // apply a max speed penalty while huffing
         base_speed_mult *= prince.get_huff_speed_penalty();
-        mark_address!("0x226ec", format!("base_speed_mult={base_speed_mult}"));
+        mark_address!("0x226ec");
 
         if self.physics_flags.airborne {
             // if the katamari is airborne, its speed shouldn't change

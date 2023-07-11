@@ -51,6 +51,35 @@ pub enum SoundId {
     /// the katamari is large.
     LargeCollect2,
 
+    /// One of five sounds played when the katamari loses a prop from a collision.
+    /// The sound chosen depends on the katamari size and the current stage.
+    LoseProp0,
+
+    /// One of five sounds played when the katamari loses a prop from a collision.
+    /// The sound chosen depends on the katamari size and the current stage.
+    LoseProp1,
+
+    /// One of five sounds played when the katamari loses a prop from a collision.
+    /// The sound chosen depends on the katamari size and the current stage.
+    LoseProp2,
+
+    /// One of five sounds played when the katamari loses a prop from a collision.
+    /// The sound chosen depends on the katamari size and the current stage.
+    LoseProp3,
+
+    /// One of five sounds played when the katamari loses a prop from a collision.
+    /// The sound chosen depends on the katamari size and the current stage.
+    LoseProp4,
+
+    // Bonk0,
+
+    // Bonk1,
+
+    // Bonk2,
+
+    // Bonk3,
+
+    // Bonk4,
     /// The sound made when the katamari begins a spin.
     Spin,
 
@@ -127,6 +156,11 @@ impl From<SoundId> for u16 {
             SoundId::LargeCollect0 => 0xa,
             SoundId::LargeCollect1 => 0xb,
             SoundId::LargeCollect2 => 0xc,
+            SoundId::LoseProp0 => 0x10,
+            SoundId::LoseProp1 => 0x11,
+            SoundId::LoseProp2 => 0x12,
+            SoundId::LoseProp3 => 0x13,
+            SoundId::LoseProp4 => 0x14,
             SoundId::Spin => 0x1a,
             SoundId::Boost => 0x1b,
             SoundId::Brake => 0x1c,
@@ -166,6 +200,11 @@ impl From<u16> for SoundId {
             0xa => SoundId::LargeCollect0,
             0xb => SoundId::LargeCollect1,
             0xc => SoundId::LargeCollect2,
+            0x10 => SoundId::LoseProp0,
+            0x11 => SoundId::LoseProp1,
+            0x12 => SoundId::LoseProp2,
+            0x13 => SoundId::LoseProp3,
+            0x14 => SoundId::LoseProp4,
             0x1a => SoundId::Spin,
             0x1b => SoundId::Boost,
             0x1c => SoundId::Brake,
