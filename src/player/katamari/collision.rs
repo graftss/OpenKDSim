@@ -8,7 +8,7 @@ use crate::{
     global::GlobalState,
     macros::{
         inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, modify_translation,
-        panic_log, set_translation, set_y, temp_debug_log, vec3_from, vec3_unit_xz,
+        panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -16,7 +16,7 @@ use crate::{
         vec3_reflection,
     },
     mission::{state::MissionState, GameMode, GameType, Mission},
-    player::{camera::Camera, prince::Prince},
+    player::{camera::Camera, katamari::flags::GroundedRay, prince::Prince},
     props::{
         config::{NamePropConfig, NAME_PROP_CONFIGS},
         prop::{
@@ -198,9 +198,7 @@ impl Katamari {
         self.process_collected_props(props, mission_state, global);
         // TODO: `kat_update_world_size_threshold??()`
 
-        if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
-            || self.fc_ray_len < 1.0
-        {
+        if self.physics_flags.grounded_ray_type.is_bottom() || self.fc_ray_len < 1.0 {
             self.fc_ray_len = self.radius_cm;
         }
     }
@@ -1417,9 +1415,7 @@ impl Katamari {
             self.climb_radius_cm = max_ray_len;
         }
 
-        if min_ratio_ray_idx.is_none()
-            || self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
-        {
+        if min_ratio_ray_idx.is_none() || self.physics_flags.grounded_ray_type.is_bottom() {
             // if the primary floor contact point is from the bottom ray:
             self.fc_ray_idx = min_ratio_ray_idx;
             self.fc_ray = min_ratio_ray;
@@ -1759,7 +1755,7 @@ impl Katamari {
             self.play_sound_fx(SoundId::EnterWater, 1.0, 0);
         }
 
-        if self.physics_flags.grounded_ray_type != Some(KatCollisionRayType::Bottom) {
+        if self.physics_flags.grounded_ray_type.is_not_bottom() {
             vec3_inplace_subtract_vec(&mut self.vault_contact_point, &self.contact_wall_clip);
         }
 
@@ -1791,7 +1787,7 @@ impl Katamari {
                 }
 
                 self.fc_ray_len = self.radius_cm;
-                self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
+                self.physics_flags.grounded_ray_type = GroundedRay::Bottom;
                 self.vault_ray_idx = None;
 
                 // update durations of falling and being airborne
@@ -1849,7 +1845,7 @@ impl Katamari {
                     TryInitVaultResult::InitVault => {
                         let ray_idx = self.vault_ray_idx.unwrap();
                         let ray_type = self.ray_type_by_idx(ray_idx);
-                        self.physics_flags.grounded_ray_type = ray_type;
+                        self.physics_flags.grounded_ray_type = ray_type.into();
 
                         if ray_type == Some(KatCollisionRayType::Prop) {
                             let ray = &self.collision_rays[ray_idx as usize];
@@ -1897,7 +1893,8 @@ impl Katamari {
                     TryInitVaultResult::OldVault => {
                         if let Some(ray_idx) = self.vault_ray_idx {
                             // update the grounded ray type based on the vaulted ray's index
-                            self.physics_flags.grounded_ray_type = self.ray_type_by_idx(ray_idx);
+                            self.physics_flags.grounded_ray_type =
+                                self.ray_type_by_idx(ray_idx).into();
 
                             // (??) i guess this is pushing the katamari up out of the ground
                             // if the vault ray is clipped too far into the ground?
@@ -1910,7 +1907,7 @@ impl Katamari {
 
                 _was_climbing = self.physics_flags.climbing;
                 if _was_climbing {
-                    self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
+                    self.physics_flags.grounded_ray_type = GroundedRay::Bottom;
                 }
             }
         }
@@ -1934,14 +1931,13 @@ impl Katamari {
         if self.physics_flags.hit_ground_fast {
             if !self.physics_flags.in_water {
                 let play_hit_ground_sfx = match self.physics_flags.grounded_ray_type {
-                    Some(KatCollisionRayType::Bottom) => true,
-                    Some(KatCollisionRayType::Prop) => false,
-                    Some(KatCollisionRayType::Mesh) => {
+                    GroundedRay::Bottom => true,
+                    GroundedRay::Prop => false,
+                    GroundedRay::Mesh => {
                         self.collision_rays[self.vault_ray_idx.unwrap() as usize].ray_len
                             / self.radius_cm
                             > 1.05
                     }
-                    None => false,
                 };
 
                 if play_hit_ground_sfx {
@@ -2061,7 +2057,7 @@ impl Katamari {
             impact_volume = impact_force * impact_similarity;
 
             if self.physics_flags.moved_fast_shell_hit_0x14
-                && self.physics_flags.grounded_ray_type != Some(KatCollisionRayType::Bottom)
+                && self.physics_flags.grounded_ray_type.is_not_bottom()
             {
                 impact_volume = 0.0;
             }
@@ -2400,7 +2396,7 @@ impl Katamari {
 
         self.physics_flags.climbing = true;
         vec3::zero(&mut self.init_bonk_velocity);
-        self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
+        self.physics_flags.grounded_ray_type = GroundedRay::Bottom;
         self.vault_ray_idx = None;
         self.fc_ray_idx = None;
     }

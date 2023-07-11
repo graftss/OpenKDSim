@@ -133,7 +133,7 @@ impl Katamari {
             ray.reset(rad_cm);
         }
 
-        self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
+        self.physics_flags.grounded_ray_type = KatCollisionRayType::Bottom.into();
         self.avg_mesh_ray_len = rad_cm;
         self.vault_ray_idx = None;
 
@@ -224,7 +224,7 @@ impl Katamari {
         }
 
         let ground_type = self.physics_flags.grounded_ray_type;
-        if ground_type != Some(KatCollisionRayType::Bottom) && ground_type.is_some() {
+        if ground_type.is_not_bottom() {
             // if the ground contact isn't the bottom ray:
             if let Some(ray_idx) = self.vault_ray_idx {
                 // update the vault ray's endpoint to be the place that ray contacts the ground,
@@ -416,7 +416,7 @@ impl Katamari {
     }
 
     pub fn set_bottom_ray_contact(&mut self) {
-        self.physics_flags.grounded_ray_type = Some(KatCollisionRayType::Bottom);
+        self.physics_flags.grounded_ray_type = KatCollisionRayType::Bottom.into();
         self.vault_ray_idx = None;
         self.fc_ray_idx = None;
         self.fc_ray = None;

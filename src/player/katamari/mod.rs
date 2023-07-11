@@ -27,7 +27,7 @@ use crate::{
         vec3_inplace_normalize, vec3_inplace_scale, vol_to_rad,
     },
     mission::{config::MissionConfig, state::MissionState},
-    player::katamari::collision::ray::KatCollisionRayType,
+    player::katamari::flags::GroundedRay,
     props::{prop::PropRef, PropsState},
 };
 
@@ -1252,7 +1252,7 @@ impl Katamari {
         let mut next_center = vec3::create();
 
         match self.physics_flags.grounded_ray_type {
-            Some(KatCollisionRayType::Mesh) => {
+            GroundedRay::Mesh => {
                 mat4::multiply(
                     &mut next_transform,
                     &self.vault_transform,
@@ -1271,7 +1271,7 @@ impl Katamari {
 
                 vec3::transform_mat4(&mut next_center, &mesh_ray, &next_transform);
             }
-            Some(KatCollisionRayType::Prop) => {
+            GroundedRay::Prop => {
                 let mut tmp_vec = vec3::create();
                 vec3::scale(&mut tmp_vec, &self.prop_vault_ray_unit, -1.0);
                 vec3::transform_mat4(&mut next_center, &tmp_vec, &self.vault_transform);

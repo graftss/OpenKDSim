@@ -6,9 +6,7 @@ use gl_matrix::{
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
-    macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, temp_debug_log, vec3_from,
-    },
+    macros::{inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, vec3_from},
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small, vec3_projection,
@@ -22,7 +20,8 @@ use crate::{
 };
 
 use super::{
-    collision::ray::KatCollisionRayType, flags::KatInclineMoveType, KatBoostEffectState, Katamari,
+    flags::{GroundedRay, KatInclineMoveType},
+    KatBoostEffectState, Katamari,
 };
 
 /// 0.9998
@@ -824,11 +823,11 @@ impl Katamari {
                 let mut t;
 
                 match self.physics_flags.grounded_ray_type {
-                    Some(KatCollisionRayType::Bottom) => {
+                    GroundedRay::Bottom => {
                         // TODO_VS: `kat_update_friction:41-45`
                         t = self.params.bottom_ray_friction * self.speed;
                     }
-                    Some(_) => {
+                    _ => {
                         let t_inner = match prince.oujistate.dash {
                             true => {
                                 1.0 - inv_lerp!(
@@ -846,9 +845,6 @@ impl Katamari {
                         let k =
                             max_length_ratio * angle_btwn_rejs * self.params.nonbottom_ray_friction;
                         t = lerp!(t_inner, bottom_friction, bottom_friction * k);
-                    }
-                    None => {
-                        panic_log!("this should not happen");
                     }
                 };
 
@@ -929,9 +925,7 @@ impl Katamari {
 
         let mut next_vel = self.velocity.vel_accel;
 
-        if self.physics_flags.grounded_ray_type == Some(KatCollisionRayType::Bottom)
-            || self.physics_flags.grounded_ray_type == None
-        {
+        if self.physics_flags.grounded_ray_type.is_bottom() {
             // if grounded via the "bottom" ray, meaning the katamari isn't vaulting:
             // TODO_VS: `kat_apply_acceleration:79-90`
             // TODO_ENDING: `kat_apply_acceleration:91-96`

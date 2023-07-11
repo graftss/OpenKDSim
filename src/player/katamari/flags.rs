@@ -1,4 +1,8 @@
-use crate::{collision::hit_attribute::HitAttribute, debug::DEBUG_CONFIG, macros::debug_log};
+use crate::{
+    collision::hit_attribute::HitAttribute,
+    debug::DEBUG_CONFIG,
+    macros::{debug_log, panic_log},
+};
 
 use super::collision::ray::{KatCollisionRayType, ShellRay};
 
@@ -14,6 +18,52 @@ pub enum KatInclineMoveType {
 impl Default for KatInclineMoveType {
     fn default() -> Self {
         Self::Flatground
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroundedRay {
+    Bottom,
+    Mesh,
+    Prop,
+}
+
+impl GroundedRay {
+    pub fn is_bottom(self) -> bool {
+        self == GroundedRay::Bottom
+    }
+
+    pub fn is_not_bottom(self) -> bool {
+        self != GroundedRay::Bottom
+    }
+}
+
+impl From<KatCollisionRayType> for GroundedRay {
+    fn from(value: KatCollisionRayType) -> Self {
+        match value {
+            KatCollisionRayType::Bottom => Self::Bottom,
+            KatCollisionRayType::Mesh => Self::Mesh,
+            KatCollisionRayType::Prop => Self::Prop,
+        }
+    }
+}
+
+impl From<Option<KatCollisionRayType>> for GroundedRay {
+    fn from(value: Option<KatCollisionRayType>) -> Self {
+        match value {
+            Some(KatCollisionRayType::Bottom) => Self::Bottom,
+            Some(KatCollisionRayType::Mesh) => Self::Mesh,
+            Some(KatCollisionRayType::Prop) => Self::Prop,
+            None => {
+                panic_log!("attempted to convert `None` to `GroundedRay`");
+            }
+        }
+    }
+}
+
+impl Default for GroundedRay {
+    fn default() -> Self {
+        Self::Bottom
     }
 }
 
@@ -92,7 +142,7 @@ pub struct KatPhysicsFlags {
 
     /// (??) The type of boundary ray currently acting as the pivot.
     /// offset: 0x11
-    pub grounded_ray_type: Option<KatCollisionRayType>,
+    pub grounded_ray_type: GroundedRay,
 
     /// If true, the katamari is contacting a non-flat floor (normal < 0.9999).
     /// offset: 0x12
@@ -172,11 +222,6 @@ impl KatPhysicsFlags {
         self.detaching_props = false;
         self.contacts_wall = false;
         self.contacts_floor = false;
-    }
-
-    pub fn grounded_by_mesh_or_prop(&self) -> bool {
-        self.grounded_ray_type.is_some()
-            && self.grounded_ray_type != Some(KatCollisionRayType::Bottom)
     }
 }
 

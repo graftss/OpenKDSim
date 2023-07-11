@@ -17,7 +17,6 @@ features
 refactoring
   - rename `ticks` -> `frames` everywhere
   - refactor `ray_idx` into an enum: { CollisionRay(i16), ShellRay(i16) }
-  - `physics_flags.groudned_ray_type` shouldn't be an option, the defult should just be Bottom
   - remove `scale_translation` and `set_translation`, replace with `modify_translation`
     - also rename `modify_translation` -> `assign_translation`
   - change argments of `vec3_from!` so that it's `u op v`
@@ -43,6 +42,8 @@ bugs
   - when holding forward into a wall, you keep bouncing off of it without ever trying to climb it.
     this is definitely not what happens in the real sim - it's much easier to climb without bonking
   - can't go inside of bowls like in original sim - is there a concave collision flag?
+    - possibly related - mas1 tv stand also has aabb collision even when katamari is small, you
+      can't go under it
   - you get stuck moving over the new year's card on the mas1 table sometimes
 
 
