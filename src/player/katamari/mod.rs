@@ -3,7 +3,7 @@ mod debug;
 mod flags;
 mod params;
 pub mod scaled_params;
-mod spline;
+pub mod spline;
 mod velocity;
 
 use std::{cell::RefCell, rc::Rc};

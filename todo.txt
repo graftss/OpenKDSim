@@ -45,6 +45,3 @@ bugs
     - possibly related - mas1 tv stand also has aabb collision even when katamari is small, you
       can't go under it
   - you get stuck moving over the new year's card on the mas1 table sometimes
-
-
-debug spline thing

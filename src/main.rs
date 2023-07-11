@@ -17,6 +17,7 @@ use math::{
 };
 use mission::{config::MissionConfig, Mission};
 use mono_data::MonoData;
+use player::katamari::spline::compute_spline_accel_mult;
 use props::{config::NamePropConfig, prop::AddPropArgs};
 
 use crate::{
@@ -443,6 +444,10 @@ fn wrapping_test(b: u8) {
     println!("c: {c:?}");
 }
 
+fn spline_test() {
+    println!("result: {}", compute_spline_accel_mult(0.4748862));
+}
+
 fn main() {
     println!("start");
 
@@ -451,6 +456,6 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
     {
-        wrapping_test(129);
+        spline_test();
     }
 }

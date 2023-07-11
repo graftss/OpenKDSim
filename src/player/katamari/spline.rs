@@ -53,7 +53,7 @@ pub fn compute_spline_accel_mult(max_speed_ratio: f32) -> f32 {
     // find the index of the first control point whose `max_speed_ratio` field is
     // larger than the player's `max_speed_ratio` passed to this call.
     let mut first_idx = 0;
-    if max_speed_ratio == 1.0 {
+    if max_speed_ratio >= 1.0 {
         first_idx = 10;
     } else {
         for (i, ctrl_pt) in SPLINE_CTRL_PTS.iter().enumerate() {
