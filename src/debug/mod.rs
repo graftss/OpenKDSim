@@ -1,6 +1,9 @@
 pub mod draw;
 
 pub struct DebugConfig {
+    /// If `false`, the `crate::util::debug_log` function becomes a no-op.
+    pub allow_debug_logs: bool,
+
     /// Writes `tick` to the debug log every frame.
     pub log_tick: bool,
 
@@ -30,7 +33,8 @@ pub struct DebugConfig {
 
 // TODO_DEBUG: this should be made editable mid-execution.
 pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
-    log_tick: false,
+    allow_debug_logs: false,
+    log_tick: true,
     log_nonzero_hit_attribute_hits: false,
     log_destroyed_props: true,
     draw_collided_prop_aabb_hits: true,

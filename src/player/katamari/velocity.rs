@@ -434,6 +434,8 @@ impl Katamari {
             // rotate the `vel_accel` velocity by the angle the prince is turning
             let mut yaw_rot = [0.0; 16];
             mat4::from_y_rotation(&mut yaw_rot, prince.get_angle_speed());
+            mark_address!("0x2256d");
+
             let vel_accel = self.velocity.vel_accel;
             vec3::transform_mat4(&mut self.velocity.vel_accel, &vel_accel, &yaw_rot);
         }

@@ -1123,6 +1123,7 @@ impl Prince {
     fn update_angle(&mut self, katamari: &Katamari) -> Option<TutorialMove> {
         let min_push = self.min_push_to_move;
         let mut tut_move_held = None;
+        self.angle_speed = 0.0;
 
         // turn off `self.flags & 0x40000`
         self.flags &= 0xfffbffff;

@@ -5,7 +5,10 @@ use std::{fs::OpenOptions, path::Path};
 
 use gl_matrix::common::{Mat4, Vec3, Vec4};
 
-use crate::constants::{TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE};
+use crate::{
+    constants::{TRANSFORM_X_POS, TRANSFORM_Y_POS, TRANSFORM_Z_POS, UNITY_TO_SIM_SCALE},
+    debug::DEBUG_CONFIG,
+};
 
 /// Rescale the translation components of a `Mat4` transform from
 /// simulation coordinates to Unity coordinates.
@@ -51,5 +54,7 @@ const DEBUG_LOG_PATH: &'static str =
     "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Katamari Damacy REROLL\\debug.log";
 
 pub fn debug_log(str: &str) {
-    debug_write(&DEBUG_LOG_PATH, str);
+    if DEBUG_CONFIG.allow_debug_logs {
+        debug_write(&DEBUG_LOG_PATH, str);
+    }
 }

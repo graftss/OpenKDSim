@@ -223,6 +223,9 @@ macro_rules! internal_mark_address {
     };
 }
 
+/// Marks a code point in this simulation which corresponds to the address `$addr`
+/// in the original simulation. Used to compare the two for debugging purposes.
+/// Additional arguments to the macro will be `debug_log`ged alongside the address.
 macro_rules! mark_address {
     ($addr: literal) => {};
 
