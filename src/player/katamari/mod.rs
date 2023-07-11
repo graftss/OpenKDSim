@@ -176,7 +176,7 @@ pub struct Katamari {
     /// If colliding with a prop that can use its AABB for collisions,
     /// its AABB can only be used if its (compare) volume is less than this value.
     /// offset: 0x58
-    use_prop_aabb_collision_vol: f32,
+    aabb_prop_collision_vol_m3: f32,
 
     /// The exact diameter of the katamari (in cm).
     /// offset: 0x5c

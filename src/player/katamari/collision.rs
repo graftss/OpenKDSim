@@ -100,7 +100,7 @@ impl Katamari {
 
         // TODO_VS: `kat_update_collision:41-61` (compute vol ratio for vs mode)
 
-        self.use_prop_aabb_collision_vol =
+        self.aabb_prop_collision_vol_m3 =
             self.vol_m3 * self.params.prop_use_aabb_collision_vol_ratio;
         self.contact_prop = None;
         self.max_attach_vol_m3 = self.vol_m3 * self.params.prop_attach_vol_ratio;
@@ -356,19 +356,17 @@ impl Katamari {
 
         // TODO_WOBBLE: `kat_check_prop_mesh_collision:102-103` (intangibility check while prop is wobbling)
 
-        // TODO_PERF: refactor code to only keep one mesh for each prop type.
-        // (store it in `NamePropConfig`). then we wouldn't need to clone the mesh here
-        let prop_mesh = match NamePropConfig::get(prop.get_name_idx()).use_aabb_for_collision {
-            true => prop.get_aabb_mesh(),
-            false => prop.get_collision_mesh(),
+        // only use the prop's AABB mesh for collision if (1) the prop's `NamePropConfig` allows it,
+        // and (2) the katamari is bigger than the prop.
+        let use_aabb_for_collision =
+            NamePropConfig::get(prop.get_name_idx()).use_aabb_for_collision;
+        let prop_bigger_than_kat = prop.get_compare_vol_m3() >= self.aabb_prop_collision_vol_m3;
+        let prop_mesh = if use_aabb_for_collision && !prop_bigger_than_kat {
+            prop.get_aabb_mesh()
+        } else {
+            prop.get_collision_mesh()
         }
-        .unwrap_or_else(|| {
-            panic_log!(
-                "failed to find prop collision mesh (name_idx={}): \n\n{:?}\n\n",
-                prop.get_name_idx(),
-                prop
-            );
-        });
+        .unwrap();
 
         let mut prop_rot = prop.get_unattached_transform().clone();
         modify_translation!(prop_rot, =, VEC3_ZERO);
