@@ -3,11 +3,16 @@ pub mod rng;
 use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
+use lazy_static::lazy_static;
 
 use self::rng::RngState;
 
+lazy_static! {
+    static ref DEFAULT_GLOBAL_STATE: GlobalState = GlobalState::default();
+}
+
 /// Miscellaneous global game state.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct GlobalState {
     /// RNG state, which contains two RNG values.
     pub rng: RngState,
@@ -134,6 +139,13 @@ impl Display for GlobalState {
 }
 
 impl GlobalState {
+    pub fn reset(&mut self) {
+        // reset everything in the global state except the rng
+        let old_rng = self.rng;
+        *self = *DEFAULT_GLOBAL_STATE;
+        self.rng = old_rng;
+    }
+
     pub fn set_gravity(&mut self, x: f32, y: f32, z: f32) {
         self.gravity[0] = x;
         self.gravity[1] = y;

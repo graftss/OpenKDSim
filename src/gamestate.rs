@@ -38,7 +38,7 @@ pub struct GameState {
 impl GameState {
     pub fn reset(&mut self) {
         self.players = PlayersState::default();
-        self.global = GlobalState::default();
+        self.global.reset();
         self.props.reset();
         self.mission_state = MissionState::default();
         self.mono_data = MonoData::default();
@@ -216,7 +216,6 @@ impl GameState {
     pub fn add_prop(&mut self, args: &AddPropArgs) -> i32 {
         let ctrl_idx = self.global.get_next_ctrl_idx();
         let area = self.mission_state.area;
-        let mono_data = self.mono_data.props.get(args.name_idx as usize);
 
         self.props.add_prop(
             &mut self.global,
@@ -224,7 +223,7 @@ impl GameState {
             ctrl_idx,
             args,
             area,
-            mono_data,
+            &self.mono_data,
         );
 
         ctrl_idx as i32

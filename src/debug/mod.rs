@@ -31,10 +31,10 @@ pub struct DebugConfig {
 // TODO_DEBUG: this should be made editable mid-execution.
 pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
     log_tick: false,
-    log_nonzero_hit_attribute_hits: true,
+    log_nonzero_hit_attribute_hits: false,
     log_destroyed_props: true,
-    draw_collided_prop_aabb_hits: false,
-    draw_collided_prop_mesh: false,
+    draw_collided_prop_aabb_hits: true,
+    draw_collided_prop_mesh: true,
     draw_collided_prop_tris: true,
     kat_draw_collision_rays: true,
     kat_draw_shell_rays: true,

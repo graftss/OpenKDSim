@@ -1,10 +1,10 @@
-use std::{rc::Rc, slice};
+use std::slice;
 
 use gl_matrix::common::Mat4;
 
 use crate::{
     constants::ZERO, delegates::DelegatesRef, global::GlobalState, mission::state::MissionState,
-    mono_data::PropMonoData, player::Player,
+    mono_data::MonoData, player::Player,
 };
 
 use self::{
@@ -101,30 +101,26 @@ impl PropsState {
         ctrl_idx: u16,
         args: &AddPropArgs,
         area: u8,
-        mono_data: Option<&Rc<PropMonoData>>,
+        mono_data: &MonoData,
     ) {
-        if let Some(md) = mono_data {
-            // if the prop belongs to a random group, make sure the random group is initialized
-            // before creating the prop.
-            if args.loc_pos_type != 0 {
-                self.random.record_random_prop(
-                    global,
-                    mission_state.mission as usize,
-                    args.random_group_id as usize,
-                );
-            }
-
-            let prop = Prop::new(
-                ctrl_idx,
-                args,
-                area,
-                md,
+        if args.loc_pos_type != 0 {
+            self.random.record_random_prop(
                 global,
-                &mut self.comments,
-                &mut self.random,
+                mission_state.mission as usize,
+                args.random_group_id as usize,
             );
-            self.props.push(prop);
         }
+
+        let prop = Prop::new(
+            ctrl_idx,
+            args,
+            area,
+            mono_data,
+            global,
+            &mut self.comments,
+            &mut self.random,
+        );
+        self.props.push(prop);
     }
 
     pub fn change_next_area(&mut self, area: u8) {

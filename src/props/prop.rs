@@ -20,7 +20,7 @@ use crate::{
         temp_debug_log, vec3_from,
     },
     mission::state::MissionState,
-    mono_data::{PropAabbs, PropMonoData},
+    mono_data::{MonoData, PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
     util::scale_sim_transform,
@@ -682,7 +682,7 @@ impl Prop {
         ctrl_idx: u16,
         args: &AddPropArgs,
         area: u8,
-        mono_data: &Rc<PropMonoData>,
+        mono_data: &MonoData,
         global: &mut GlobalState,
         comments: &mut KingCommentState,
         random: &mut RandomPropsState,
@@ -699,7 +699,7 @@ impl Prop {
         ctrl_idx: u16,
         args: &AddPropArgs,
         area: u8,
-        mono_data: &Rc<PropMonoData>,
+        mono_data: &MonoData,
         global: &mut GlobalState,
         comments: &mut KingCommentState,
         random: &mut RandomPropsState,
@@ -714,8 +714,9 @@ impl Prop {
             args.name_idx
         };
 
+        let prop_mono_data = &mono_data.props[name_idx as usize];
+
         let config = NamePropConfig::get(name_idx.into());
-        let mono_data = mono_data.clone();
 
         // initialize rotation matrix
         let id = mat4::create();
@@ -836,11 +837,11 @@ impl Prop {
             trajectory_velocity: [0.0; 3],
         };
 
-        if let Some(aabbs) = &mono_data.aabbs {
+        if let Some(aabbs) = &prop_mono_data.aabbs {
             result.init_aabb_and_volume(aabbs, config);
         }
 
-        result.collision_mesh = match &mono_data.collision_mesh {
+        result.collision_mesh = match &prop_mono_data.collision_mesh {
             mesh @ Some(_) => mesh.as_ref().map(|m| m.clone()),
             None => result.aabb_mesh.as_ref().map(|mesh| mesh.clone()),
         };
@@ -860,7 +861,7 @@ impl Prop {
         // note the conditional call to `prop_init_tree_links` here in the original sim,
         // but the condition to call it appears to never be true in reroll.
 
-        result.mono_data = Some(mono_data);
+        result.mono_data = Some(prop_mono_data.clone());
 
         result
     }

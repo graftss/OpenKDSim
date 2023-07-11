@@ -8,7 +8,7 @@ const RNG1_ADVANCE: u32 = 0x19660d;
 /// offset: 0x60480
 const RNG2_VALUES: &'static [u8; 256] = include_bytes!("bin/rng2_values.bin");
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct RngState {
     /// RNG1 value. Initial value is 0x10e1 (4321 in decimal).
     /// offset: 0x7bc44
