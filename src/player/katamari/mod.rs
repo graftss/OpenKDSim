@@ -126,7 +126,7 @@ pub struct Katamari {
 
     /// The number of props lost during a bonk.
     /// offset: 0xd34c4c
-    props_lost_from_bonks: u32,
+    detached_props_from_bonk: u32,
 
     /// The list of collectible props near the katamari computed by `Katamari::find_nearby_props`.
     /// Cleared and recomputed each frame.
@@ -548,7 +548,7 @@ pub struct Katamari {
 
     /// The (real-time) game time when the last collision occurred.
     /// offset: 0x884
-    last_bonk_game_time_ms: i32,
+    last_wall_bonk_game_time_ms: i32,
 
     /// (??) The prop which is colliding with the katamari. (why are there two such props in ghidra)
     /// offset: 0x888
@@ -993,7 +993,7 @@ impl Katamari {
 
         self.prop_combo_count = 0;
         self.physics_flags.wheel_spin = false;
-        self.last_bonk_game_time_ms = 0;
+        self.last_wall_bonk_game_time_ms = 0;
 
         // TODO_PROPS: `kat_init:270-275` (prop combo initialization)
 

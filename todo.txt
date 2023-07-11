@@ -22,6 +22,8 @@ refactoring
   - change argments of `vec3_from!` so that it's `u op v`
   - rename `vec3_unit_xz` -> `vec3_lateral_unit`
   - fix signedness of everything; anything that can never be negative should be unsigned
+  - change stage config sound id methods to return Option<SoundId>
+    - change `play_sound_fx` to accept `Option<SoundId>` instead of `SoundId`
 
 perf
   - is it possible to drop the static `include_bytes!` data after
@@ -42,4 +44,3 @@ bugs
   - when holding forward into a wall, you keep bouncing off of it without ever trying to climb it.
     this is definitely not what happens in the real sim - it's much easier to climb without bonking
   - you get stuck moving over the new year's card on the mas1 table sometimes
-  - hitting props doesn't play the bonk sound - see `Katamari::lose_props_from_bonk`

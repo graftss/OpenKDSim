@@ -71,15 +71,26 @@ pub enum SoundId {
     /// The sound chosen depends on the katamari size and the current stage.
     LoseProp4,
 
-    // Bonk0,
+    /// One of five sounds played when the katamari bonks a wall without losing a prop.
+    /// The sound chosen depends on the katamari size and the current stage.
+    WallBonk0,
 
-    // Bonk1,
+    /// One of five sounds played when the katamari bonks a wall without losing a prop.
+    /// The sound chosen depends on the katamari size and the current stage.
+    WallBonk1,
 
-    // Bonk2,
+    /// One of five sounds played when the katamari bonks a wall without losing a prop.
+    /// The sound chosen depends on the katamari size and the current stage.
+    WallBonk2,
 
-    // Bonk3,
+    /// One of five sounds played when the katamari bonks a wall without losing a prop.
+    /// The sound chosen depends on the katamari size and the current stage.
+    WallBonk3,
 
-    // Bonk4,
+    /// One of five sounds played when the katamari bonks a wall without losing a prop.
+    /// The sound chosen depends on the katamari size and the current stage.
+    WallBonk4,
+
     /// The sound made when the katamari begins a spin.
     Spin,
 
@@ -161,6 +172,11 @@ impl From<SoundId> for u16 {
             SoundId::LoseProp2 => 0x12,
             SoundId::LoseProp3 => 0x13,
             SoundId::LoseProp4 => 0x14,
+            SoundId::WallBonk0 => 0x15,
+            SoundId::WallBonk1 => 0x16,
+            SoundId::WallBonk2 => 0x17,
+            SoundId::WallBonk3 => 0x18,
+            SoundId::WallBonk4 => 0x19,
             SoundId::Spin => 0x1a,
             SoundId::Boost => 0x1b,
             SoundId::Brake => 0x1c,
@@ -205,6 +221,11 @@ impl From<u16> for SoundId {
             0x12 => SoundId::LoseProp2,
             0x13 => SoundId::LoseProp3,
             0x14 => SoundId::LoseProp4,
+            0x15 => SoundId::WallBonk0,
+            0x16 => SoundId::WallBonk1,
+            0x17 => SoundId::WallBonk2,
+            0x18 => SoundId::WallBonk3,
+            0x19 => SoundId::WallBonk4,
             0x1a => SoundId::Spin,
             0x1b => SoundId::Boost,
             0x1c => SoundId::Brake,

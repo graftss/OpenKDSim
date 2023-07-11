@@ -1686,7 +1686,7 @@ impl Katamari {
             self.airborne_prop_gravity,
         );
 
-        self.props_lost_from_bonks += 1;
+        self.detached_props_from_bonk += 1;
     }
 
     /// Compute the initial velocity of a prop when it is detached from the katamari.
@@ -2125,7 +2125,7 @@ impl Katamari {
         let param_min_impact_similarity = 0.3;
         let param_sound_cooldown_ms = 0xa5;
 
-        let mut _play_map_sound = false;
+        let mut play_wall_bonk_sound = false;
         let mut speed = self.speed;
 
         'elastic_collision: {
@@ -2156,9 +2156,12 @@ impl Katamari {
                 }
             } else {
                 let speed_ratio = self.speed / self.scaled_params.base_max_speed;
-                _play_map_sound = speed_ratio > param_min_speed_ratio
+
+                play_wall_bonk_sound = speed_ratio > param_min_speed_ratio
                     && impact_similarity > param_min_impact_similarity
-                    && global.game_time_ms - self.last_bonk_game_time_ms > param_sound_cooldown_ms;
+                    && global.game_time_ms - self.last_wall_bonk_game_time_ms
+                        > param_sound_cooldown_ms;
+
                 speed *= self.y_elasticity;
             }
 
@@ -2177,13 +2180,13 @@ impl Katamari {
         let BONK_COOLDOWN_MS = 0xa6;
 
         // if it's been too soon since we bonked, play the FX but don't actually lose any props
-        if global.game_time_ms - self.last_bonk_game_time_ms < BONK_COOLDOWN_MS {
+        if global.game_time_ms - self.last_wall_bonk_game_time_ms < BONK_COOLDOWN_MS {
             return self.play_bonk_fx(false);
         }
 
-        // the katamari bonks and loses props
-        self.last_bonk_game_time_ms = global.game_time_ms;
-        self.props_lost_from_bonks = 0;
+        // at this point, the katamari has bonked a wall
+        self.last_wall_bonk_game_time_ms = global.game_time_ms;
+        self.detached_props_from_bonk = 0;
 
         let not_climbing = !self.physics_flags.climbing && !self.last_physics_flags.climbing;
 
@@ -2195,7 +2198,7 @@ impl Katamari {
                 self.lose_props_from_bonk(mission_state, global, impact_volume);
             }
 
-            if self.props_lost_from_bonks > 0 {
+            if self.detached_props_from_bonk > 0 {
                 let sound_id = mission_state
                     .stage_config
                     .get_lose_prop_sound_id(self.diam_trunc_mm as u32);
@@ -2204,11 +2207,20 @@ impl Katamari {
             }
         }
 
-        if _play_map_sound {
-            // TODO_FX: `sound_play_map_size_sound(impact_force)`
+        if play_wall_bonk_sound {
+            self.play_wall_bonk_sound(mission_state, impact_force)
         }
 
         self.play_bonk_fx(false);
+    }
+
+    fn play_wall_bonk_sound(&self, mission_state: &MissionState, impact_force: f32) {
+        // TODO_LOW: return if gamemode is 4
+        let sound_id = mission_state
+            .stage_config
+            .get_wall_bonk_sound_id(self.diam_trunc_mm as u32);
+        let volume = impact_force.clamp(0.5, 1.0);
+        self.play_sound_fx(sound_id.into(), volume, 0);
     }
 
     fn lose_props_from_bonk(

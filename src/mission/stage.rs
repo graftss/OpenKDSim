@@ -275,7 +275,7 @@ pub struct StageSizeSoundIds {
     pub cutoff_diam_mm: u32,
     pub collect_prop: u16,
     pub lose_prop: u16,
-    pub unknown_0x8: u16,
+    pub wall_bonk: u16,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -310,12 +310,12 @@ impl StageSoundIds {
             .map_or(DEFAULT_RESULT, |idx| self.ctrl_pts[idx].lose_prop)
     }
 
-    fn get_map_size_sound_id(&self, kat_diam_mm: u32) -> u16 {
+    fn get_wall_bonk_sound_id(&self, kat_diam_mm: u32) -> u16 {
         // fall back to small sounds if all else fails
         static DEFAULT_RESULT: u16 = 1;
 
         self.find_size_idx(kat_diam_mm)
-            .map_or(DEFAULT_RESULT, |idx| self.ctrl_pts[idx].unknown_0x8)
+            .map_or(DEFAULT_RESULT, |idx| self.ctrl_pts[idx].wall_bonk)
     }
 }
 
@@ -324,29 +324,29 @@ lazy_static! {
         // house sound ids
         StageSoundIds {
             ctrl_pts: vec![
-                StageSizeSoundIds { cutoff_diam_mm: 500, collect_prop: 7, lose_prop: 18, unknown_0x8: 23 },
-                StageSizeSoundIds { cutoff_diam_mm: 200, collect_prop: 4, lose_prop: 17, unknown_0x8: 22 },
-                StageSizeSoundIds { cutoff_diam_mm: 0, collect_prop: 1, lose_prop: 16, unknown_0x8: 21 },
+                StageSizeSoundIds { cutoff_diam_mm: 500, collect_prop: 7, lose_prop: 18, wall_bonk: 23 },
+                StageSizeSoundIds { cutoff_diam_mm: 200, collect_prop: 4, lose_prop: 17, wall_bonk: 22 },
+                StageSizeSoundIds { cutoff_diam_mm: 0, collect_prop: 1, lose_prop: 16, wall_bonk: 21 },
             ]
         },
 
         // town sound ids
         StageSoundIds {
             ctrl_pts: vec![
-                StageSizeSoundIds { cutoff_diam_mm: 6000, collect_prop: 10, lose_prop: 19, unknown_0x8: 24 },
-                StageSizeSoundIds { cutoff_diam_mm: 1500, collect_prop: 7, lose_prop: 18, unknown_0x8: 23 },
-                StageSizeSoundIds { cutoff_diam_mm: 450, collect_prop: 4, lose_prop: 17, unknown_0x8: 22 },
-                StageSizeSoundIds { cutoff_diam_mm: 0, collect_prop: 1, lose_prop: 16, unknown_0x8: 21 },
+                StageSizeSoundIds { cutoff_diam_mm: 6000, collect_prop: 10, lose_prop: 19, wall_bonk: 24 },
+                StageSizeSoundIds { cutoff_diam_mm: 1500, collect_prop: 7, lose_prop: 18, wall_bonk: 23 },
+                StageSizeSoundIds { cutoff_diam_mm: 450, collect_prop: 4, lose_prop: 17, wall_bonk: 22 },
+                StageSizeSoundIds { cutoff_diam_mm: 0, collect_prop: 1, lose_prop: 16, wall_bonk: 21 },
             ]
         },
 
         // world sound ids
         StageSoundIds {
             ctrl_pts: vec![
-                StageSizeSoundIds { cutoff_diam_mm: 61000, collect_prop: 13, lose_prop: 20, unknown_0x8: 25 },
-                StageSizeSoundIds { cutoff_diam_mm: 12000, collect_prop: 10, lose_prop: 19, unknown_0x8: 24 },
-                StageSizeSoundIds { cutoff_diam_mm: 3000, collect_prop: 7, lose_prop: 18, unknown_0x8: 23 },
-                StageSizeSoundIds { cutoff_diam_mm: 0, collect_prop: 4, lose_prop: 17, unknown_0x8: 22 },
+                StageSizeSoundIds { cutoff_diam_mm: 61000, collect_prop: 13, lose_prop: 20, wall_bonk: 25 },
+                StageSizeSoundIds { cutoff_diam_mm: 12000, collect_prop: 10, lose_prop: 19, wall_bonk: 24 },
+                StageSizeSoundIds { cutoff_diam_mm: 3000, collect_prop: 7, lose_prop: 18, wall_bonk: 23 },
+                StageSizeSoundIds { cutoff_diam_mm: 0, collect_prop: 4, lose_prop: 17, wall_bonk: 22 },
             ]
         },
 
@@ -429,6 +429,17 @@ impl StageConfig {
                 );
             })
             .get_lose_prop_sound_id(kat_diam_mm)
+    }
+
+    pub fn get_wall_bonk_sound_id(&self, kat_diam_mm: u32) -> u16 {
+        self.sound_ids
+            .unwrap_or_else(|| {
+                panic_log!(
+                    "error reading base collect object sound id: stage {}",
+                    self.stage_idx
+                );
+            })
+            .get_wall_bonk_sound_id(kat_diam_mm)
     }
 }
 
