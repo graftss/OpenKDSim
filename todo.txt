@@ -40,3 +40,10 @@ bugs
     will orbit around in a circle for some reason
     - e.g. pinch, pump right stick up, then go back to pinch
   - playing the original sim, then playing open sim, results in earthquake glitch in open sim
+  - when holding forward into a wall, you keep bouncing off of it without ever trying to climb it.
+    this is definitely not what happens in the real sim - it's much easier to climb without bonking
+  - can't go inside of bowls like in original sim - is there a concave collision flag?
+  - you get stuck moving over the new year's card on the mas1 table sometimes
+
+
+debug spline thing

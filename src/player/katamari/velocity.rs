@@ -6,7 +6,9 @@ use gl_matrix::{
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, vec3_from},
+    macros::{
+        inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, temp_debug_log, vec3_from,
+    },
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small, vec3_projection,
@@ -977,7 +979,6 @@ impl Katamari {
 
     /// Compute the shell collision points around the katamari's boundary. The shell points are
     /// positioned based on how the katamari's center moved since the previous tick.
-    /// Specifically, the shell is oriented to be orthogonal to the katamari's velocity.
     /// offset: 0x23b70
     fn update_shell_points(&mut self) {
         // compute shell top and bottom

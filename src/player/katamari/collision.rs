@@ -293,9 +293,7 @@ impl Katamari {
             if !did_collide {
                 continue;
             }
-            if did_collide {
-                temp_debug_log!("  did_collide:{}", prop.get_ctrl_idx());
-            }
+
             // TODO_PARAM
             let MIN_MAX_SPEED_RATIO_FOR_SCREAM = 0.6;
             let MIN_DIAM_RATIO_FOR_SCREAM = 5.0;
@@ -1980,7 +1978,7 @@ impl Katamari {
         // TODO_VS: `vs_attack` check here
         let contacts_wall = self.num_wall_contacts > 0;
         let should_halve_speed = fast_collision && contacts_wall;
-        let can_bonk_and_lose_props = fast_collision && should_halve_speed;
+        let can_bonk_and_lose_props = !fast_collision || should_halve_speed;
         let landed_from_fast_fall = !(fast_collision && !contacts_wall && self.falling_ticks < 10);
         let flag_d_false_in_1p = false;
 
@@ -2195,7 +2193,7 @@ impl Katamari {
 
         let not_climbing = !self.physics_flags.climbing && !self.last_physics_flags.climbing;
 
-        if not_climbing && impact_force > 0.0 {
+        if not_climbing && impact_volume > 0.0 {
             // TODO_LOW: `kat_begin_screen_shake()`
             let can_lose_props = !camera.state.cam_eff_1P && !global.map_change_mode;
 
@@ -2203,7 +2201,13 @@ impl Katamari {
                 self.lose_props_from_bonk(mission_state, global, impact_volume);
             }
 
-            // TODO_PROPS: `kat_update_wall_contacts:380-409` (lose props from collision, play bonk sfx)
+            if self.props_lost_from_bonks > 0 {
+                let sound_id = mission_state
+                    .stage_config
+                    .get_lose_prop_sound_id(self.diam_trunc_mm as u32);
+                self.play_sound_fx(sound_id.into(), 1.0, 0);
+                self.play_bonk_fx(false);
+            }
         }
 
         if _play_map_sound {
@@ -2235,12 +2239,17 @@ impl Katamari {
         let impact_speed = min!(min_impact_speed, self.speed);
         let extra_speed = (impact_speed - min_impact_speed) / (self.base_speed - min_impact_speed);
 
+        // temp_debug_log!("    min_impact_speed={min_impact_speed}, impact_speed={impact_speed}, extra_speed={extra_speed}");
+        // temp_debug_log!("    speed={}, base_speed={}", self.speed, self.base_speed);
+
         if impact_speed <= min_impact_speed {
             return;
         }
 
         let impact_volume_t = inv_lerp!(impact_volume, MIN_IMPACT_VOLUME_TO_LOSE_PROPS, 1.0);
         let lost_life = LOST_LIFE_SCALE * self.vol_m3 * impact_volume_t * extra_speed;
+
+        // temp_debug_log!("    lost_life:{lost_life}");
 
         if mission_state.mission_config.game_type == GameType::NumThemeProps {
             // TODO_THEME: `kat_lose_props_from_bonk:44-87`
