@@ -708,7 +708,6 @@ impl Prop {
         // the random group
         let name_idx = if args.loc_pos_type != 0 {
             let random_name_idx = random.sample_group(global, args.random_group_id as usize);
-            temp_debug_log!("ctrx_idx={ctrl_idx}, random name_idx = {random_name_idx:?}");
             random_name_idx.unwrap_or(args.name_idx)
         } else {
             args.name_idx

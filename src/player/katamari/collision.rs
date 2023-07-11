@@ -8,7 +8,7 @@ use crate::{
     global::GlobalState,
     macros::{
         inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, min, modify_translation,
-        panic_log, set_translation, set_y, vec3_from, vec3_unit_xz,
+        panic_log, set_translation, set_y, temp_debug_log, vec3_from, vec3_unit_xz,
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
@@ -2233,8 +2233,8 @@ impl Katamari {
         let impact_speed = min!(min_impact_speed, self.speed);
         let extra_speed = (impact_speed - min_impact_speed) / (self.base_speed - min_impact_speed);
 
-        // temp_debug_log!("    min_impact_speed={min_impact_speed}, impact_speed={impact_speed}, extra_speed={extra_speed}");
-        // temp_debug_log!("    speed={}, base_speed={}", self.speed, self.base_speed);
+        temp_debug_log!("    min_impact_speed={min_impact_speed}, impact_speed={impact_speed}, extra_speed={extra_speed}");
+        temp_debug_log!("    speed={}, base_speed={}", self.speed, self.base_speed);
 
         if impact_speed <= min_impact_speed {
             return;
@@ -2243,7 +2243,7 @@ impl Katamari {
         let impact_volume_t = inv_lerp!(impact_volume, MIN_IMPACT_VOLUME_TO_LOSE_PROPS, 1.0);
         let lost_life = LOST_LIFE_SCALE * self.vol_m3 * impact_volume_t * extra_speed;
 
-        // temp_debug_log!("    lost_life:{lost_life}");
+        temp_debug_log!("    lost_life:{lost_life}");
 
         if mission_state.mission_config.game_type == GameType::NumThemeProps {
             // TODO_THEME: `kat_lose_props_from_bonk:44-87`

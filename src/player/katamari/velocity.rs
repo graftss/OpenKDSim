@@ -6,7 +6,10 @@ use gl_matrix::{
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
-    macros::{inv_lerp, inv_lerp_clamp, lerp, mark_call, max, panic_log, set_y, vec3_from},
+    macros::{
+        inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, panic_log, set_y,
+        temp_debug_log, vec3_from,
+    },
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small, vec3_projection,
@@ -401,26 +404,30 @@ impl Katamari {
             // TODO_TUTORIAL: `kat_update_velocity:155-165`
         }
 
-        let (mut push_accel, push_mag) = if !prince.oujistate.dash {
+        let mut push_accel;
+        let push_mag;
+
+        if !prince.oujistate.dash {
             // if not boosting:
-            let accel = if let Some(push_dir) = prince.get_push_dir() {
+            push_accel = if let Some(push_dir) = prince.get_push_dir() {
                 self.scaled_params.get_push_accel(push_dir)
             } else {
                 init_vel_accel_len
             };
 
-            (accel, prince.input_avg_push_len)
+            push_mag = prince.input_avg_push_len;
         } else {
             // if boosting:
-            let accel = if prince.oujistate.wheel_spin {
+            push_accel = if prince.oujistate.wheel_spin {
                 0.0
             } else {
                 self.scaled_params.boost_accel
             };
 
-            (accel, 1.0)
+            push_mag = 1.0;
         };
 
+        mark_address!("0x22504");
         self.physics_flags.no_input_push = push_mag <= 0.0;
 
         if prince.get_flags() & 0x40000 != 0 {
@@ -446,6 +453,7 @@ impl Katamari {
             };
 
             let pre_speed = lerp!(prince.get_push_strength(), sideways_speed, push_speed);
+            mark_address!("0x22638");
 
             prince.get_params().push_mag_speed_mult(push_mag, pre_speed)
         } else {
@@ -454,6 +462,7 @@ impl Katamari {
 
         // apply a max speed penalty while huffing
         base_speed_mult *= prince.get_huff_speed_penalty();
+        mark_address!("0x226ec", format!("base_speed_mult={base_speed_mult}"));
 
         if self.physics_flags.airborne {
             // if the katamari is airborne, its speed shouldn't change
@@ -479,6 +488,7 @@ impl Katamari {
         self.max_backwards_speed = base_speed * self.scaled_params.max_backwards_speed;
 
         let mut accel = [0.0; 3];
+        // TODO_VS
         let mut is_shoot_brake = false;
         match self.compute_brake_state(prince, camera) {
             BrakeState::NoPush => {

@@ -1017,9 +1017,9 @@ impl Katamari {
     /// Set global katamari speed multipliers, as in the API function `SetKatamariSpeed`.
     pub fn set_speed(&mut self, forw: f32, side: f32, backw: f32, boost: f32) {
         self.params.forwards_speed_mult = forw;
-        self.params.forwards_speed_mult = side;
-        self.params.forwards_speed_mult = backw;
-        self.params.forwards_speed_mult = boost;
+        self.params.sideways_speed_mult = side;
+        self.params.backwards_speed_mult = backw;
+        self.params.boost_speed_mult = boost;
     }
 }
 

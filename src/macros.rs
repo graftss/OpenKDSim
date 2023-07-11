@@ -211,6 +211,7 @@ macro_rules! set_y {
     };
 }
 
+// TODO: this is broken
 #[allow(unused_macros)]
 macro_rules! internal_mark_address {
     ($value: expr) => {
@@ -218,7 +219,7 @@ macro_rules! internal_mark_address {
     };
 
     ($($value: expr),+) => {
-        internal_mark_address!(+)
+        crate::macros::internal_mark_address!(+)
     };
 }
 
