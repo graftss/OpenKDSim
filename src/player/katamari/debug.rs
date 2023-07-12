@@ -7,7 +7,7 @@ use crate::{
     collision::mesh::Mesh,
     constants::VEC3_X_POS,
     debug::DEBUG_CONFIG,
-    macros::{debug_log, vec3_from},
+    macros::{debug_log, inv_lerp_clamp, max, min, vec3_from},
     math::acos_f32,
 };
 
@@ -71,13 +71,23 @@ impl Katamari {
 
         if let Some(delegates) = &self.delegates {
             let mut my_delegates = delegates.borrow_mut();
+
+            // compute max ray length
+            let mut max_ray_len = 0.0;
+            let mut min_ray_len = self.max_ray_len;
+            for ray in self.collision_rays.iter() {
+                max_ray_len = max!(max_ray_len, ray.ray_len);
+                min_ray_len = min!(min_ray_len, ray.ray_len);
+            }
+
             for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
                 let p0 = &self.center;
                 let p1 = vec3_from!(+, ray.kat_to_endpoint, self.center);
                 let color = if self.vault_ray_idx == Some(ray_idx as i16) {
-                    [0.0, 1.0, 0.0, 0.2]
+                    let intensity = inv_lerp_clamp!(ray.ray_len, min_ray_len, max_ray_len) * 0.8 + 0.2;
+                    [0.0, 1.0, 0.0, intensity]
                 } else {
-                    [1.0, 0.0, 0.0, 0.2]
+                    [1.0, 0.0, 0.0, 0.8]
                 };
 
                 my_delegates.debug_draw.draw_line(p0, &p1, &color);
@@ -127,5 +137,19 @@ impl Katamari {
                 }
             }
         }
+    }
+
+    pub fn debug_move_over_prop_bug_state(&self) -> String {
+        let wall_str = if self.num_wall_contacts > 0 {
+            let wall = &self.hit_walls[0];
+            format!("  wall: {wall:?}")
+        } else {
+            "".to_owned()
+        };
+
+        format!(
+            "speed: {}, num_floors:{}, num_walls:{}\n",
+            self.speed, self.num_floor_contacts, self.num_wall_contacts
+        ) + &wall_str
     }
 }

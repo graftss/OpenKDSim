@@ -336,6 +336,15 @@ impl RaycastState {
             vec3_inplace_normalize(&mut normal_unit);
             vec3::copy(&mut self.ray_to_triangle_hit.normal_unit, &normal_unit);
 
+            // if the triangle's normal and the ray have a positive dot product, that means
+            // they're going in the same direction. we don't want a collision in those cases,
+            // since it leads to e.g. getting stuck on "walls" (triangles whose normal points down,
+            // meaning they arent floors) on the bottom of thin props when we roll over them.
+            let ray_dot_tri_normal = vec3::dot(&normal_unit, &ray);
+            if ray_dot_tri_normal > 0.0 {
+                return None;
+            }
+
             // temp_debug_log!("  ray_hits_triangle hit (flag={tri_in_world_space}):");
             // temp_debug_log!("    let ray = [{:?}, {:?}];", self.point0, self.point1);
             // temp_debug_log!("    let triangle = {:?};", triangle);

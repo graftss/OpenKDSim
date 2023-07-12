@@ -63,8 +63,8 @@ const CHILD_PROP_ARGS: AddPropArgs = AddPropArgs {
     scale_x: 6.0,
     scale_y: 6.0,
     scale_z: 6.0,
-    name_idx: 269, // mandarin slice
-    loc_pos_type: u16::MAX,
+    name_idx: 782, // mandarin slice
+    loc_pos_type: 0,
     random_group_id: u16::MAX,
     mono_move_type: u16::MAX,
     mono_hit_on_area: u16::MAX,
@@ -133,7 +133,7 @@ const SIB_PROP_ARGS: AddPropArgs = AddPropArgs {
     shake_off_flag: 1,
 };
 
-unsafe fn test() {
+unsafe fn test_new_years_card() {
     use mission::stage::*;
     let mono_data_ptr = MAS1_MONO_DATA.as_ptr();
 
@@ -145,16 +145,8 @@ unsafe fn test() {
         let prop = state.props.get_prop(0).unwrap().as_ref().borrow();
 
         println!("prop: {:?}", prop);
+        println!("root aabb: {:?}", prop.get_aabb_mesh());
     });
-}
-
-unsafe fn test_monodata() {
-    let mut md = MonoData::default();
-    md.init_from_raw(MAS1_MONO_DATA.as_ptr());
-
-    let cherries = md.props.get(995);
-
-    println!("cherries: {cherries:?}");
 }
 
 fn replicate_init_vault() {
@@ -444,10 +436,6 @@ fn wrapping_test(b: u8) {
     println!("c: {c:?}");
 }
 
-fn spline_test() {
-    println!("result: {}", compute_spline_accel_mult(0.4748862));
-}
-
 fn main() {
     println!("start");
 
@@ -455,7 +443,7 @@ fn main() {
 
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
-    {
-        spline_test();
+    unsafe {
+        test_new_years_card();
     }
 }

@@ -3,7 +3,9 @@ unimplemented
   - turntables: `kat_apply_turntable_contact`
   - water: `kat_update_water_contact`
   - dynamic prop alphas
+  - props with subobjects - where does rotation come from?
   - a billion other things
+
 
 features
   savestates
@@ -37,5 +39,8 @@ bugs
       - it's not *entirely* that though, since it can happen with very few props attached
       - but this is definitely happening when props are destroyed near the end
         of `Katamari::update_collision`
-  - playing the original sim, then playing open sim, results in earthquake glitch in open sim
-  - you get stuck moving over the new year's card on the mas1 table sometimes
+  - original simulation can climb into the pink bowl at mas1 spawn at init size, open sim you can't
+  - still clip through table
+    - 10.3cm mas1, trying to climb up mas1 red phones by the sword is wrong in open sim
+      - you clip through the phones unless you move really slowly
+  - boosting doesn't feel right at all

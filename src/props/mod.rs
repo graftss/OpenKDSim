@@ -177,6 +177,13 @@ impl PropsState {
     /// Root method to update all props.
     /// offset: 0x259c0
     pub fn update(&mut self, player: &Player, mission_state: &MissionState) {
+        // for prop_ref in self.props_iter_mut() {
+        //     let mut prop = prop_ref.borrow_mut();
+        //     if prop.get_ctrl_idx() != 0x11f {
+        //         prop.set_disabled(1);
+        //     }
+        // }
+
         // TODO_ZONE: `props_update_nonending:28` (`kat_find_zone()`; this should probably be moved somewhere else)
         if mission_state.is_ending() {
             self.update_ending();

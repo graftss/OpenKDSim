@@ -8,6 +8,7 @@ use crate::{
         mesh::{Mesh, MeshSector, TriGroup, TriVertex},
     },
     constants::NUM_NAME_PROPS,
+    macros::{max, min},
     props::config::NamePropConfig,
 };
 
@@ -46,9 +47,25 @@ impl PropAabbs {
     }
 
     /// Compute the "root" AABB which encloses both the prop and all of its subobjects.
-    pub fn get_root_aabb(&self) -> &Aabb {
-        // TODO: incorporate subobject AABB's, as in `prop_init_aabb:90-115`
-        self.get_prop_aabb()
+    pub fn get_root_aabb(&self) -> Aabb {
+        // TODO_SUBOBJECT: rotate the AABB sector of each subobject separately
+        static SUBOBJECT_ROT: Vec3 = [0.0; 3];
+
+        let mut root_max = [0.0; 3];
+        let mut root_min = [0.0; 3];
+        for aabb in self.aabbs.iter() {
+            root_min[0] = min!(root_min[0], aabb.min[0]);
+            root_min[1] = min!(root_min[1], aabb.min[1]);
+            root_min[2] = min!(root_min[2], aabb.min[2]);
+            root_max[0] = max!(root_max[0], aabb.max[0]);
+            root_max[1] = max!(root_max[1], aabb.max[1]);
+            root_max[2] = max!(root_max[2], aabb.max[2]);
+        }
+
+        Aabb {
+            min: root_min,
+            max: root_max,
+        }
     }
 }
 

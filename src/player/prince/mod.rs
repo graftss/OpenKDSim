@@ -704,9 +704,9 @@ impl Prince {
         self.non_backwards_turn_speed = 0.06;
         self.max_analog_allowing_flip = 0.3;
         self.gacha_window_duration = 14;
-        self.huff_duration_0x2e8 = 160;
-        self.huff_duration_0x2f4 = 161; // 241;
-        self.boost_max_energy = 3; // 0xf0;
+        self.huff_duration_0x2e8 = 240;
+        self.huff_duration_0x2f4 = 241;
+        self.boost_max_energy = 0xf0;
         self.gachas_for_spin = 3;
         self.boost_recharge = 18;
         self.boost_recharge_frequency = 100;

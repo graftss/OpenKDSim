@@ -129,7 +129,9 @@ impl Katamari {
 
         // TODO_VS: `kat_update_collision:96-101` (decrement timer)
 
+        mark_address!("0x12f7f");
         self.find_nearby_props(props, prince, mission_state);
+        mark_address!("0x12f87");
 
         if mission_state.gamemode == GameMode::Ending {
             // TODO_ENDING: `kat_update_collision:105-132 (ending-specific reduced collision)
@@ -1321,6 +1323,8 @@ impl Katamari {
 
     /// offset: 0x13930
     fn process_surface_contacts(&mut self) {
+        mark_address!("0x13930");
+
         self.physics_flags.on_flat_floor = false;
         self.physics_flags.on_sloped_floor = false;
         self.hit_flags.clear();

@@ -1,10 +1,12 @@
+use std::fmt::Debug;
+
 use gl_matrix::common::Vec3;
 
 use crate::{collision::hit_attribute::HitAttribute, props::prop::PropRef};
 
 /// Describes a collision between a katamari collision ray and another
 /// surface (which could be on either a prop or the map)
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct SurfaceHit {
     /// (??)
     /// offset: 0x0
@@ -48,4 +50,26 @@ pub struct SurfaceHit {
     /// is a pointer to that prop.
     /// offset: 0x58
     pub prop: Option<PropRef>,
+}
+
+impl Debug for SurfaceHit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prop = self
+            .prop
+            .as_ref()
+            .map(|prop_ref| prop_ref.borrow().get_ctrl_idx());
+
+        f.debug_struct("SurfaceHit")
+            .field("clip_normal_len", &self.clip_normal_len)
+            .field("ray_len", &self.ray_len)
+            .field("ray_idx", &self.ray_idx)
+            .field("impact_dist_ratio", &self.impact_dist_ratio)
+            .field("ray", &self.ray)
+            .field("normal_unit", &self.normal_unit)
+            .field("clip_normal", &self.clip_normal)
+            .field("contact_point", &self.contact_point)
+            .field("hit_attr", &self.hit_attr)
+            .field("prop", &prop)
+            .finish()
+    }
 }
