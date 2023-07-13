@@ -102,7 +102,7 @@ impl Katamari {
 
         self.aabb_prop_collision_vol_m3 =
             self.vol_m3 * self.params.prop_use_aabb_collision_vol_ratio;
-        self.contact_prop = None;
+        self.remove_contact_prop();
         self.max_attach_vol_m3 = self.vol_m3 * self.params.prop_attach_vol_ratio;
         self.physics_flags.reset_for_collision_update();
 
@@ -230,7 +230,7 @@ impl Katamari {
         self.nearby_collectible_props.clear();
         self.new_collected_props.clear();
 
-        self.contact_prop = None;
+        self.remove_contact_prop();
 
         if self.ignore_prop_collision_timer != 0 {
             return;
@@ -313,7 +313,9 @@ impl Katamari {
 
             prop.reset_scream_cooldown_timer();
 
-            self.contact_prop = Some(prop_ref.clone());
+            // TODO_DOC: this shouldn't be necessary and it's not clear why the simulation does it
+            // when the contact prop is already set in `check_prop_mesh_collision`
+            // self.contact_prop = Some(prop_ref.clone());
             prop.set_kat_collision_vel(&kat_move);
             self.resolve_uncollectible_prop_collision(props, prop_ref.clone(), &mut prop);
 
@@ -338,6 +340,16 @@ impl Katamari {
                 prince.end_spin_and_boost(self);
             }
         }
+    }
+
+    fn set_contact_prop(&mut self, prop_ref: &PropRef) {
+        self.contact_prop = Some(prop_ref.clone());
+        self.contact_prop_ctrl_idx = Some(prop_ref.borrow().get_ctrl_idx());
+    }
+
+    fn remove_contact_prop(&mut self) {
+        self.contact_prop = None;
+        self.contact_prop_ctrl_idx = None;
     }
 
     /// Returns `true` if this katamari meets `prop` in a non-collection collision.
@@ -468,15 +480,16 @@ impl Katamari {
                     if record_result != RecordSurfaceContactResult::ShellTop {
                         self.physics_flags.moved_fast_shell_hit = true;
                         self.play_bonk_fx(prop.get_move_type().is_some());
-                        self.contact_prop = Some(prop_ref.clone());
+                        self.set_contact_prop(&prop_ref);
                         return true;
                     }
                 }
             }
 
             if found_hit {
-                self.contact_prop = Some(prop_ref.clone());
-                return true;
+                self.set_contact_prop(&prop_ref);
+                panic_log!("why is this needed");
+                // return true;
             }
         }
 
@@ -622,7 +635,7 @@ impl Katamari {
         }
 
         if found_any_hit {
-            self.contact_prop = Some(prop_ref.clone());
+            self.set_contact_prop(&prop_ref);
 
             // if any aabb was hit, attempt to draw the prop's mesh
             if DEBUG_CONFIG.draw_collided_prop_mesh {
@@ -803,7 +816,7 @@ impl Katamari {
 
         let mut collected_props = self.new_collected_props.clone();
 
-        for (collection_idx, prop_ref) in collected_props.iter_mut().enumerate().rev() {
+        for (_collection_idx, prop_ref) in collected_props.iter_mut().enumerate().rev() {
             // TODO_LOW: early exit from this loop if we reached the gametype c goal
             //           (which is a fixed # of collected props)
             let mut prop = prop_ref.borrow_mut();
@@ -826,13 +839,6 @@ impl Katamari {
             if sfx_kind > 0 {
                 let sound_id = SoundId::PropCollect(sfx_kind);
                 self.play_sound_fx(sound_id, 1.0, 0);
-            }
-
-            // TODO: check that this (meaning `collection_idx == 0`) actually hits the last iteration
-            // of this loop
-            if collection_idx == 0 {
-                self.last_attached_prop_name_idx = name_idx;
-                self.last_attached_prop = Some(prop_ref.clone());
             }
 
             // TODO_COMBO: `kat_process_collected_props:111-164` (update collection combo)
@@ -905,10 +911,7 @@ impl Katamari {
         prop.attach_to_kat(&self);
         self.vol_m3 += self.attach_vol_penalty * prop.get_attach_vol_m3();
 
-        // update collection order linked list
-        if self.first_attached_prop.is_none() {
-            self.first_attached_prop = Some(prop_ref.clone());
-        }
+        // update collection order list
         self.attached_props.push(prop_ref.clone());
 
         // compute the unit vector from this katamari to `prop`
@@ -1630,17 +1633,15 @@ impl Katamari {
 
         // TODO_PERF: don't clone this
         let mut attached_props = self.attached_props.clone();
-        let mut detached_ctrl_idxs = vec![];
+        let mut detached_indices = vec![];
 
-        for prop_ref in attached_props.iter_mut().rev() {
+        for (attach_idx, prop_ref) in attached_props.iter_mut().rev().enumerate() {
             let should_detach;
             let prop_vol;
-            let ctrl_idx;
             {
                 let mut prop = prop_ref.borrow_mut();
                 let prop_attach_life = prop.get_attach_life();
                 prop_vol = prop.get_compare_vol_m3();
-                ctrl_idx = prop.get_ctrl_idx();
 
                 if prop.is_disabled() {
                     continue;
@@ -1654,7 +1655,7 @@ impl Katamari {
 
             if should_detach {
                 self.detach_prop(mission_state, global, prop_ref, detach_speed);
-                detached_ctrl_idxs.push(ctrl_idx);
+                detached_indices.push(attach_idx);
                 remaining_life -= prop_vol;
                 if remaining_life <= 0.0 {
                     return;
@@ -1666,6 +1667,8 @@ impl Katamari {
                 return;
             }
         }
+
+        // TODO_HIGH: remove `detached_indices` from `attached_props`
     }
 
     /// Detach a prop from the katamari with the speed `detach_speed`.

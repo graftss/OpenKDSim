@@ -91,15 +91,19 @@ pub struct Katamari {
 
     /// A list of all currently hit floor surfaces.
     /// offset: 0x1959f0
+    // Since hit floors and walls are cleared and recomputed every frame, they don't need to be
+    // serialized.
+    #[serde(skip)]
     hit_floors: Vec<SurfaceHit>,
+
+    /// A list of all hit wall surfaces.
+    #[serde(skip)]
+    hit_walls: Vec<SurfaceHit>,
 
     /// (??) A list of all hit floor surfaces on the previous tick.
     /// Seems like it's unused?
     /// offset: 0x1941f0
-    last_hit_floors: Vec<SurfaceHit>,
-
-    /// A list of all hit wall surfaces.
-    hit_walls: Vec<SurfaceHit>,
+    // last_hit_floors: Vec<SurfaceHit>,
 
     /// TODO
     // We don't need to serialize the raycast state, since all of its computation is temporary
@@ -113,7 +117,8 @@ pub struct Katamari {
 
     /// A history of the katamari's surface contacts over the past several frames.
     /// This is used to detect when it's likely stuck.
-    // TODO_SERIAL:
+    // TODO_SERIAL: manually implement `Serialize` and `Deserialize` on `HitHistory`.
+    // but not a priority since we aren't even using it yet
     #[serde(skip)]
     hit_history: HitHistory,
 
@@ -152,9 +157,11 @@ pub struct Katamari {
     /// In the original simulation, this list was not stored as an array; instead each attached prop
     /// had a pointer to the props that are/were last attached and next attached.
     /// This linked list was then traversed when iterating over all attached props.
-    // TODO_SERIAL: convert this to a list of control indices
+    // TODO_SERIAL: load `PropRef`s using the ctrl indices vector post-load
     #[serde(skip)]
     attached_props: Vec<PropRef>,
+
+    attached_prop_ctrl_indices: Vec<u16>,
 
     /// In the original simulation, `Katamari::can_climb_wall_contact` attempts to read the normal of
     /// wall contact at index 0 (`hit_walls[0]`) on a frame when `num_wall_contacts == 0`.
@@ -561,11 +568,13 @@ pub struct Katamari {
     /// offset: 0x884
     last_wall_bonk_game_time_ms: i32,
 
-    /// (??) The prop which is colliding with the katamari. (why are there two such props in ghidra)
+    /// The prop which is colliding with the katamari. (why are there two such props in ghidra)
     /// offset: 0x888
-    // TODO_SERIAL: convert to control index
+    // TODO_SERIAL: read from `contact_prop_ctrl_idx` after load
     #[serde(skip)]
     contact_prop: Option<PropRef>,
+
+    contact_prop_ctrl_idx: Option<u16>,
 
     /// (??) this might be the cooldown on the "struggle" VFX that plays when almost at max climb height
     /// offset: 0x898
@@ -693,19 +702,17 @@ pub struct Katamari {
 
     /// The first prop that was attached to the katamari.
     /// offset: 0x39d8
-    // TODO_SERIAL: remove this since it's less info than `attached_props`
-    #[serde(skip)]
-    first_attached_prop: Option<PropRef>,
+    // #[serde(skip)]
+    // first_attached_prop: Option<PropRef>,
 
     /// The last prop that was attached to the katamari.
     /// offset: 0x39e0
-    // TODO_SERIAL: remove this since it's less info than `attached_props`
-    #[serde(skip)]
-    last_attached_prop: Option<PropRef>,
+    // #[serde(skip)]
+    // last_attached_prop: Option<PropRef>,
 
     /// The name index of the last attached prop.
     /// offset: 0x39e8
-    last_attached_prop_name_idx: u16,
+    // last_attached_prop_name_idx: u16,
 
     /// The penalty multiplier that will be applied to a prop when it is attached.
     /// offset: 0x3a70
@@ -995,10 +1002,7 @@ impl Katamari {
         vec3::copy(&mut self.bonus_vel, &VEC3_ZERO);
         vec3::copy(&mut self.contact_floor_normal_unit, &VEC3_Y_POS);
 
-        self.first_attached_prop = None;
-        self.last_attached_prop = None;
         self.enable_prop_rays = true;
-        self.last_attached_prop_name_idx = 0;
 
         self.initialize_collision_rays();
 
@@ -1158,6 +1162,14 @@ impl Katamari {
         if !camera.preclear.get_enabled() {
             // TODO_LOW: `kat_update:499-512` (update `camera_focus_position`, which seems to be unused)
         }
+
+        // sync the serializable vector of attached ctrl indices with the vectors of pointers to
+        // the actual props
+        self.attached_prop_ctrl_indices = self
+            .attached_props
+            .iter()
+            .map(|prop_ref| prop_ref.borrow().get_ctrl_idx())
+            .collect();
     }
 
     /// Update the katamari's scaled params by interpolating the mission's param control points.

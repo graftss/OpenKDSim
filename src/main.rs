@@ -451,7 +451,7 @@ fn main() {
 
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
-    unsafe {
+    {
         serialize_test();
     }
 }
