@@ -17,8 +17,9 @@ use math::{
 };
 use mission::{config::MissionConfig, Mission};
 use mono_data::MonoData;
-use player::katamari::spline::compute_spline_accel_mult;
+use player::{katamari::spline::compute_spline_accel_mult, prince::Prince};
 use props::{config::NamePropConfig, prop::AddPropArgs};
+use serde::Serialize;
 
 use crate::{
     collision::raycast_state::RaycastState,
@@ -436,6 +437,13 @@ fn wrapping_test(b: u8) {
     println!("c: {c:?}");
 }
 
+fn serialize_test() {
+    let mut p = Prince::default();
+    p.gacha_count = 87;
+    let serialized = serde_json::to_string(&p).unwrap();
+    println!("serialized: {serialized:?}");
+}
+
 fn main() {
     println!("start");
 
@@ -444,6 +452,6 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
     unsafe {
-        test_new_years_card();
+        serialize_test();
     }
 }

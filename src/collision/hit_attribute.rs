@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::macros::panic_log;
 
 /// Encodes nonstandard collision properties of surfaces. For example,
@@ -5,7 +7,7 @@ use crate::macros::panic_log;
 /// from climbing on it, and `SpeedCheckOff` is the hit attribute that the
 /// big hill in the Town stage has to make the katamari move extra fast.
 #[repr(u8)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum HitAttribute {
     None,
     WaterSurface,

@@ -1,11 +1,13 @@
-#[derive(Debug)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 enum PreclearStage {
     MAS4 = 0,
     MAS8 = 1,
     MTM = 2,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PreclearState {
     enabled: bool,
     is_pullback: bool,

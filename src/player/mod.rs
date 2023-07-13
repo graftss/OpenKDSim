@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
 
 use self::{
@@ -16,13 +18,15 @@ pub mod input;
 pub mod katamari;
 pub mod prince;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Player {
     pub animation: Animation,
     pub camera: Camera,
-    pub input: Input,
     pub katamari: Katamari,
     pub prince: Prince,
+
+    #[serde(skip)]
+    pub input: Input,
 }
 
 impl Player {

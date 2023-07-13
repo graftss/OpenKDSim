@@ -351,13 +351,13 @@ impl GameState {
 
     /// Mimicks the `Tick` API function.
     pub fn tick(&mut self, _delta: f32) {
-        if DEBUG_CONFIG.log_tick {
-            debug_log!("tick");
-        }
-
         let is_vs_mode = self.mission_state.is_vs_mode;
 
         self.global.ticks += 1;
+
+        if DEBUG_CONFIG.log_tick {
+            debug_log!("tick {}", self.global.ticks);
+        }
 
         // TODO_STOREFLAG: `update_game:23-89` (if store flag is on)
         self.global.updating_player = 0;
@@ -388,7 +388,7 @@ impl GameState {
             } else {
                 diam_m
             };
-            // TODO: update prop fadeout alpha crap
+            // TODO: update prop alpha based on distance from katamari
         } else {
             self.global.updating_player = 1;
             self.players[1].update_camera(&self.mission_state);

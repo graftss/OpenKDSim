@@ -1,12 +1,13 @@
 use std::fmt::Debug;
 
 use gl_matrix::common::Vec3;
+use serde::{Serialize, Deserialize};
 
 use crate::{collision::hit_attribute::HitAttribute, props::prop::PropRef};
 
 /// Describes a collision between a katamari collision ray and another
 /// surface (which could be on either a prop or the map)
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct SurfaceHit {
     /// (??)
     /// offset: 0x0
@@ -49,6 +50,8 @@ pub struct SurfaceHit {
     /// If the contact surface belongs to a prop collision mesh, this
     /// is a pointer to that prop.
     /// offset: 0x58
+    // TODO_SERIAL: replace `PropRef` with u16 control index
+    #[serde(skip)]
     pub prop: Option<PropRef>,
 }
 

@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{
     macros::{inv_lerp, lerp},
     mission::config::KatScaledParamsCtrlPt,
@@ -5,7 +7,7 @@ use crate::{
 };
 
 /// Katamari parameters which vary based on the katamari's current size.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct KatScaledParams {
     /// Base max speed which acts as a multiplier on the speeds of all movement types.
     /// offset: 0x0

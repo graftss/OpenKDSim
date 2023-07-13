@@ -5,6 +5,7 @@ use gl_matrix::{
     mat4::{self},
     vec3,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_ZERO},
@@ -28,7 +29,7 @@ use self::params::PrinceParams;
 mod debug;
 mod params;
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct OujiState {
     /// offset: 0x0
     pub dash_start: bool,
@@ -122,7 +123,7 @@ impl OujiState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrinceViewMode {
     Normal = 0,
     R1Jump = 1,
@@ -136,7 +137,7 @@ impl Default for PrinceViewMode {
 }
 
 /// The directions that the prince can push the katamari.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PushDir {
     Forwards,
     Backwards,
@@ -144,14 +145,14 @@ pub enum PushDir {
 }
 
 /// The directions that the prince can push the katamari sideways.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrinceSidewaysDir {
     Left,
     Right,
 }
 
 /// Classifies the ways the prince can be turning around the katamari.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrinceTurnType {
     None,
 
@@ -184,10 +185,11 @@ impl Default for PrinceTurnType {
 /// what's in `Katamari`, but this struct notably includes player input.
 /// offset: 0xd33210
 /// width: 0x518
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Prince {
     params: PrinceParams,
 
+    #[serde(skip)]
     delegates: Option<DelegatesRef>,
 
     /// The player index controlling this prince.

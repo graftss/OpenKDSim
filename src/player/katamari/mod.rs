@@ -12,6 +12,7 @@ use gl_matrix::{
     common::{Mat4, Vec3},
     mat4, vec3,
 };
+use serde::{Serialize, Deserialize};
 
 use crate::{
     collision::raycast_state::RaycastState,
@@ -45,7 +46,7 @@ use super::{
 };
 
 /// (??) not sure about this
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlarmType {
     Closest,
     Closer,
@@ -53,7 +54,7 @@ pub enum AlarmType {
 }
 
 /// TODO
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KatBoostEffectState {
     Build,
     StopBuilding,
@@ -62,7 +63,7 @@ pub enum KatBoostEffectState {
 }
 
 /// (??) Encodes the katamari's velocity relative to the camera's forward direction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CamRelativeDir {
     Forwards,
     Backwards,
@@ -70,9 +71,10 @@ pub enum CamRelativeDir {
     Right,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Katamari {
     // BEGIN new fields (that were not part of the original simulation's `Katamari` struct.)
+    #[serde(skip)]
     delegates: Option<DelegatesRef>,
 
     /// Parameters that affect katamari movement. In the original simulation these were
@@ -100,6 +102,9 @@ pub struct Katamari {
     hit_walls: Vec<SurfaceHit>,
 
     /// TODO
+    // We don't need to serialize the raycast state, since all of its computation is temporary
+    // (and within a single frame), and thus irrelevant to saving state between frames.
+    #[serde(skip)]
     raycast_state: RaycastState,
 
     /// The number of props attached to the katamari (including unloaded ones).
@@ -108,6 +113,8 @@ pub struct Katamari {
 
     /// A history of the katamari's surface contacts over the past several frames.
     /// This is used to detect when it's likely stuck.
+    // TODO_SERIAL:
+    #[serde(skip)]
     hit_history: HitHistory,
 
     /// Set to true *just before* the katamari is detaching props and
@@ -131,18 +138,22 @@ pub struct Katamari {
     /// The list of collectible props near the katamari computed by `Katamari::find_nearby_props`.
     /// Cleared and recomputed each frame.
     /// offset: 0xd34c50
+    #[serde(skip)]
     nearby_collectible_props: Vec<PropRef>,
 
     /// The list of props which will be collected on this frame.
     /// Computed by `Katamari::process_nearby_collectible_props`.
     /// Cleared and recomputed each frame.
     /// offset: 0xd35050
+    #[serde(skip)]
     new_collected_props: Vec<PropRef>,
 
     /// The list of props attached to the katamari.
     /// In the original simulation, this list was not stored as an array; instead each attached prop
     /// had a pointer to the props that are/were last attached and next attached.
     /// This linked list was then traversed when iterating over all attached props.
+    // TODO_SERIAL: convert this to a list of control indices
+    #[serde(skip)]
     attached_props: Vec<PropRef>,
 
     /// In the original simulation, `Katamari::can_climb_wall_contact` attempts to read the normal of
@@ -552,6 +563,8 @@ pub struct Katamari {
 
     /// (??) The prop which is colliding with the katamari. (why are there two such props in ghidra)
     /// offset: 0x888
+    // TODO_SERIAL: convert to control index
+    #[serde(skip)]
     contact_prop: Option<PropRef>,
 
     /// (??) this might be the cooldown on the "struggle" VFX that plays when almost at max climb height
@@ -680,10 +693,14 @@ pub struct Katamari {
 
     /// The first prop that was attached to the katamari.
     /// offset: 0x39d8
+    // TODO_SERIAL: remove this since it's less info than `attached_props`
+    #[serde(skip)]
     first_attached_prop: Option<PropRef>,
 
     /// The last prop that was attached to the katamari.
     /// offset: 0x39e0
+    // TODO_SERIAL: remove this since it's less info than `attached_props`
+    #[serde(skip)]
     last_attached_prop: Option<PropRef>,
 
     /// The name index of the last attached prop.
@@ -1096,7 +1113,7 @@ impl Katamari {
 
         self.apply_acceleration(mission_state);
 
-        mark_address!("0x1df7f");
+        mark_address!("0x1df7f", self.debug_velocity_state());
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;

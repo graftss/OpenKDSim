@@ -1,14 +1,11 @@
 use gl_matrix::{
     common::{Mat4, Vec3, Vec4},
-    vec3,
 };
 
 use crate::{
     collision::mesh::Mesh,
-    constants::VEC3_X_POS,
     debug::DEBUG_CONFIG,
     macros::{debug_log, inv_lerp_clamp, max, min, vec3_from},
-    math::acos_f32,
 };
 
 use super::Katamari;
@@ -115,15 +112,6 @@ impl Katamari {
         }
     }
 
-    pub fn debug_velocity_state(&self) -> String {
-        let vel_accel_len = vec3::length(&self.velocity.vel_accel);
-        let angle = acos_f32(vec3::dot(&VEC3_X_POS, &self.velocity.vel_accel));
-        format!(
-            "vel_accel_len:{:?}, bottom_ray={:?}, angle={}, speed={}",
-            vel_accel_len, self.physics_flags.grounded_ray_type, angle, self.speed
-        )
-    }
-
     pub fn debug_draw_collided_prop_mesh(&self, mesh: &Mesh, transform: &Mat4) {
         static MESH_COLOR: Vec4 = [0.0, 0.4, 0.0, 0.1];
         if let Some(delegates) = &self.delegates {
@@ -151,5 +139,9 @@ impl Katamari {
             "speed: {}, num_floors:{}, num_walls:{}\n",
             self.speed, self.num_floor_contacts, self.num_wall_contacts
         ) + &wall_str
+    }
+
+    pub fn debug_velocity_state(&self) -> String {
+        format!("{:?}", self.velocity)
     }
 }

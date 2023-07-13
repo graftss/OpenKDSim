@@ -1,6 +1,8 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{constants::FRAC_PI_2, player::prince::PushDir};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct KatamariParams {
     /// The number of ticks where the katamari can't start a second climb after falling out
     /// of a first climb.

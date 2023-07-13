@@ -44,3 +44,5 @@ bugs
     - 10.3cm mas1, trying to climb up mas1 red phones by the sword is wrong in open sim
       - you clip through the phones unless you move really slowly
   - boosting doesn't feel right at all
+  - downhill acceleration is wrong: nb wild speeds just off the white part of the mas1 tablecloth
+    where the cord goes under it

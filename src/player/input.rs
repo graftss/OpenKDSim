@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use gl_matrix::{common::Vec2, vec2};
+use serde::{Serialize, Deserialize};
 
 use crate::math::acos_f32;
 
@@ -50,7 +51,7 @@ pub struct Input {
 }
 
 /// A single analog stick's non-quantized input.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct StickInput {
     pub axes: Vec2,
 }
@@ -112,14 +113,14 @@ impl StickInput {
 }
 
 /// The possible directions a single stick can push.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StickPushDir {
     Up,
     Down,
 }
 
 /// The possible directions both sticks can push.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnalogPushDirs {
     pub left: Option<StickPushDir>,
     pub right: Option<StickPushDir>,
@@ -178,7 +179,7 @@ impl AnalogPushDirs {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GachaDir {
     Left,
     Right,

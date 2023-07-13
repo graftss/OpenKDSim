@@ -1,6 +1,7 @@
 use circular_queue::CircularQueue;
 use gl_matrix::common::Vec3;
 
+
 /// An element of the surface contact history, which records the number of
 /// contacts and the closest normal contact for both walls and floors.
 /// This data is recorded each tick and used to detect when the katamari might

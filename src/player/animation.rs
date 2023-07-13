@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{
     delegates::DelegatesRef,
     global::rng::RngState,
@@ -14,7 +16,7 @@ use super::{
     prince::{Prince, PrinceSidewaysDir, PrinceTurnType, PrinceViewMode, PushDir},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AnimationId {
     Idle1,
     IdleHuff,
@@ -96,7 +98,7 @@ impl AnimationId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AnimationParams {
     /// The highest the katamari's max speed ratio can be while still performing
     /// an idle animation.
@@ -122,10 +124,12 @@ impl Default for AnimationParams {
 /// A struct in the original simulation that seems to mostly hold animation behavior.
 /// Since a lot of animation logic in Reroll is handled by Unity, this struct was
 /// mostly unused, and mainly just lets Unity know which animations to play.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Animation {
     // BEGIN not part of original simulation struct
     /// A reference to the Unity delegates for the purposes of starting animations in Unity.
+    // TODO_SERIAL: replace this when state is loaded
+    #[serde(skip)]
     delegates: Option<DelegatesRef>,
 
     /// Collected magic constants used in animation code.

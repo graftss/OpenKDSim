@@ -160,7 +160,7 @@ impl Katamari {
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
                 if let Some(hit) = self.raycast_state.get_closest_hit() {
-                    if found_hit && hit.metadata == HitAttribute::SpecialCamera.into() {
+                    if found_hit && (hit.metadata == HitAttribute::SpecialCamera as i32) {
                         self.hit_flags.special_camera = true;
                     }
 

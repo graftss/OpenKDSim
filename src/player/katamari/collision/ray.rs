@@ -1,4 +1,5 @@
 use gl_matrix::{common::Vec3, mat4, vec3};
+use serde::{Serialize, Deserialize};
 
 use crate::{
     constants::VEC3_ZERO,
@@ -12,7 +13,7 @@ use super::mesh::KAT_MESHES;
 
 /// The extra "shell" collision rays which extend along the top half of the katamari.
 /// (see https://discord.com/channels/232268612285497345/805240416894713866/842591732229996544)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShellRay {
     Top = 1,
     Left = 2,
@@ -50,7 +51,7 @@ pub enum KatCollisionRayType {
     Prop = 2,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct KatCollisionRay {
     /// The endpoint relative to the katamari
     /// offset: 0x0
@@ -74,6 +75,8 @@ pub struct KatCollisionRay {
 
     /// If this ray is induced by a prop, points to that prop
     /// offset: 0x50
+    // TODO_SERIAL: convert to control index
+    #[serde(skip)]
     pub prop: Option<PropRef>,
 
     /// Length of the ray.

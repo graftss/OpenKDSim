@@ -1,6 +1,8 @@
+use serde::{Serialize, Deserialize};
+
 use crate::macros::panic_log;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BoostGachaParam {
     /// The minimum diameter at which this gacha value applies.
     pub min_diam_cm: f32,
@@ -9,7 +11,7 @@ pub struct BoostGachaParam {
     pub num_gachas: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PrinceParams {
     /// The maximum ratio of the katamari's max speed that allows the prince to
     /// enter a non-normal view mode (l1 look or r1 jump).

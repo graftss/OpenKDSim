@@ -1,4 +1,6 @@
-#[derive(Debug)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CameraParams {
     /// (??) A duration when the camera is zooming out.
     /// offset: 0x7a0b4

@@ -2,6 +2,7 @@ use gl_matrix::{
     common::{Mat4, Vec3},
     mat4, vec3,
 };
+use serde::{Serialize, Deserialize};
 
 use crate::{
     collision::raycast_state::{RaycastCallType, RaycastState},
@@ -29,13 +30,13 @@ pub mod params;
 pub mod preclear;
 
 /// TODO
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CamOverrideType {
     PrinceLocked,
 }
 
 /// Different camera states when transitioning into and out of an R1 jump.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CamR1JumpState {
     /// At the start of a jump when the prince is gaining height.
     Rising,
@@ -66,7 +67,7 @@ impl Default for CamR1JumpState {
 /// General camera state.
 /// offset: 0x192ee0
 /// width: 0x980
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CameraState {
     // START extra fields not in the original simulation
     /// In the original simulation, this was a global variable used to lock the
@@ -74,8 +75,11 @@ pub struct CameraState {
     /// offset: 0x10ead8
     override_type: Option<CamOverrideType>,
 
+    #[serde(skip)]
     raycast_state: RaycastState,
 
+    #[serde(skip)]
+    // TODO_SERIAL: reassign this when states are loaded
     delegates_ref: Option<DelegatesRef>,
 
     // END extra fields not in the original simulation
@@ -234,6 +238,8 @@ pub struct CameraState {
 
     /// (??) The update callback that will run during the ending gamemode.
     /// offset: 0x970
+    // TODO_ENDING
+    #[serde(skip)]
     update_ending_callback: Option<Box<fn() -> ()>>,
 
     /// If true, uses the "zoomed in" camera position (e.g. under living room table in MAS1/MAS2)
@@ -879,7 +885,7 @@ impl CameraState {
 /// Transform matrices for the camera.
 /// offset: 0xd34180
 /// width: 0x188
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CameraTransform {
     /// The transformation matrix of the camera looking at its target.
     /// offset: 0x0
@@ -952,7 +958,7 @@ impl CameraTransform {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Camera {
     pub state: CameraState,
     pub transform: CameraTransform,

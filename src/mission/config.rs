@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use gl_matrix::common::Vec3;
 use lazy_static::lazy_static;
+use serde::{Serialize, Deserialize};
 
 use crate::{
     constants::{NUM_MISSIONS, PI},
@@ -108,7 +109,7 @@ lazy_static! {
 /// by linearly interpolating between the `KatScaledCtrlPt` values with sizes just smaller
 /// and just bigger than the katamari's actual size.
 /// offset: 0x60180 (mission-indexed table of pointers to variable-length control point lists)
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct KatScaledParamsCtrlPt {
     /// The diameter at which the given params apply.
     /// offset: 0x0
@@ -172,7 +173,7 @@ impl KatScaledParamsCtrlPt {
 /// A control point that determines how the camera should be positioned at a specific
 /// katamari size. The actual position is determined by lerping the values of the
 /// two control points on either side of the katamari's actual size.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct CamScaledCtrlPt {
     /// The minimum katamari diameter at which this control point takes effect.
     pub diam_cm: f32,

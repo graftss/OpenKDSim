@@ -2,6 +2,7 @@ use gl_matrix::{
     common::{Mat4, Vec3},
     mat4, vec3,
 };
+use serde::{Serialize, Deserialize};
 
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
@@ -45,7 +46,7 @@ enum BrakeState {
 }
 
 /// Katamari velocity and acceleration values.
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Serialize, Deserialize)]
 pub struct KatVelocity {
     /// Current velocity
     /// offset: 0x0

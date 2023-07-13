@@ -1,6 +1,8 @@
+use serde::{Serialize, Deserialize};
+
 use crate::macros::log;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum CameraMode {
     Normal,
     R1Jump,

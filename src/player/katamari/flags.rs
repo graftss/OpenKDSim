@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{
     collision::hit_attribute::HitAttribute,
     debug::DEBUG_CONFIG,
@@ -8,7 +10,7 @@ use super::collision::ray::{KatCollisionRayType, ShellRay};
 
 /// The direction the katamari is moving relative to the slope of
 /// the surface it's moving on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KatInclineMoveType {
     Flatground,
     Uphill,
@@ -21,7 +23,7 @@ impl Default for KatInclineMoveType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GroundedRay {
     Bottom,
     Mesh,
@@ -67,7 +69,7 @@ impl Default for GroundedRay {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct KatPhysicsFlags {
     /// If true, the katamari has no surface contacts.
     /// offset: 0x0
@@ -227,7 +229,7 @@ impl KatPhysicsFlags {
 
 /// A group of flags which mostly record if the katamari is contacting certain special types of surfaces
 /// with non-standard `HitAttribute` values.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct KatHitFlags {
     /// If true, ignores "pushing downward" incline effect (e.g. on park entrance steps)
     /// offset: 0x0
