@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::macros::panic_log;
 
 pub mod config;
@@ -9,7 +11,7 @@ pub mod vsmode;
 
 /// The "game type" of a mission encodes its objective (e.g. reaching a fixed
 /// clear size for Make a Star levels).
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GameType {
     /// Game type for "Make a Star" missions, where the objective is to reach a fixed diameter.
     ClearSize = 0,
@@ -69,7 +71,7 @@ impl From<u8> for GameType {
 
 /// Game missions.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Mission {
     None = 0,               // king talking???
     MAS1 = 1,               // MAS1
@@ -211,7 +213,7 @@ impl From<u8> for Mission {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GameMode {
     Normal = 0,
     Tutorial = 1,

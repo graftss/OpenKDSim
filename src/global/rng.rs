@@ -1,5 +1,7 @@
 use std::num::Wrapping;
 
+use serde::{Serialize, Deserialize};
+
 /// To advance the `rng1` value, it is multiplied by this number.
 const RNG1_ADVANCE: u32 = 0x19660d;
 
@@ -8,7 +10,7 @@ const RNG1_ADVANCE: u32 = 0x19660d;
 /// offset: 0x60480
 const RNG2_VALUES: &'static [u8; 256] = include_bytes!("bin/rng2_values.bin");
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RngState {
     /// RNG1 value. Initial value is 0x10e1 (4321 in decimal).
     /// offset: 0x7bc44

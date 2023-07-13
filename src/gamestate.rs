@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+use serde::{Serialize, Deserialize};
+
 use crate::{
     debug::DEBUG_CONFIG,
     delegates::Delegates,
@@ -11,7 +13,7 @@ use crate::{
     props::{prop::AddPropArgs, PropsState},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GameState {
     /// State unique to a particular player.
     pub players: PlayersState,
@@ -21,17 +23,21 @@ pub struct GameState {
     pub global: GlobalState,
 
     /// State relating to props.
+    #[serde(skip)]
     pub props: PropsState,
 
     /// State relating to the mission in progress.
     pub mission_state: MissionState,
 
     /// Delegates which call back into unity code.
+    #[serde(skip)]
     pub delegates: Rc<RefCell<Delegates>>,
 
     /// Constant, geometric data relating to props that's passed to the
     /// simulation from unity (e.g. prop collision meshes, prop random
     /// roam zones).
+    // TODO_SERIAL: set this post-load
+    #[serde(skip)]
     pub mono_data: MonoData,
 }
 

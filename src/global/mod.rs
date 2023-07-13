@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use gl_matrix::common::{Vec3, Vec4};
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 use self::rng::RngState;
 
@@ -12,7 +13,7 @@ lazy_static! {
 }
 
 /// Miscellaneous global game state.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct GlobalState {
     /// RNG state, which contains two RNG values.
     pub rng: RngState,

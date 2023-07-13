@@ -1,7 +1,7 @@
 use crate::macros::{panic_log, rescale};
 
 /// A stage is a map (notably: House, Town, World).
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Stage {
     House,
     Town,
@@ -56,6 +56,7 @@ use crate::{
 };
 use gl_matrix::common::Vec3;
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 static SC_FLIP_PARAMS_TABLE: &'static [u8] = include_bytes!("bin/stage_config_flip_params.bin");
 static SC_ELASTICITY_TABLE: &'static [u8] = include_bytes!("bin/stage_config_elasticity.bin");

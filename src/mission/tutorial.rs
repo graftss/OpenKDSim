@@ -1,4 +1,6 @@
-#[derive(Debug, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct TutorialMoves {
     pub roll_forwards: bool,
     pub roll_to_the_right: bool,
@@ -34,7 +36,7 @@ impl TutorialMoves {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum TutorialMove {
     RollForwards,
     RollToTheRight,
@@ -52,7 +54,7 @@ pub enum TutorialMove {
 
 /// Maintains tutorial-specific state.
 /// offset: 0xd34680
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct TutorialState {
     /// (??) The second argument of `SetTutorialA`.
     /// offset: 0x0

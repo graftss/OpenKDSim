@@ -1,6 +1,7 @@
 use gl_matrix::common::Mat4;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct EndingState {
     map_roll: Mat4,
 }

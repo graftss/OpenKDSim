@@ -28,7 +28,7 @@ static MC_CAMERA_PARAMS_TABLE: &'static [u8] =
 /// This piecewise function is encoded as a sequence of control points, each
 /// determining a certain volume penalty at a certain katamari diameter.
 /// offset: 0x5fa20
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct VolPenaltyCtrlPt {
     /// The katamari diameter at which this penalty applies.
     /// offset: 0x0
@@ -228,7 +228,7 @@ impl CamScaledCtrlPt {
 }
 
 /// Constant, mission-specific data.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct MissionConfig {
     pub id: Mission,
 

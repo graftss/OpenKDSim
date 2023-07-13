@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use super::{
     config::MissionConfig,
     ending::EndingState,
@@ -7,12 +9,14 @@ use super::{
     GameMode, Mission,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct MissionState {
     /// Mission-specific immutable (presumably) values.
     pub mission_config: MissionConfig,
 
     /// Stage-specific immutable (presumably) values.
+    // TODO_SERIAL: set this post-load
+    #[serde(skip)]
     pub stage_config: StageConfig,
 
     /// Ending-specific state.
