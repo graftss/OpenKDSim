@@ -1,6 +1,6 @@
 use std::num::Wrapping;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// To advance the `rng1` value, it is multiplied by this number.
 const RNG1_ADVANCE: u32 = 0x19660d;

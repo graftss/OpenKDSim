@@ -1,6 +1,4 @@
-use gl_matrix::{
-    common::{Mat4, Vec3, Vec4},
-};
+use gl_matrix::common::{Mat4, Vec3, Vec4};
 
 use crate::{
     collision::mesh::Mesh,

@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 const NUM_GLOBAL_PATH_STATES: usize = 256;
 
 /// State about a single path, which may have multiple props moving along it at once.
 /// Updating this state allows individual props on the path to affect all such props.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GlobalPath {
     /// Flags: &1:reversed, &2:stalled.
     /// offset: 0x0
@@ -17,7 +19,7 @@ pub struct GlobalPath {
     pub double_speed: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GlobalPathState {
     paths: Vec<GlobalPath>,
 }

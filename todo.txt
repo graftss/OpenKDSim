@@ -9,8 +9,8 @@ unimplemented
 
 features
   savestates
-    - `Serialize` interface for save/loading savestates, implemented on all
-      relevant game state structs
+    - trait for setting extra fields on structs after deserialization
+
   resetting
     - `Reset` interface to reset attempt-specific bits of game state
       - implement it on all parts of `GameState`
@@ -26,6 +26,8 @@ refactoring
   - fix signedness of everything; anything that can never be negative should be unsigned
   - change stage config sound id methods to return Option<SoundId>
     - change `play_sound_fx` to accept `Option<SoundId>` instead of `SoundId`
+  - get rid of `PropRef` - store `Vec<Prop>` in `PropsState`, and all other prop references are
+    just ctrl indices
 
 perf
   - is it possible to drop the static `include_bytes!` data after

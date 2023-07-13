@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
 

@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::mission::{config::MissionConfig, GameType};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PropParams {
     /// See `destroy_prop_diam_ratio_clearprops`. This ratio applies to normal mission.
     /// offset: 0x9eac8

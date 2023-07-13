@@ -9,6 +9,7 @@ use gl_matrix::{
     mat4::{self},
     vec3,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
@@ -33,7 +34,7 @@ use super::{
     PropsState,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PropGlobalState {
     /// Normal unattached state.
     Unattached = 1,
@@ -51,7 +52,7 @@ impl Default for PropGlobalState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 enum PropLinkAction {
     /// No special link action.
     None,
@@ -109,7 +110,7 @@ struct PropSubobject {
     pub rot_vec: Vec3,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum PropUnattachedState {
     /// The default state that most props are in most of the time.
@@ -133,7 +134,7 @@ impl Default for PropUnattachedState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 enum PropAnimationType {
     Waiting = 0,
@@ -216,7 +217,8 @@ enum UnattachedTransformState {
 
 bitflags::bitflags! {
     /// Definition of the 0x6 offset field of `Prop`, which is a 1-byte bitfield.
-    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(transparent)]
     pub struct PropFlags1: u8 {
         /// True when the prop has a parent.
         const HasParent = 0x2;
@@ -244,7 +246,8 @@ bitflags::bitflags! {
 
 bitflags::bitflags! {
     /// Definition of the 0x8 offset field of `Prop`, which is a 1-byte bitfield.
-    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(transparent)]
     pub struct PropFlags2: u8 {
         /// True if the prop is following its parent prop.
         const FollowParent = 0x1;
@@ -267,7 +270,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PropTrajectoryType {
     Normal,
 
@@ -279,7 +282,7 @@ pub enum PropTrajectoryType {
     VendingMachine,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Prop {
     /// The unique id of this prop.
     /// offset: 0x0
@@ -412,18 +415,26 @@ pub struct Prop {
 
     /// A pointer to the prop's first subobject.
     /// offset: 0x558
+    // TODO_SUBOBJ: make this a vector of subobjects
+    #[serde(skip)]
     first_subobject: Option<Box<PropSubobject>>,
 
     /// (??) a script that seems to only be used for policeman gunshots in reroll
     /// offset: 0x560
+    // TODO_PROP_MOTION: make this an enum that determines which script to call
+    #[serde(skip)]
     script_0x560: Option<Box<PropScript>>,
 
     /// The prop's motion script, if it has one.
     /// offset: 0x568
+    // TODO_PROP_MOTION: make this an enum that determines which script to call
+    #[serde(skip)]
     motion_script: Option<Box<PropScript>>,
 
     /// The prop's innate script, if it has one.
     /// offset: 0x570
+    // TODO_PROP_MOTION: make this an enum that determines which script to call
+    #[serde(skip)]
     innate_script: Option<Box<PropScript>>,
 
     /// The prop's parent, if it has one.
@@ -496,6 +507,7 @@ pub struct Prop {
 
     /// The AABB of this prop encoded as a collision mesh.
     /// offset: 0x5e0
+    #[serde(skip)]
     pub aabb_mesh: Option<Rc<Mesh>>,
 
     /// The 8 corner points of the prop's AABB.
@@ -555,10 +567,14 @@ pub struct Prop {
 
     /// Information about this type of prop from its `PropMonoData`.
     /// Namely, its AABB, collision mesh, and vault points.
+    // TODO_SERIAL: set this after load
+    #[serde(skip)]
     mono_data: Option<Rc<PropMonoData>>,
 
     /// The mesh used for non-collection collisions with this prop.
     /// offset: 0x960
+    #[serde(skip)]
+    // TODO_SERIAL: set this after load
     collision_mesh: Option<Rc<Mesh>>,
 
     /// (??) The additional transform applied to the prop while it is attached to the katamari.
@@ -1413,7 +1429,7 @@ impl Prop {
         }
 
         self.trajectory_velocity = *init_vel;
-        // TODO_MOTION:
+        // TODO_PROP_MOTION:
         /*  (prop->motionData).numAirborneBounces = 0;
         (prop->motionData).field14_0x19 = 0;
         (prop->motionData).landed = false;
@@ -1434,7 +1450,7 @@ impl Prop {
                 RotationAxis::Z
             };
 
-            // TODO_MOTION:
+            // TODO_PROP_MOTION:
             /*  (prop->motionData).rotationAxis = AVar5;
             (prop->motionData).field17_0x1c = 0.2;
             (prop->motionData).field18_0x20 = 0.0 */

@@ -677,7 +677,7 @@ impl Katamari {
         //     return;
         // }
 
-        // TODO_PROP_BEHAVIOR: `kat_resolve_uncollectible_prop_collision:72-`
+        // TODO_PROP_MOTION: `kat_resolve_uncollectible_prop_collision:72-`
     }
 
     /// Resolve a collision between this katamari and an uncollectible, stationary prop.
@@ -688,7 +688,7 @@ impl Katamari {
             return;
         }
 
-        // TODO_PROP_BEHAVIOR: `kat_resolve_stationary_prop_collision` (inelastic rolling collision)
+        // TODO_PROP_MOTION: `kat_resolve_stationary_prop_collision` (inelastic rolling collision)
     }
 
     /// offset: 0x28640

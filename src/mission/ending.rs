@@ -1,5 +1,5 @@
 use gl_matrix::common::Mat4;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct EndingState {

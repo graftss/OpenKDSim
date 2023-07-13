@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use gl_matrix::{common::Vec2, vec2};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::math::acos_f32;
 

@@ -1,25 +1,14 @@
+use serde::{Deserialize, Serialize};
+
 use crate::global::GlobalState;
 
 use self::data::RANDOM_GROUP_CONFIG;
 
 mod data;
 
-/// Contains all random groups present within a single mission.
+/// The configuration for a pool item in a random group.
 #[derive(Debug, Default)]
-pub struct MissionRandomConfig {
-    groups: Vec<RandomGroupConfig>,
-}
-
-/// A single random group, which contains one or more items that are randomly
-/// sampled to populate the group when props are loaded.
-#[derive(Debug, Default)]
-pub struct RandomGroupConfig {
-    items: Vec<RandomGroupItem>,
-}
-
-/// An item in a random group.
-#[derive(Debug, Default)]
-pub struct RandomGroupItem {
+pub struct PoolItemConfig {
     /// The maximum number of this item that may be spawned within its group.
     quantity: u16,
 
@@ -30,8 +19,46 @@ pub struct RandomGroupItem {
     spawn_weight: u16,
 }
 
+/// A single random group, which contains one or more items that are randomly
+/// sampled to populate the group when props are loaded.
 #[derive(Debug, Default)]
-pub struct RandomPropGroup {
+pub struct RandomGroupConfig {
+    items: Vec<PoolItemConfig>,
+}
+
+/// Contains all random groups present within a single mission.
+#[derive(Debug, Default)]
+pub struct MissionRandomGroupsConfig {
+    groups: Vec<RandomGroupConfig>,
+}
+
+/// An item in a random object pool. An item encodes a specific type of object
+/// (via its `name_idx`) along with the maximum number of that type of object
+/// left to randomly spawn in the pool.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct PoolItem {
+    /// The number of remaining objects of this type that can spawn.
+    remaining: u16,
+
+    /// The name index (i.e. object type) that this pool item spawns.
+    name_idx: u16,
+
+    /// Each item in a random pool has a chance to be disabled from spawning any
+    /// objects, given by
+    can_spawn: bool,
+}
+
+impl PoolItem {
+    fn spawn(&mut self) {
+        self.remaining -= 1;
+        if self.remaining == 0 {
+            self.can_spawn = false;
+        }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct RandomGroup {
     /// offset: 0x0
     initialized: bool,
 
@@ -46,23 +73,7 @@ pub struct RandomPropGroup {
     pool: Vec<PoolItem>,
 }
 
-#[derive(Debug, Default)]
-struct PoolItem {
-    remaining: u16,
-    name_idx: u16,
-    can_spawn: bool,
-}
-
-impl PoolItem {
-    fn spawn(&mut self) {
-        self.remaining -= 1;
-        if self.remaining == 0 {
-            self.can_spawn = false;
-        }
-    }
-}
-
-impl RandomPropGroup {
+impl RandomGroup {
     /// Initialize the random group at index `group_idx`.
     /// offset: 0x2d670
     pub fn init(&mut self, global: &mut GlobalState, mission_idx: usize, group_idx: usize) {
@@ -155,9 +166,9 @@ impl RandomPropGroup {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct RandomPropsState {
-    groups: Vec<RandomPropGroup>,
+    groups: Vec<RandomGroup>,
 }
 
 impl RandomPropsState {
@@ -167,7 +178,7 @@ impl RandomPropsState {
 
         self.groups.clear();
         for _ in 0..MAX_RANDOM_GROUPS {
-            self.groups.push(RandomPropGroup::default());
+            self.groups.push(RandomGroup::default());
         }
     }
 

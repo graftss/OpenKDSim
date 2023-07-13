@@ -1,5 +1,5 @@
 use gl_matrix::{common::Vec3, mat4, vec3};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::VEC3_ZERO,

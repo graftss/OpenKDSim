@@ -1,6 +1,7 @@
 use std::slice;
 
 use gl_matrix::common::Mat4;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::ZERO, delegates::DelegatesRef, global::GlobalState, mission::state::MissionState,
@@ -25,21 +26,31 @@ pub mod prop;
 pub mod random;
 
 /// State of all props in the current mission.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PropsState {
+    // TODO: replace `PropRef` with `Prop` here
+    #[serde(skip)]
     pub props: Vec<PropRef>,
+
     pub global_paths: GlobalPathState,
 
     /// NOTE: the simulation sort of tracks comment groups, but they aren't actually
     /// used since unity also tracks them and doesn't query the simulation's data.
     /// they also appear to be inaccurately tracked.
     /// so this field isn't used in this simulation at present.
+    #[serde(skip)]
     pub comments: KingCommentState,
 
     pub random: RandomPropsState,
 
+    // TODO_SERIAL: set this after load
+    #[serde(skip)]
     pub config: Option<&'static Vec<NamePropConfig>>,
+
     pub params: PropParams,
+
+    // TODO_SERIAL: set this after load
+    #[serde(skip)]
     pub delegates: Option<DelegatesRef>,
 }
 

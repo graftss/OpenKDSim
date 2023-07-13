@@ -2,7 +2,7 @@ use gl_matrix::{
     common::{Mat4, Vec3},
     mat4, vec3,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     collision::raycast_state::{RaycastCallType, RaycastState},

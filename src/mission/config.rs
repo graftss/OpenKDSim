@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use gl_matrix::common::Vec3;
 use lazy_static::lazy_static;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::{NUM_MISSIONS, PI},

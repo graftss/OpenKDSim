@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     debug::DEBUG_CONFIG,
@@ -23,7 +23,6 @@ pub struct GameState {
     pub global: GlobalState,
 
     /// State relating to props.
-    #[serde(skip)]
     pub props: PropsState,
 
     /// State relating to the mission in progress.

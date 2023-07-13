@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use gl_matrix::common::Vec3;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{collision::hit_attribute::HitAttribute, props::prop::PropRef};
 
