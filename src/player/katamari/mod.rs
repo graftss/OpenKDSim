@@ -21,6 +21,7 @@ use crate::{
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     delegates::{has_delegates::HasDelegates, Delegates, DelegatesRef},
+    gamestate::GameState,
     global::GlobalState,
     macros::{inv_lerp, mark_address, min, panic_log, set_translation, vec3_from},
     math::{
@@ -30,6 +31,7 @@ use crate::{
     mission::{config::MissionConfig, state::MissionState},
     player::katamari::flags::GroundedRay,
     props::{prop::PropRef, PropsState},
+    savestate::Hydrate,
 };
 
 use self::{
@@ -157,7 +159,6 @@ pub struct Katamari {
     /// In the original simulation, this list was not stored as an array; instead each attached prop
     /// had a pointer to the props that are/were last attached and next attached.
     /// This linked list was then traversed when iterating over all attached props.
-    // TODO_SERIAL: load `PropRef`s using the ctrl indices vector post-load
     #[serde(skip)]
     attached_props: Vec<PropRef>,
 
@@ -570,7 +571,6 @@ pub struct Katamari {
 
     /// The prop which is colliding with the katamari. (why are there two such props in ghidra)
     /// offset: 0x888
-    // TODO_SERIAL: read from `contact_prop_ctrl_idx` after load
     #[serde(skip)]
     contact_prop: Option<PropRef>,
 
@@ -610,11 +610,14 @@ pub struct Katamari {
 
     /// The katamari's current collision rays.
     /// offset: 0x8d0
+    #[serde(skip)]
     collision_rays: KatCollisionRays,
 
     /// The katamari's collision rays on the previous tick.
+    /// This seems to be unused.
     /// offset: 0x20d0
-    last_collision_rays: KatCollisionRays,
+    // #[serde(skip)]
+    // last_collision_rays: KatCollisionRays,
 
     /// The number of mesh collision rays. (The default mesh has 18.)
     /// offset: 0x38d0
@@ -779,6 +782,27 @@ impl HasDelegates for Katamari {
 
     fn set_delegates_ref(&mut self, delegates_ref: &DelegatesRef) {
         self.delegates = Some(delegates_ref.clone());
+    }
+}
+
+impl Hydrate for Katamari {
+    fn hydrate(&mut self, old_state: &GameState, new_state: &GameState) {
+        self.set_delegates_ref(&old_state.delegates);
+
+        // hydrate `attached_props` from `attached_prop_ctrl_indices`
+        self.attached_props = self
+            .attached_prop_ctrl_indices
+            .iter()
+            .flat_map(|ctrl_idx| new_state.props.get_prop(*ctrl_idx as usize))
+            .map(|prop_ref| prop_ref.clone())
+            .collect();
+
+        // hydrate `contact_prop` from `contact_prop_ctrl_idx`
+        if let Some(ctrl_idx) = self.contact_prop_ctrl_idx {
+            if let Some(prop_ref) = new_state.props.get_prop(ctrl_idx as usize) {
+                self.contact_prop = Some(prop_ref.clone());
+            }
+        }
     }
 }
 

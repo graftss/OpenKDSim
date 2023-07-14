@@ -15,6 +15,7 @@ use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
     debug::DEBUG_CONFIG,
+    gamestate::GameState,
     global::GlobalState,
     macros::{
         max_to_none, modify_translation, new_mat4_copy, scale_translation, set_translation,
@@ -24,6 +25,7 @@ use crate::{
     mono_data::{MonoData, PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
+    savestate::Hydrate,
     util::scale_sim_transform,
 };
 
@@ -567,14 +569,12 @@ pub struct Prop {
 
     /// Information about this type of prop from its `PropMonoData`.
     /// Namely, its AABB, collision mesh, and vault points.
-    // TODO_SERIAL: set this after load
     #[serde(skip)]
     mono_data: Option<Rc<PropMonoData>>,
 
     /// The mesh used for non-collection collisions with this prop.
     /// offset: 0x960
     #[serde(skip)]
-    // TODO_SERIAL: set this after load
     collision_mesh: Option<Rc<Mesh>>,
 
     /// (??) The additional transform applied to the prop while it is attached to the katamari.
@@ -693,6 +693,16 @@ impl Display for Prop {
     }
 }
 
+impl Hydrate for Prop {
+    fn hydrate(&mut self, old_state: &GameState, _new_state: &GameState) {
+        let name_idx = self.name_idx;
+
+        let prop_mono_data = &old_state.mono_data.props[name_idx as usize];
+        let config = NamePropConfig::get(name_idx);
+        self.init_mono_data_fields(prop_mono_data, config)
+    }
+}
+
 impl Prop {
     pub fn new(
         ctrl_idx: u16,
@@ -728,8 +738,6 @@ impl Prop {
         } else {
             args.name_idx
         };
-
-        let prop_mono_data = &mono_data.props[name_idx as usize];
 
         let config = NamePropConfig::get(name_idx.into());
 
@@ -852,14 +860,8 @@ impl Prop {
             trajectory_velocity: [0.0; 3],
         };
 
-        if let Some(aabbs) = &prop_mono_data.aabbs {
-            result.init_aabb_and_volume(aabbs, config);
-        }
-
-        result.collision_mesh = match &prop_mono_data.collision_mesh {
-            mesh @ Some(_) => mesh.as_ref().map(|m| m.clone()),
-            None => result.aabb_mesh.as_ref().map(|mesh| mesh.clone()),
-        };
+        let prop_mono_data = &mono_data.props[name_idx as usize];
+        result.init_mono_data_fields(prop_mono_data, config);
 
         // move random-spawn props vertically so that they're resting on the ground
         if args.loc_pos_type != 0 {
@@ -876,9 +878,26 @@ impl Prop {
         // note the conditional call to `prop_init_tree_links` here in the original sim,
         // but the condition to call it appears to never be true in reroll.
 
-        result.mono_data = Some(prop_mono_data.clone());
-
         result
+    }
+
+    /// Compute the prop's AABB mesh and collision mesh from its `PropMonoData`, which is
+    /// data shared between all props with the same name index.
+    fn init_mono_data_fields(
+        &mut self,
+        prop_mono_data: &Rc<PropMonoData>,
+        config: &NamePropConfig,
+    ) {
+        if let Some(aabbs) = &prop_mono_data.aabbs {
+            self.init_aabb_and_volume(aabbs, config);
+        }
+
+        self.collision_mesh = match &prop_mono_data.collision_mesh {
+            mesh @ Some(_) => mesh.as_ref().map(|m| m.clone()),
+            None => self.aabb_mesh.as_ref().map(|mesh| mesh.clone()),
+        };
+
+        self.mono_data = Some(prop_mono_data.clone());
     }
 
     /// Initialize the prop's AABB and volume
@@ -916,7 +935,6 @@ impl Prop {
             // collision radius.
             if vol_sizes_m[i] < min_vol_size_m {
                 min_vol_size_m = vol_sizes_m[i];
-                println!("mvsm={}", min_vol_size_m);
             }
         }
 

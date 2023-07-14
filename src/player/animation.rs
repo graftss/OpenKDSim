@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     delegates::DelegatesRef,
+    gamestate::GameState,
     global::rng::RngState,
     macros::log,
     mission::{state::MissionState, tutorial::TutorialMove},
@@ -9,6 +10,7 @@ use crate::{
         camera::{mode::CameraMode, CamR1JumpState, Camera},
         katamari::Katamari,
     },
+    savestate::Hydrate,
 };
 
 use super::{
@@ -128,7 +130,6 @@ impl Default for AnimationParams {
 pub struct Animation {
     // BEGIN not part of original simulation struct
     /// A reference to the Unity delegates for the purposes of starting animations in Unity.
-    // TODO_SERIAL: replace this when state is loaded
     #[serde(skip)]
     delegates: Option<DelegatesRef>,
 
@@ -160,6 +161,12 @@ pub struct Animation {
     /// The playback speed of the active animation.
     /// offset: 0x1c8
     pub speed: f32,
+}
+
+impl Hydrate for Animation {
+    fn hydrate(&mut self, old_state: &GameState, _new_state: &GameState) {
+        self.set_delegates(&old_state.delegates);
+    }
 }
 
 impl Animation {

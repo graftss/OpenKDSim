@@ -28,6 +28,8 @@ refactoring
     - change `play_sound_fx` to accept `Option<SoundId>` instead of `SoundId`
   - get rid of `PropRef` - store `Vec<Prop>` in `PropsState`, and all other prop references are
     just ctrl indices
+  - use `num_enum` crate on all enums that need to be converted to/from primitives
+  - standardize delegates field name (either all `delegates` or all `delegates_ref`)
 
 perf
   - is it possible to drop the static `include_bytes!` data after

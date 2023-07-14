@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::{gamestate::GameState, savestate::Hydrate};
+
 use super::{
     config::MissionConfig,
     ending::EndingState,
@@ -11,11 +13,11 @@ use super::{
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct MissionState {
-    /// Mission-specific immutable (presumably) values.
+    /// Mission-specific immutable values.
+    #[serde(skip)]
     pub mission_config: MissionConfig,
 
-    /// Stage-specific immutable (presumably) values.
-    // TODO_SERIAL: set this post-load
+    /// Stage-specific immutable values.
     #[serde(skip)]
     pub stage_config: StageConfig,
 
@@ -87,5 +89,12 @@ impl MissionState {
         if self.is_tutorial() {
             self.tutorial.set_move_held(tut_move);
         }
+    }
+}
+
+impl Hydrate for MissionState {
+    fn hydrate(&mut self, _old_state: &GameState, _new_state: &GameState) {
+        MissionConfig::get(&mut self.mission_config, self.mission as u8);
+        StageConfig::get(&mut self.stage_config, self.stage.into());
     }
 }

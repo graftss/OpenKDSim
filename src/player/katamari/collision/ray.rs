@@ -51,7 +51,7 @@ pub enum KatCollisionRayType {
     Prop = 2,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone)]
 pub struct KatCollisionRay {
     /// The endpoint relative to the katamari
     /// offset: 0x0
@@ -75,8 +75,6 @@ pub struct KatCollisionRay {
 
     /// If this ray is induced by a prop, points to that prop
     /// offset: 0x50
-    // TODO_SERIAL: convert to control index
-    #[serde(skip)]
     pub prop: Option<PropRef>,
 
     /// Length of the ray.
@@ -141,13 +139,15 @@ impl Katamari {
         self.vault_ray_idx = None;
 
         self.update_collision_rays();
-        self.last_collision_rays = self.collision_rays.clone();
+        // self.last_collision_rays = self.collision_rays.clone();
     }
 
     /// Update the katamari's collision rays
     /// offset: 0x1af00
     pub fn update_collision_rays(&mut self) {
-        self.last_collision_rays = self.collision_rays.clone();
+        // The original sim maintains the previous frame's collision rays, but they
+        // don't seem to be used.
+        // self.last_collision_rays = self.collision_rays.clone();
 
         mark_address!("0x1af26");
         self.reset_collision_rays();

@@ -218,7 +218,7 @@ impl PropMonoData {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct MonoData {
     pub zones: MonoDataPtr,
     pub areas: [MonoDataPtr; 5],

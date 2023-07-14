@@ -42,6 +42,7 @@ mod mission;
 mod mono_data;
 mod player;
 mod props;
+mod savestate;
 mod util;
 
 thread_local! {

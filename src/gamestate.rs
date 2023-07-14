@@ -35,7 +35,6 @@ pub struct GameState {
     /// Constant, geometric data relating to props that's passed to the
     /// simulation from unity (e.g. prop collision meshes, prop random
     /// roam zones).
-    // TODO_SERIAL: set this post-load
     #[serde(skip)]
     pub mono_data: MonoData,
 }

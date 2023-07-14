@@ -4,8 +4,13 @@ use gl_matrix::common::Mat4;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    constants::ZERO, delegates::DelegatesRef, global::GlobalState, mission::state::MissionState,
-    mono_data::MonoData, player::Player,
+    constants::ZERO,
+    delegates::{has_delegates::HasDelegates, DelegatesRef},
+    global::GlobalState,
+    mission::state::MissionState,
+    mono_data::MonoData,
+    player::Player,
+    savestate::Hydrate,
 };
 
 use self::{
@@ -43,13 +48,11 @@ pub struct PropsState {
 
     pub random: RandomPropsState,
 
-    // TODO_SERIAL: set this after load
     #[serde(skip)]
     pub config: Option<&'static Vec<NamePropConfig>>,
 
     pub params: PropParams,
 
-    // TODO_SERIAL: set this after load
     #[serde(skip)]
     pub delegates: Option<DelegatesRef>,
 }
@@ -61,6 +64,27 @@ impl PropsState {
         self.global_paths.init();
         self.random.reset();
         self.config = Some(&NAME_PROP_CONFIGS);
+    }
+}
+
+impl HasDelegates for PropsState {
+    fn get_delegates_ref(&self) -> Option<&DelegatesRef> {
+        self.delegates.as_ref()
+    }
+
+    fn set_delegates_ref(&mut self, delegates_ref: &DelegatesRef) {
+        self.delegates = Some(delegates_ref.clone());
+    }
+}
+
+impl Hydrate for PropsState {
+    fn hydrate(
+        &mut self,
+        old_state: &crate::gamestate::GameState,
+        _new_state: &crate::gamestate::GameState,
+    ) {
+        self.set_delegates_ref(&old_state.delegates);
+        self.config = old_state.props.config;
     }
 }
 
