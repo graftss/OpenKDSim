@@ -195,8 +195,8 @@ impl From<SoundId> for u16 {
             SoundId::VsMode0x34 => 0x34,
             SoundId::VsMode0x3b => 0x3b,
             SoundId::VsMode0x61 => 0x61,
-            SoundId::PropBonk(kind) => 0x79 + (kind as u16 - 1) * 2,
             SoundId::PropCollect(kind) => 0x78 + (kind as u16 - 1) * 2,
+            SoundId::PropBonk(kind) => 0x79 + (kind as u16 - 1) * 2,
         }
     }
 }
@@ -248,7 +248,7 @@ impl From<u16> for SoundId {
                 let kind = (value - 0x78) / 2 + 1;
                 SoundId::PropCollect(kind as u8)
             }
-            _ if value % 1 == 0 && value >= 0x78 && value <= 0x203 => {
+            _ if value % 2 == 1 && value >= 0x78 && value <= 0x203 => {
                 let kind = (value - 0x79) / 2 + 1;
                 SoundId::PropBonk(kind as u8)
             }
