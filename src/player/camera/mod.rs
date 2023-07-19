@@ -8,7 +8,6 @@ use crate::{
     collision::raycast_state::{RaycastCallType, RaycastState},
     constants::{FRAC_PI_2, UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
-    gamestate::GameState,
     macros::{max, min, set_y, vec3_from, vec3_unit_xz},
     math::{
         acos_f32, change_bounded_angle, mat4_compute_yaw_rot, mat4_look_at, vec3_inplace_add_vec,
@@ -19,7 +18,6 @@ use crate::{
         state::MissionState,
         GameMode,
     },
-    savestate::Hydrate,
 };
 
 use self::{mode::CameraMode, params::CameraParams, preclear::PreclearState};
@@ -260,12 +258,6 @@ impl HasDelegates for CameraState {
 
     fn set_delegates_ref(&mut self, delegates_ref: &DelegatesRef) {
         self.delegates_ref = Some(delegates_ref.clone());
-    }
-}
-
-impl Hydrate for CameraState {
-    fn hydrate(&mut self, old_state: &GameState, _new_state: &GameState) {
-        self.set_delegates_ref(&old_state.delegates);
     }
 }
 
@@ -1234,11 +1226,5 @@ impl Camera {
         *tz = self.transform.pos[2] / UNITY_TO_SIM_SCALE;
 
         *offset = self.transform.mas4_preclear_offset;
-    }
-}
-
-impl Hydrate for Camera {
-    fn hydrate(&mut self, old_state: &GameState, new_state: &GameState) {
-        self.state.hydrate(old_state, new_state);
     }
 }

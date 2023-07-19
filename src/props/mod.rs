@@ -1,4 +1,4 @@
-use std::slice;
+use std::{slice};
 
 use gl_matrix::common::Mat4;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,6 @@ use crate::{
     mission::state::MissionState,
     mono_data::MonoData,
     player::Player,
-    savestate::Hydrate,
 };
 
 use self::{
@@ -34,7 +33,6 @@ pub mod random;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PropsState {
     // TODO: replace `PropRef` with `Prop` here
-    #[serde(skip)]
     pub props: Vec<PropRef>,
 
     pub global_paths: GlobalPathState,
@@ -74,17 +72,6 @@ impl HasDelegates for PropsState {
 
     fn set_delegates_ref(&mut self, delegates_ref: &DelegatesRef) {
         self.delegates = Some(delegates_ref.clone());
-    }
-}
-
-impl Hydrate for PropsState {
-    fn hydrate(
-        &mut self,
-        old_state: &crate::gamestate::GameState,
-        _new_state: &crate::gamestate::GameState,
-    ) {
-        self.set_delegates_ref(&old_state.delegates);
-        self.config = old_state.props.config;
     }
 }
 

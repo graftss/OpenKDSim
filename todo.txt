@@ -30,6 +30,7 @@ refactoring
     just ctrl indices
   - use `num_enum` crate on all enums that need to be converted to/from primitives
   - standardize delegates field name (either all `delegates` or all `delegates_ref`)
+  - merge `delegates` and `has_delegates` modules, make `sound_id` and `vfx_id` top-level
 
 perf
   - is it possible to drop the static `include_bytes!` data after
@@ -51,3 +52,8 @@ bugs
   - downhill acceleration is wrong: nb wild speeds just off the white part of the mas1 tablecloth
     where the cord goes under it
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
+
+docs
+  - glossary of terms
+    - prop, name idx, ctrl idx, delegate, collision ray (all three types)
+    - include links to the source code

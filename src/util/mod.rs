@@ -1,7 +1,10 @@
 pub mod color;
 pub mod spline;
 
-use std::{fs::OpenOptions, path::Path};
+use std::{
+    fs::{OpenOptions},
+    path::Path,
+};
 
 use gl_matrix::common::{Mat4, Vec3, Vec4};
 
@@ -35,7 +38,7 @@ pub fn vec3_from_le_bytes(out: &mut Vec3, bytes: &[u8], offset: usize) {
 }
 
 /// Write the string `str` to the file `path`.
-pub fn debug_write(path: &str, str: &str) {
+pub fn debug_write(path: &str, str: &str) -> std::io::Result<()> {
     use std::io::Write;
 
     let path = Path::new(path);
@@ -47,7 +50,7 @@ pub fn debug_write(path: &str, str: &str) {
         .open(path)
         .unwrap();
 
-    if let Err(_e) = writeln!(file, "{}", str) {}
+    writeln!(file, "{}", str)
 }
 
 const DEBUG_LOG_PATH: &'static str =
@@ -55,6 +58,6 @@ const DEBUG_LOG_PATH: &'static str =
 
 pub fn debug_log(str: &str) {
     if DEBUG_CONFIG.allow_debug_logs {
-        debug_write(&DEBUG_LOG_PATH, str);
+        debug_write(&DEBUG_LOG_PATH, str).unwrap()
     }
 }

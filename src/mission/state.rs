@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{gamestate::GameState, savestate::Hydrate};
+
 
 use super::{
     config::MissionConfig,
@@ -89,12 +89,5 @@ impl MissionState {
         if self.is_tutorial() {
             self.tutorial.set_move_held(tut_move);
         }
-    }
-}
-
-impl Hydrate for MissionState {
-    fn hydrate(&mut self, _old_state: &GameState, _new_state: &GameState) {
-        MissionConfig::get(&mut self.mission_config, self.mission as u8);
-        StageConfig::get(&mut self.stage_config, self.stage.into());
     }
 }

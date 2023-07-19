@@ -25,6 +25,7 @@ use delegates::*;
 use gamestate::GameState;
 use gl_matrix::common::Mat4;
 
+use macros::temp_debug_log;
 use player::prince::OujiState;
 use props::{
     config::NamePropConfig,
@@ -32,7 +33,11 @@ use props::{
 };
 use std::cell::RefCell;
 
-use crate::macros::{log, panic_log};
+
+use crate::{
+    macros::{log, panic_log},
+    savestate::Hydrate,
+};
 
 thread_local! {
     static STATE: RefCell<GameState> = RefCell::new(GameState::default());
@@ -897,6 +902,49 @@ pub extern "C" fn TakesCallbackDebugDraw(cb: DebugDrawDelegate, unity_data_ptr: 
         let mut delegates = state_mut.delegates.borrow_mut();
         delegates.debug_draw = DebugDrawBus::new(cb, unity_data_ptr);
     });
+}
+
+#[no_mangle]
+pub extern "C" fn RequestSaveState(slot: i32) -> bool {
+    STATE.with(|state| {
+        temp_debug_log!("requesting save state (slot {slot})");
+        let s = serde_json::to_string_pretty(state).unwrap();
+        std::fs::write("test-state.json", &s).unwrap();
+
+        true
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn RequestLoadState(_slot: i32) -> bool {
+    let path = "test-state.json";
+    if let Ok(data) = std::fs::read_to_string(std::path::Path::new(path)) {
+        temp_debug_log!("read file");
+        match serde_json::from_str::<GameState>(&data) {
+            Ok(mut new_state) => {
+                temp_debug_log!("read gamestate:");
+                let kat_pos = new_state.players[0].katamari.get_center();
+                temp_debug_log!("  read pos: {:?}", kat_pos);
+                STATE.with(|old_state| {
+                    temp_debug_log!(
+                        "  old pos: {:?}",
+                        old_state.borrow().players[0].katamari.get_center()
+                    );
+                    new_state.hydrate(old_state);
+                    old_state.replace(new_state);
+                    temp_debug_log!(
+                        "  after replace pos: {:?}",
+                        old_state.borrow().players[0].katamari.get_center()
+                    );
+                });
+            }
+            Err(e) => {
+                temp_debug_log!("error reading gamestate: {e:?}");
+            }
+        }
+    }
+
+    true
 }
 
 /// This seems to be what simulates a single object in the collection UI and the names UI.

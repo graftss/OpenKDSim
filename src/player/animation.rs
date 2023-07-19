@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     delegates::DelegatesRef,
-    gamestate::GameState,
     global::rng::RngState,
     macros::log,
     mission::{state::MissionState, tutorial::TutorialMove},
@@ -10,7 +9,6 @@ use crate::{
         camera::{mode::CameraMode, CamR1JumpState, Camera},
         katamari::Katamari,
     },
-    savestate::Hydrate,
 };
 
 use super::{
@@ -161,12 +159,6 @@ pub struct Animation {
     /// The playback speed of the active animation.
     /// offset: 0x1c8
     pub speed: f32,
-}
-
-impl Hydrate for Animation {
-    fn hydrate(&mut self, old_state: &GameState, _new_state: &GameState) {
-        self.set_delegates(&old_state.delegates);
-    }
 }
 
 impl Animation {

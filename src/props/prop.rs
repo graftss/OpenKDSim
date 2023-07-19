@@ -15,7 +15,6 @@ use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
     constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
     debug::DEBUG_CONFIG,
-    gamestate::GameState,
     global::GlobalState,
     macros::{
         max_to_none, modify_translation, new_mat4_copy, scale_translation, set_translation,
@@ -25,7 +24,6 @@ use crate::{
     mono_data::{MonoData, PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
     props::config::NamePropConfig,
-    savestate::Hydrate,
     util::scale_sim_transform,
 };
 
@@ -693,16 +691,6 @@ impl Display for Prop {
     }
 }
 
-impl Hydrate for Prop {
-    fn hydrate(&mut self, old_state: &GameState, _new_state: &GameState) {
-        let name_idx = self.name_idx;
-
-        let prop_mono_data = &old_state.mono_data.props[name_idx as usize];
-        let config = NamePropConfig::get(name_idx);
-        self.init_mono_data_fields(prop_mono_data, config)
-    }
-}
-
 impl Prop {
     pub fn new(
         ctrl_idx: u16,
@@ -883,7 +871,7 @@ impl Prop {
 
     /// Compute the prop's AABB mesh and collision mesh from its `PropMonoData`, which is
     /// data shared between all props with the same name index.
-    fn init_mono_data_fields(
+    pub fn init_mono_data_fields(
         &mut self,
         prop_mono_data: &Rc<PropMonoData>,
         config: &NamePropConfig,

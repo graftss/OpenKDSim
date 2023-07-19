@@ -21,7 +21,6 @@ use crate::{
         VEC3_X_NEG, VEC3_Y_POS, VEC3_ZERO,
     },
     delegates::{has_delegates::HasDelegates, Delegates, DelegatesRef},
-    gamestate::GameState,
     global::GlobalState,
     macros::{inv_lerp, mark_address, min, panic_log, set_translation, vec3_from},
     math::{
@@ -31,7 +30,6 @@ use crate::{
     mission::{config::MissionConfig, state::MissionState},
     player::katamari::flags::GroundedRay,
     props::{prop::PropRef, PropsState},
-    savestate::Hydrate,
 };
 
 use self::{
@@ -785,27 +783,6 @@ impl HasDelegates for Katamari {
     }
 }
 
-impl Hydrate for Katamari {
-    fn hydrate(&mut self, old_state: &GameState, new_state: &GameState) {
-        self.set_delegates_ref(&old_state.delegates);
-
-        // hydrate `attached_props` from `attached_prop_ctrl_indices`
-        self.attached_props = self
-            .attached_prop_ctrl_indices
-            .iter()
-            .flat_map(|ctrl_idx| new_state.props.get_prop(*ctrl_idx as usize))
-            .map(|prop_ref| prop_ref.clone())
-            .collect();
-
-        // hydrate `contact_prop` from `contact_prop_ctrl_idx`
-        if let Some(ctrl_idx) = self.contact_prop_ctrl_idx {
-            if let Some(prop_ref) = new_state.props.get_prop(ctrl_idx as usize) {
-                self.contact_prop = Some(prop_ref.clone());
-            }
-        }
-    }
-}
-
 impl Katamari {
     pub fn get_init_radius(&self) -> f32 {
         self.init_diam_cm / 2.0
@@ -869,6 +846,21 @@ impl Katamari {
 
     pub fn get_water_surface_hit(&self) -> &Vec3 {
         &self.water_surface_hit
+    }
+
+    /// Additional `Hydrate` behavior that requires an immutable reference to `PropsState` to
+    /// map recover `PropRef` values (which are not serialized) from `ctrl_idx` values (which
+    /// are serialized).
+    /// TODO_REFACTOR: there's got to be a better way to do this
+    pub fn hydrate_prop_refs(&mut self, props: &PropsState) {
+        if let Some(ctrl_idx) = self.contact_prop_ctrl_idx {
+            self.contact_prop = Some(props.get_prop(ctrl_idx as usize).unwrap().clone());
+        }
+
+        self.attached_props.clear();
+        for ctrl_idx in self.attached_prop_ctrl_indices.iter() {
+            self.attached_props.push(props.get_prop(*ctrl_idx as usize).unwrap().clone());
+        }
     }
 
     /// Computes the ratio of the katamari's current speed to its "max" speed,
@@ -1141,7 +1133,7 @@ impl Katamari {
 
         self.apply_acceleration(mission_state);
 
-        mark_address!("0x1df7f", self.debug_velocity_state());
+        // mark_address!("0x1df7f", self.debug_velocity_state());
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;
