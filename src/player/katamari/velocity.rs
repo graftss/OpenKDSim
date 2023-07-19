@@ -630,6 +630,8 @@ impl Katamari {
         // TODO_PARAM
         let SW_SPEED_DISP_DURATION = 0xf;
 
+        self.speed = self.boost_speed;
+
         let prince_to_kat = vec3_from!(-, self.bottom, prince.get_pos());
         vec3::normalize(&mut self.velocity.vel_accel_unit, &prince_to_kat);
         vec3::scale(

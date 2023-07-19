@@ -211,7 +211,7 @@ macro_rules! set_y {
     };
 }
 
-// TODO: this is broken
+// TODO: this is broken with more than two arguments
 #[allow(unused_macros)]
 macro_rules! internal_mark_address {
     ($value: expr) => {
@@ -228,7 +228,10 @@ macro_rules! internal_mark_address {
 /// Additional arguments to the macro will be `debug_log`ged alongside the address.
 macro_rules! mark_address {
     ($addr: literal) => {};
+}
 
+#[allow(unused_macros)]
+macro_rules! mark_address_log {
     ($addr: literal, $($y: expr),+) => {
         crate::util::debug_log(&format!("  {}", $addr));
         crate::macros::internal_mark_address!($($y),+);
@@ -252,6 +255,7 @@ pub(crate) use {
     lerp,
     log,
     mark_address,
+    mark_address_log,
     mark_call,
     max,
     max_to_none,

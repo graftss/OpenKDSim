@@ -35,6 +35,7 @@ refactoring
 perf
   - is it possible to drop the static `include_bytes!` data after
     reading it into tables? (e.g. for stage config table)
+    - yes, just call `include_bytes!` in a non-static scope so that it's dropped lol
 
 bugs
   - sometimes a bunch of attached props stop updating and freeze in place while the katamari
@@ -48,7 +49,6 @@ bugs
   - still clip through table
     - 10.3cm mas1, trying to climb up mas1 red phones by the sword is wrong in open sim
       - you clip through the phones unless you move really slowly
-  - boosting doesn't feel right at all
   - downhill acceleration is wrong: nb wild speeds just off the white part of the mas1 tablecloth
     where the cord goes under it
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`

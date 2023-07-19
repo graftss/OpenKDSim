@@ -71,7 +71,7 @@ impl GameState {
         &mut self,
         forw_s: f32,
         side_s: f32,
-        backw_s: f32,
+        back_s: f32,
         boost_s: f32,
         _forw_a: f32,
         _side_a: f32,
@@ -86,7 +86,7 @@ impl GameState {
         self.global.royal_warp_plane_y = limit_y * 100.0;
         self.players[0]
             .katamari
-            .set_speed(forw_s, side_s, backw_s, boost_s);
+            .set_speed(forw_s, side_s, back_s, boost_s);
         self.players[0].prince.set_global_turn_speed(rot_s);
         self.players[0].camera.set_delay(cam_x, cam_y, cam_z);
     }

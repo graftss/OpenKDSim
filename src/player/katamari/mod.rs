@@ -1134,7 +1134,7 @@ impl Katamari {
 
         self.apply_acceleration(mission_state);
 
-        // mark_address!("0x1df7f", self.debug_velocity_state());
+        mark_address!("0x1df7f");
 
         let cam_transform = camera.get_transform();
         let left = VEC3_X_NEG;
