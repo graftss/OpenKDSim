@@ -1,10 +1,7 @@
 pub mod color;
 pub mod spline;
 
-use std::{
-    fs::{OpenOptions},
-    path::Path,
-};
+use std::{fs::OpenOptions, path::Path};
 
 use gl_matrix::common::{Mat4, Vec3, Vec4};
 

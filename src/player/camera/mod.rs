@@ -76,7 +76,7 @@ pub struct CameraState {
     override_type: Option<CamOverrideType>,
 
     #[serde(skip)]
-    raycast_state: RaycastState,
+    pub raycast_state: RaycastState,
 
     #[serde(skip)]
     delegates_ref: Option<DelegatesRef>,

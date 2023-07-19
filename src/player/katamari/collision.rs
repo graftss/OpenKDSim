@@ -286,7 +286,6 @@ impl Katamari {
 
             // otherwise, the prop is nearby, but uncollectible.
             prop.near_player = true;
-
             let did_collide =
                 self.check_prop_mesh_collision(prop_ref.clone(), &mut prop, mission_state);
 
@@ -342,9 +341,9 @@ impl Katamari {
         }
     }
 
-    fn set_contact_prop(&mut self, prop_ref: &PropRef) {
+    fn set_contact_prop(&mut self, prop_ref: &PropRef, ctrl_idx: u16) {
         self.contact_prop = Some(prop_ref.clone());
-        self.contact_prop_ctrl_idx = Some(prop_ref.borrow().get_ctrl_idx());
+        self.contact_prop_ctrl_idx = Some(ctrl_idx);
     }
 
     fn remove_contact_prop(&mut self) {
@@ -480,14 +479,14 @@ impl Katamari {
                     if record_result != RecordSurfaceContactResult::ShellTop {
                         self.physics_flags.moved_fast_shell_hit = true;
                         self.play_bonk_fx(prop.get_move_type().is_some());
-                        self.set_contact_prop(&prop_ref);
+                        self.set_contact_prop(&prop_ref, prop.get_ctrl_idx());
                         return true;
                     }
                 }
             }
 
             if found_hit {
-                self.set_contact_prop(&prop_ref);
+                self.set_contact_prop(&prop_ref, prop.get_ctrl_idx());
                 panic_log!("why is this needed");
                 // return true;
             }
@@ -635,7 +634,7 @@ impl Katamari {
         }
 
         if found_any_hit {
-            self.set_contact_prop(&prop_ref);
+            self.set_contact_prop(&prop_ref, prop.get_ctrl_idx());
 
             // if any aabb was hit, attempt to draw the prop's mesh
             if DEBUG_CONFIG.draw_collided_prop_mesh {

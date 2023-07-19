@@ -1,4 +1,4 @@
-use std::{cell::RefCell};
+use std::cell::RefCell;
 
 use crate::{
     delegates::has_delegates::HasDelegates,
@@ -31,10 +31,15 @@ impl Hydrate for GameState {
         self.delegates = old_state.delegates.clone();
         self.mono_data = old_state.mono_data.clone();
         self.mission_state.hydrate(old_state_ref);
+
+        // NOTE: props need to be hydrated before player, since the katamari uses props to
+        // hydrate itself
         self.props.hydrate(old_state_ref);
+
         for player in self.players.iter_mut() {
             player.hydrate(old_state_ref);
             player.katamari.hydrate_prop_refs(&self.props);
+            player.katamari.initialize_collision_rays();
         }
     }
 }
@@ -54,6 +59,10 @@ impl Hydrate for PropsState {
         let old_state = old_state_ref.borrow();
         self.set_delegates_ref(&old_state.delegates);
         self.config = old_state.props.config;
+
+        for prop_ref in self.props.iter() {
+            prop_ref.borrow_mut().hydrate(old_state_ref);
+        }
     }
 }
 
@@ -65,8 +74,10 @@ impl Hydrate for MissionState {
 }
 
 impl Hydrate for CameraState {
-    fn hydrate(&mut self, old_state: &RefCell<GameState>) {
-        self.set_delegates_ref(&old_state.borrow().delegates);
+    fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
+        let delegates = &old_state_ref.borrow().delegates;
+        self.raycast_state.set_delegates_ref(delegates);
+        self.set_delegates_ref(delegates);
     }
 }
 
@@ -84,7 +95,9 @@ impl Hydrate for Animation {
 
 impl Hydrate for Katamari {
     fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
-        self.set_delegates_ref(&old_state_ref.borrow().delegates);
+        let delegates = &old_state_ref.borrow().delegates;
+        self.set_delegates_ref(delegates);
+        self.raycast_state.set_delegates_ref(delegates);
         // TODO: delete `attached_props` and `contact_prop` propref fields on `Katamari`
     }
 }

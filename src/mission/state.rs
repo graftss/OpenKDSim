@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-
-
 use super::{
     config::MissionConfig,
     ending::EndingState,

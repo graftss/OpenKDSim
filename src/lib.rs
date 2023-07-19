@@ -33,7 +33,6 @@ use props::{
 };
 use std::cell::RefCell;
 
-
 use crate::{
     macros::{log, panic_log},
     savestate::Hydrate,

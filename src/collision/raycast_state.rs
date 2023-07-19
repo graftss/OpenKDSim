@@ -9,7 +9,7 @@ use crate::{
     collision::mesh::TriGroup,
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     debug::DEBUG_CONFIG,
-    delegates::Delegates,
+    delegates::{has_delegates::HasDelegates, Delegates},
     macros::{panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
@@ -60,6 +60,7 @@ pub struct RaycastState {
     /// For some reason this was a global vector instead of part of the raycast state...
     /// offset: 0xb3230
     triangle_hit_point: Vec3,
+
     // END fields not in the original simulation
     /// Initial point of the collision ray.
     /// offset: 0x0
@@ -117,6 +118,16 @@ pub struct RaycastState {
     /// The index in `hit_tris` of the closest triangle that was hit, if any.
     /// offset: 0x858
     pub closest_hit_idx: Option<u8>,
+}
+
+impl HasDelegates for RaycastState {
+    fn get_delegates_ref(&self) -> Option<&crate::delegates::DelegatesRef> {
+        self.delegates.as_ref()
+    }
+
+    fn set_delegates_ref(&mut self, delegates_ref: &crate::delegates::DelegatesRef) {
+        self.delegates = Some(delegates_ref.clone());
+    }
 }
 
 pub enum RaycastCallType {

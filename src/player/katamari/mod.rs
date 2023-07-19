@@ -109,7 +109,7 @@ pub struct Katamari {
     // We don't need to serialize the raycast state, since all of its computation is temporary
     // (and within a single frame), and thus irrelevant to saving state between frames.
     #[serde(skip)]
-    raycast_state: RaycastState,
+    pub raycast_state: RaycastState,
 
     /// The number of props attached to the katamari (including unloaded ones).
     /// offset: 0x133a08
@@ -859,7 +859,8 @@ impl Katamari {
 
         self.attached_props.clear();
         for ctrl_idx in self.attached_prop_ctrl_indices.iter() {
-            self.attached_props.push(props.get_prop(*ctrl_idx as usize).unwrap().clone());
+            self.attached_props
+                .push(props.get_prop(*ctrl_idx as usize).unwrap().clone());
         }
     }
 

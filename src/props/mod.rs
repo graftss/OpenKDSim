@@ -1,4 +1,4 @@
-use std::{slice};
+use std::slice;
 
 use gl_matrix::common::Mat4;
 use serde::{Deserialize, Serialize};

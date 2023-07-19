@@ -116,8 +116,8 @@ struct PropVaultPoint {
 }
 
 impl Katamari {
-    /// Resets the katamari's collision rays to their initial state.
-    /// This is only called at the start of a mission and after a royal warp.
+    /// Resets the katamari's collision rays to their initial state. Unlike
+    /// `reset_collision_rays`, this is not something that's called every frame.
     /// offset: 0x1afb0
     pub fn initialize_collision_rays(&mut self) {
         let rad_cm = self.radius_cm;
