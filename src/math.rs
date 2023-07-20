@@ -88,7 +88,11 @@ pub fn vec3_inplace_normalize(vec: &mut Vec3) {
 }
 
 /// Computes the vector projection and rejection of u onto v.
-pub fn vec3_projection(u_proj_v: &mut Vec3, u_rej_v: &mut Vec3, u: &Vec3, v: &Vec3) {
+///
+/// Projection: `(u.v) * v`
+///
+/// Rejection: `u - (u.v) * v`
+pub fn vec3_unit_proj_and_rej(u_proj_v: &mut Vec3, u_rej_v: &mut Vec3, u: &Vec3, v: &Vec3) {
     vec3::scale(u_proj_v, &v, vec3::dot(u, v));
     vec3::subtract(u_rej_v, u, u_proj_v);
 }
@@ -100,7 +104,7 @@ pub fn vec3_reflection(u_reflect_v: &mut Vec3, u: &Vec3, v: &Vec3) {
     vec3::scale_and_add(u_reflect_v, u, v, -2.0 * dot);
 }
 
-/// This performs the matrix multiplication `v * m`, which is the opposite muliplication
+/// This performs the matrix multiplication `v * m`, which is the **opposite** muliplication
 /// order of `vec3::transform_mat4` in the `gl_matrix` crate.
 /// We have the same assumptions on `v` and `m` that let us ignore the fourth coordinate
 /// of `v` that is mathematically required to make the dimensions agree.

@@ -46,12 +46,8 @@ bugs
       - but this is definitely happening when props are destroyed near the end
         of `Katamari::update_collision`
   - original simulation can climb into the pink bowl at mas1 spawn at init size, open sim you can't
-  - still clip through table
-    - 10.3cm mas1, trying to climb up mas1 red phones by the sword is wrong in open sim
-      - you clip through the phones unless you move really slowly
-  - downhill acceleration is wrong: nb wild speeds just off the white part of the mas1 tablecloth
-    where the cord goes under it
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
+  - katamari clips into mas1 red phone leaning against wall
 
 docs
   - glossary of terms

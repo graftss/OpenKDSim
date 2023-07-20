@@ -8,11 +8,12 @@ use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
     macros::{
-        inv_lerp, inv_lerp_clamp, lerp, mark_address, mark_call, max, panic_log, set_y, vec3_from,
+        inv_lerp, lerp, mark_address, mark_call, max, panic_log, set_y, vec3_from,
     },
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
-        vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small, vec3_projection,
+        vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small,
+        vec3_unit_proj_and_rej,
     },
     mission::{stage::Stage, state::MissionState, GameMode},
     player::{
@@ -155,10 +156,12 @@ impl Katamari {
             .get_airborne_prop_gravity(self.diam_cm);
 
         vec3::zero(&mut self.velocity.accel_incline);
+
         if !self.physics_flags.climbing {
             if !self.physics_flags.airborne {
                 // if not climbing a wall and not airborne:
                 vec3::zero(&mut self.velocity.vel_grav);
+                set_y!(self.velocity.vel_grav, self.gravity);
 
                 if !self.hit_flags.force_flatground {
                     // not wallclimbing, grounded, and not on forced flatground.
@@ -173,16 +176,17 @@ impl Katamari {
                         // if the slope is steep enough to cause acceleration:
 
                         // compute the unit rejection of gravity onto the floor:
-                        let mut floor_rej_down = [0.0; 3];
-                        let mut floor_proj_down = [0.0; 3];
-                        vec3_projection(
-                            &mut floor_proj_down,
-                            &mut floor_rej_down,
+                        let mut down_rej_floor = vec3::create();
+                        let mut down_proj_floor = vec3::create();
+                        vec3_unit_proj_and_rej(
+                            &mut down_proj_floor,
+                            &mut down_rej_floor,
                             &VEC3_Y_NEG,
                             &self.contact_floor_normal_unit,
                         );
-                        vec3_inplace_zero_small(&mut floor_rej_down, 1e-05);
-                        vec3_inplace_normalize(&mut floor_rej_down);
+                        vec3_inplace_zero_small(&mut down_rej_floor, 1e-05);
+                        let mut floor_rej_down_unit = vec3::create();
+                        vec3::normalize(&mut floor_rej_down_unit, &down_rej_floor);
 
                         // compute some kind of lateral unit velocity and the lateral speed
                         // in its direction
@@ -200,7 +204,7 @@ impl Katamari {
                                 // if the player is moving, the incline movetype is determined
                                 // by the similarity between the direction of their velocity and
                                 // the (??) direction the slope is facing.
-                                let similarity = vec3::dot(&vel_xz_unit, &floor_proj_down);
+                                let similarity = vec3::dot(&vel_xz_unit, &floor_rej_down_unit);
                                 let threshold = match self.physics_flags.no_input_push {
                                     true => 0.0,
                                     false => 0.258819,
@@ -238,15 +242,16 @@ impl Katamari {
                                 // the multiple is determined by the prince's push strength and the number of
                                 // ticks that the katamari has been moving uphill.
                                 self.move_uphill_ticks += 1;
-                                self.move_downhill_ticks = 0;
 
                                 // TODO: wasn't this already computed
                                 let slope = acos_f32(self.contact_floor_normal_unit[1]);
-                                let accel_t = inv_lerp_clamp!(
-                                    slope,
-                                    self.params.min_slope_grade_causing_accel,
-                                    self.params.effective_max_slope_grade * FRAC_PI_2
-                                );
+                                let effective_max_slope_grade = self.params.effective_max_slope_grade * FRAC_PI_2;
+                                let accel_t = match slope {
+                                    _ if slope < self.params.min_slope_grade_causing_accel => 0.0,
+                                    _ if slope < effective_max_slope_grade => 1.0,
+                                    _ => slope / effective_max_slope_grade,
+                                };
+
                                 prince.decrease_push_uphill_strength(accel_t);
 
                                 let incline_base_accel = if prince.input_avg_push_len <= 0.0 {
@@ -262,7 +267,7 @@ impl Katamari {
                                     easein_accel * (self.diam_cm / 50.0) * incline_base_accel;
                                 vec3::scale(
                                     &mut self.velocity.accel_incline,
-                                    &floor_rej_down,
+                                    &down_rej_floor,
                                     incline_mult,
                                 );
                             }
@@ -280,7 +285,7 @@ impl Katamari {
                                     * easein_accel;
                                 vec3::scale(
                                     &mut self.velocity.accel_incline,
-                                    &floor_rej_down,
+                                    &down_rej_floor,
                                     incline_mult,
                                 );
                             }

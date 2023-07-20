@@ -12,8 +12,8 @@ use crate::{
     },
     math::{
         acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
-        vec3_inplace_subtract, vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_projection,
-        vec3_reflection,
+        vec3_inplace_subtract, vec3_inplace_subtract_vec, vec3_inplace_zero_small, vec3_reflection,
+        vec3_unit_proj_and_rej,
     },
     mission::{state::MissionState, GameMode, GameType, Mission},
     player::{camera::Camera, katamari::flags::GroundedRay, prince::Prince},
@@ -1830,7 +1830,7 @@ impl Katamari {
                 }
 
                 // compute the projection and rejection of the katamari's velocity onto its contacted floor
-                vec3_projection(
+                vec3_unit_proj_and_rej(
                     &mut self.velocity.vel_proj_floor,
                     &mut self.velocity.vel_rej_floor,
                     &self.velocity.vel_unit,
@@ -2572,7 +2572,7 @@ impl Katamari {
         // compute unit rejection of katamari velocity onto floor normal
         let mut vel_proj_floor = [0.0; 3];
         let mut vel_rej_floor = [0.0; 3];
-        vec3_projection(
+        vec3_unit_proj_and_rej(
             &mut vel_proj_floor,
             &mut vel_rej_floor,
             &self.velocity.vel_unit,
@@ -2587,7 +2587,7 @@ impl Katamari {
 
         let mut fc_proj_floor = [0.0; 3];
         let mut fc_rej_floor = [0.0; 3];
-        vec3_projection(
+        vec3_unit_proj_and_rej(
             &mut fc_proj_floor,
             &mut fc_rej_floor,
             &fc_ray_unit,

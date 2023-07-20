@@ -300,6 +300,11 @@ pub struct Katamari {
     /// offset: 0x19c
     y_elasticity: f32,
 
+    /// The y-acceleration from gravity applied to the katamari. Usually this is
+    /// just `scaled_params.accel_grav`, but apparently sometimes in VS mode it changes.
+    /// offset: 0x1a0
+    gravity: f32,
+
     /// The threshold for the unit normal y coordinate of surfaces that distinguishes
     /// floors and walls: higher is a floor, lower is a wall.
     /// (NOTE: migrated to `KatamariParams`)
@@ -1195,8 +1200,8 @@ impl Katamari {
         // TODO_VS: in vs mode, the smaller of the two katamaris takes its params from
         // the bigger katamari, so that would need to be handled differently.
         mission_config.get_kat_scaled_params(&mut self.scaled_params, self.diam_cm);
-        // TODO_VS: there's also some crap at the end with `vsAttack` and gravity.
-        // (see `kat_update_scaled_params`)
+        self.gravity = self.scaled_params.accel_grav;
+        // TODO_VS: conditionally double gravity in vs mode
     }
 
     /// Using the katamari volume, cache radius- and diameter-based katamari fields.

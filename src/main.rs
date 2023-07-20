@@ -13,7 +13,7 @@ use gl_matrix::{
 };
 use macros::{inv_lerp_clamp, lerp};
 use math::{
-    acos_f32, vec3_inplace_normalize, vec3_inplace_scale, vec3_projection, vec3_reflection,
+    acos_f32, vec3_inplace_normalize, vec3_inplace_scale, vec3_reflection, vec3_unit_proj_and_rej,
 };
 use mission::{config::MissionConfig, Mission};
 use mono_data::MonoData;
@@ -169,7 +169,7 @@ fn replicate_init_vault() {
 
     let mut vel_proj_floor = [0.0; 3];
     let mut vel_rej_floor = [0.0; 3];
-    vec3_projection(
+    vec3_unit_proj_and_rej(
         &mut vel_proj_floor,
         &mut vel_rej_floor,
         &vel_unit,
@@ -187,7 +187,7 @@ fn replicate_init_vault() {
 
     let mut fc_proj_floor = [0.0; 3];
     let mut fc_rej_floor = [0.0; 3];
-    vec3_projection(
+    vec3_unit_proj_and_rej(
         &mut fc_proj_floor,
         &mut fc_rej_floor,
         &fc_ray_unit,
