@@ -1,9 +1,13 @@
-use gl_matrix::common::{Mat4, Vec3, Vec4};
+use gl_matrix::{
+    common::{Mat4, Vec3, Vec4},
+    vec4,
+};
 
 use crate::{
     collision::mesh::Mesh,
     debug::DEBUG_CONFIG,
-    macros::{debug_log, inv_lerp_clamp, max, min, vec3_from},
+    macros::{max, min, vec3_from},
+    util::color,
 };
 
 use super::Katamari;
@@ -13,50 +17,27 @@ impl Katamari {
         return false;
     }
 
-    /// Print information about the katamari's position and collision.
-    /// `offset_note` is designed to be the offset in the original simulation corresponding
-    /// to the point in the open simulation at which this function is called.
-    /// That way, this data can be compared to the analogous data via a breakpoint in the
-    /// original simulation.
-    pub fn debug_log_clip_data(&self, offset_note: &str) {
-        debug_log!("  {}", offset_note);
-        debug_log!("    center:{:?}", self.center);
-
-        // debug_log!("    rotation_speed:{:?}", self.rotation_speed);
-        // debug_log!("    rotation_mat:{:?}", self.rotation_mat);
-        // debug_log!("    rotation_axis:{:?}", self.rotation_axis_unit);
-        // debug_log!("    camera_side_vector:{:?}", self.camera_side_vector);
-
-        debug_log!("    contact floor clip:{:?}", self.contact_floor_clip);
-        debug_log!("    clip_translation:{:?}", self.clip_translation);
-        debug_log!(
-            "    contact_floor_normal_unit:{:?}",
-            self.contact_floor_normal_unit
+    pub fn debug_clip_state(&self) -> String {
+        let overall_info = format!(
+            "num_floors: {:?}, floor_normal:{:?}, floor_clip:{:?}, clip_trans:{:?}",
+            self.num_floor_contacts,
+            self.contact_floor_normal_unit,
+            self.contact_floor_clip,
+            self.clip_translation
         );
-        debug_log!("    num_floor_contacts:{:?}", self.num_floor_contacts);
-        for (idx, floor) in self.hit_floors.iter().enumerate() {
-            debug_log!("    f{}: {:?}", idx, floor);
-        }
 
-        // for (idx, ray) in self.collision_rays.iter().enumerate() {
-        //     debug_log!("    ray {}: {:?} (len={:?})", idx, ray.ray_local, ray.ray_len);
-        //     if idx == 18 { break; }
-        // }
+        let per_surface_info = self.hit_floors.iter().enumerate().fold(
+            "".to_string(),
+            |summary, (floor_idx, floor)| {
+                summary
+                    + &format!(
+                        "\n  floor {floor_idx}: normal={:?}, clip={:?}",
+                        floor.normal_unit, floor.clip_normal
+                    )
+            },
+        );
 
-        // fc data
-        // debug_log!("    fc_ray_idx: {:?}", self.fc_ray_idx);
-        // debug_log!("    fc_ray: {:?}", self.fc_ray);
-        // debug_log!("    fc_ray_len: {:?}", self.fc_ray);
-        // debug_log!("    fc_contact_point: {:?}", self.fc_contact_point);
-
-        // bottom collision ray
-        if let Some(ray) = self.collision_rays.get(0) {
-            debug_log!("    bottom contact: {}", ray.contacts_surface);
-            debug_log!("    bottom endpoint: {:?}", ray.endpoint);
-            debug_log!("    bottom len: {}", ray.ray_len);
-        } else {
-            debug_log!("  NO BOTTOM RAY");
-        }
+        overall_info + &per_surface_info
     }
 
     /// Use the `debug_draw_line` delegate to draw the katamari's collision rays on the screen.
@@ -75,15 +56,39 @@ impl Katamari {
                 min_ray_len = min!(min_ray_len, ray.ray_len);
             }
 
+            let mut floor_hits = vec![false; self.collision_rays.len()];
+            let mut wall_hits = vec![false; self.collision_rays.len()];
+
+            self.hit_floors.iter().for_each(|surface| if surface.ray_idx >= 0 {
+                floor_hits[surface.ray_idx as usize] = true
+            });
+            self.hit_walls.iter().for_each(|surface| if surface.ray_idx >= 0 {
+                wall_hits[surface.ray_idx as usize] = true
+            });
+
             for (ray_idx, ray) in self.collision_rays.iter().enumerate() {
                 let p0 = &self.center;
                 let p1 = vec3_from!(+, ray.kat_to_endpoint, self.center);
-                let color = if self.vault_ray_idx == Some(ray_idx as i16) {
-                    let intensity = inv_lerp_clamp!(ray.ray_len, min_ray_len, max_ray_len) * 0.8 + 0.2;
-                    [0.0, 1.0, 0.0, intensity]
-                } else {
-                    [1.0, 0.0, 0.0, 0.8]
+
+                let base_ray_color = match ray_idx {
+                    0 => color::BLACK,
+                    _ if (ray_idx as u16) < self.first_prop_ray_index => color::RED,
+                    _ => color::BLUE,
                 };
+
+                let hit_color = if floor_hits[ray_idx] {
+                    Some(color::GREEN)
+                } else if wall_hits[ray_idx] {
+                    Some(color::DARK_GREEN)
+                } else {
+                    None
+                };
+
+                let mut color = base_ray_color.clone();
+
+                if let Some(hit_color) = hit_color {
+                    vec4::lerp(&mut color, &base_ray_color, &hit_color, 0.8);
+                }
 
                 my_delegates.debug_draw.draw_line(p0, &p1, &color);
             }

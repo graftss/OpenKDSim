@@ -1474,7 +1474,7 @@ impl Katamari {
             // if the player contacts a floor:
             for floor in self.hit_floors.iter() {
                 let clip = floor.clip_normal;
-                for i in 0..2 {
+                for i in 0..=2 {
                     if clip[i] > max_clip_coords[i] {
                         max_clip_coords[i] = clip[i];
                     } else if clip[i] < min_clip_coords[i] {
@@ -1502,7 +1502,7 @@ impl Katamari {
             // if the player contacts a floor:
             for wall in self.hit_walls.iter() {
                 let clip = wall.clip_normal;
-                for i in [0, 1, 2] {
+                for i in 0..=2 {
                     if clip[i] > max_clip_coords[i] {
                         max_clip_coords[i] = clip[i];
                     } else if clip[i] < min_clip_coords[i] {
@@ -1584,7 +1584,7 @@ impl Katamari {
             }
         };
 
-        // TODO: `kat_resolve_being_stuck:304-335` (a case that's too annoying right now)
+        // TODO_STUCK: `kat_resolve_being_stuck:304-335` (a case that's too annoying right now)
 
         if stuck_btwn_walls {
             // if stuck between walls, try to push the katamari away from the wall
@@ -1761,7 +1761,10 @@ impl Katamari {
         }
 
         // TODO_TURNTABLE: `kat_apply_turntable_contact()`
+        mark_address!("0x14cf6");
+
         self.apply_clip_translation();
+        mark_address!("0x14cfe");
 
         if self.physics_flags.in_water
             && !self.last_physics_flags.in_water

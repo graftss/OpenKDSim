@@ -1,7 +1,9 @@
 unimplemented
-  - prop motion
   - turntables: `kat_apply_turntable_contact`
   - water: `kat_update_water_contact`
+  - camera moving upwards to avoid clipping through a wall
+  - camera gradual zoom out at goal size / preclear
+  - prop motion
   - dynamic prop alphas
   - props with subobjects - where does rotation come from?
   - a billion other things
@@ -45,9 +47,8 @@ bugs
       - it's not *entirely* that though, since it can happen with very few props attached
       - but this is definitely happening when props are destroyed near the end
         of `Katamari::update_collision`
-  - original simulation can climb into the pink bowl at mas1 spawn at init size, open sim you can't
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
-  - katamari clips into mas1 red phone leaning against wall
+  - spin sound stopped playing
 
 docs
   - glossary of terms
