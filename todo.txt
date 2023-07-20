@@ -33,6 +33,8 @@ refactoring
   - use `num_enum` crate on all enums that need to be converted to/from primitives
   - standardize delegates field name (either all `delegates` or all `delegates_ref`)
   - merge `delegates` and `has_delegates` modules, make `sound_id` and `vfx_id` top-level
+  - replace `Katamari::ray_contact_floor_idxs` (a vector of ray indices that contact a floor)
+    with an array [bool; u32], that's true at index i if ray i contacts a floor
 
 perf
   - is it possible to drop the static `include_bytes!` data after
@@ -48,7 +50,8 @@ bugs
       - but this is definitely happening when props are destroyed near the end
         of `Katamari::update_collision`
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
-  - you lose speed too quickly in mas7 any% start through the bananas
+  - destroyed props still aren't being hidden
+  - when gacha count is 0, the first gacha isn't increasing the gacha count (i think?)
 
 docs
   - glossary of terms

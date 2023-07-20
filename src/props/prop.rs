@@ -1100,8 +1100,8 @@ impl Prop {
         &self.unattached_transform
     }
 
-    pub fn do_unattached_translation(&mut self, translation: &Vec3) {
-        modify_translation!(self.unattached_transform, +=, translation);
+    pub fn do_attached_translation(&mut self, translation: &Vec3) {
+        modify_translation!(self.attached_transform, +=, translation);
     }
 
     pub fn get_attached_transform(&self) -> &Mat4 {

@@ -526,6 +526,13 @@ impl Katamari {
 
         let decay = self.vault_prop_decay_mult;
 
+        let mut ray_contacts_floor = [false; 32];
+        for ray_idx in self.floor_contact_ray_idxs.iter() {
+            if *ray_idx >= 0 {
+                ray_contacts_floor[*ray_idx as usize] = true;
+            }
+        }
+
         for prop_ref in self.attached_props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
             if prop.is_disabled() {
@@ -533,21 +540,23 @@ impl Katamari {
             }
 
             // decay props nearest some ray that's contacting the floor
-            for i in 0..self.num_floor_contacts {
-                if prop.get_nearest_kat_ray_idx()
-                    == Some(self.floor_contact_ray_idxs[i as usize] as u16)
-                {
+            if let Some(ray_idx) = prop.get_nearest_kat_ray_idx() {
+                if ray_contacts_floor[ray_idx as usize] {
                     prop.decay_init_attached_transform(decay);
                 }
             }
         }
 
-        // decay vault props
-        let prop_ray_iter = self.collision_rays[self.first_prop_ray_index as usize..].iter();
-        for ray in prop_ray_iter {
-            if let Some(prop_ref) = &ray.prop {
-                let mut prop = prop_ref.borrow_mut();
-                prop.decay_init_attached_transform(decay);
+        // decay prop rays that have a ground contact
+        let prop_ray_iter = self.collision_rays[self.first_prop_ray_index as usize..]
+            .iter()
+            .enumerate();
+        for (ray_idx, ray) in prop_ray_iter {
+            if ray_contacts_floor[ray_idx] {
+                if let Some(prop_ref) = &ray.prop {
+                    let mut prop = prop_ref.borrow_mut();
+                    prop.decay_init_attached_transform(decay);
+                }
             }
         }
     }

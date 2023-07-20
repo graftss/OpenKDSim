@@ -112,8 +112,9 @@ pub struct Katamari {
     pub raycast_state: RaycastState,
 
     /// The number of props attached to the katamari (including unloaded ones).
+    /// Obsolete, since we can just read the length of the `attached_props` vector.
     /// offset: 0x133a08
-    num_attached_props: u16,
+    // num_attached_props: u16,
 
     /// A history of the katamari's surface contacts over the past several frames.
     /// This is used to detect when it's likely stuck.
@@ -1219,7 +1220,7 @@ impl Katamari {
             self.vol_m3 = f32::from_bits(0x4df9abdf);
         }
 
-        // TODO_LOW: `kat_cache_sizes:26-28` (something about `GameShow` mission)
+        // TODO_LOW: `kat_update_size_features:26-28` (something about `GameShow` mission)
 
         self.diam_m = self.diam_cm / 100.0;
         self.display_radius_cm = self.radius_cm * self.params.display_radius_ratio;

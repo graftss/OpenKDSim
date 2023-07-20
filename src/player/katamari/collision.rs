@@ -174,18 +174,21 @@ impl Katamari {
         let MIN_ATTACHED_PROPS_FOR_SOMETHING = 100.0;
         let MAX_ATTACHED_PROPS_FOR_SOMETHING = 190.0;
 
-        let attached_props = self.num_attached_props as f32;
+        let num_attached_props = self.attached_props.len() as f32;
         let t = inv_lerp_clamp!(
-            attached_props,
+            num_attached_props,
             MIN_ATTACHED_PROPS_FOR_SOMETHING,
             MAX_ATTACHED_PROPS_FOR_SOMETHING
         );
         let destroy_props_radius =
             self.display_radius_cm + t * (self.radius_cm - self.display_radius_cm) * 0.75;
 
+        let mut neg_clip_translation = vec3::create();
+        vec3::scale(&mut neg_clip_translation, &self.clip_translation, -1.0);
+
         for prop_ref in self.attached_props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
-            prop.do_unattached_translation(&self.clip_translation);
+            prop.do_attached_translation(&neg_clip_translation);
 
             let in_destroy_range = prop.get_dist_to_katamari(self.player as i32)
                 + prop.get_radius()
