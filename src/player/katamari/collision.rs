@@ -1528,52 +1528,63 @@ impl Katamari {
             &self.contact_floor_normal_unit,
         );
 
-        // TODO: this control flow
         let stuck_btwn_walls = if self.hit_flags.small_ledge_climb {
-            true
-        } else if self.num_wall_contacts == 0 {
-            // if no wall contacts, not stuck
             false
-        } else if self.num_wall_contacts == 1 {
-            if self.num_floor_contacts == 0 {
-                false
-            } else {
-                // contacting exactly 1 wall and at least 1 floor:
-
-                let wall_dot_floor = vec3::dot(
-                    &self.contact_wall_normal_unit,
-                    &self.contact_floor_normal_unit,
-                );
-                // TODO_LOW: technically this needs to be an `acos` of doubles
-                let angle = acos_f32(wall_dot_floor);
-
-                // stuck if the wall-to-floor angle is over the threshold parameter and the katamari moved.
-                angle > self.params.wall_to_floor_angle_stuck_threshold
-                    && !vec3::exact_equals(&self.center, &self.last_center)
-            }
-        } else if self.num_wall_contacts == 2 {
-            // contacting exactly 2 walls:
-            let wall_dot_wall = vec3::dot(
-                &self.hit_walls[0].normal_unit,
-                &self.hit_walls[1].normal_unit,
-            );
-
-            if wall_dot_wall > self.params.wall_to_wall_angle_stuck_threshold {
-                // stuck if the angle between the walls is beyond the threshold param
-                self.lose_props_when_stuck();
-                true
-            } else {
-                // also stuck if the katamari's was stuck on the previous tick
-                self.stuck_ticks > 0
-            }
         } else {
-            // contacting 3 or more walls:
-            // always stuck
-            self.lose_props_when_stuck();
-            true
+            match (self.num_wall_contacts, self.num_floor_contacts) {
+                // contacts no walls: not stuck
+                (0, _) => false,
+
+                // contacts 1 wall and no floors: not stuck
+                (1, 0) => false,
+
+                // contacts 1 wall and >= 1 floor:
+                // check the angle between the wall and the nearest floor
+                (1, _) => {
+                    // contacting exactly 1 wall and at least 1 floor:
+
+                    let wall_dot_floor = vec3::dot(
+                        &self.contact_wall_normal_unit,
+                        &self.contact_floor_normal_unit,
+                    );
+
+                    // TODO_LOW: technically this needs to be an `acos` of doubles
+                    let wall_to_floor_angle = acos_f32(wall_dot_floor);
+
+                    // stuck if the wall-to-floor angle is over the threshold parameter and the katamari moved.
+                    wall_to_floor_angle > self.params.wall_to_floor_angle_stuck_threshold
+                        && !vec3::exact_equals(&self.center, &self.last_center)
+                }
+
+                // contacts 2 walls:
+                (2, _) => {
+                    let wall_dot_wall = vec3::dot(
+                        &self.hit_walls[0].normal_unit,
+                        &self.hit_walls[1].normal_unit,
+                    );
+
+                    // TODO_LOW: technically this needs to be an `acos` of doubles
+                    let wall_to_wall_angle = acos_f32(wall_dot_wall);
+
+                    if wall_to_wall_angle > self.params.wall_to_wall_angle_stuck_threshold {
+                        // stuck if the angle between the walls is beyond the threshold param
+                        self.lose_props_when_stuck();
+                        true
+                    } else {
+                        // also stuck if the katamari's was stuck on the previous tick
+                        self.stuck_ticks > 0
+                    }
+                }
+
+                // contacts 3 or more walls:
+                _ => {
+                    self.lose_props_when_stuck();
+                    true
+                }
+            }
         };
 
-        // TODO: `kat_update_stuckness:304-335` (a case that's too annoying right now)
+        // TODO: `kat_resolve_being_stuck:304-335` (a case that's too annoying right now)
 
         if stuck_btwn_walls {
             // if stuck between walls, try to push the katamari away from the wall

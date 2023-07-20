@@ -7,9 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     constants::{FRAC_PI_2, PI, TAU, VEC3_Y_NEG, VEC3_Y_POS, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, vfx_id::VfxId},
-    macros::{
-        inv_lerp, lerp, mark_address, mark_call, max, panic_log, set_y, vec3_from,
-    },
+    macros::{inv_lerp, lerp, mark_address, mark_call, max, panic_log, set_y, vec3_from},
     math::{
         acos_f32, normalize_bounded_angle, vec3_inplace_add_scaled, vec3_inplace_add_vec,
         vec3_inplace_normalize, vec3_inplace_scale, vec3_inplace_zero_small,
@@ -245,7 +243,8 @@ impl Katamari {
 
                                 // TODO: wasn't this already computed
                                 let slope = acos_f32(self.contact_floor_normal_unit[1]);
-                                let effective_max_slope_grade = self.params.effective_max_slope_grade * FRAC_PI_2;
+                                let effective_max_slope_grade =
+                                    self.params.effective_max_slope_grade * FRAC_PI_2;
                                 let accel_t = match slope {
                                     _ if slope < self.params.min_slope_grade_causing_accel => 0.0,
                                     _ if slope < effective_max_slope_grade => 1.0,

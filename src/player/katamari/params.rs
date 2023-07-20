@@ -50,17 +50,17 @@ pub struct KatamariParams {
     /// offset: 0x7160c
     pub surface_similarity_threshold: f32,
 
-    /// If: - the katamari contacts a wall and a floor,
+    /// If the following are true, then the katamari is considered stuck:
+    ///     - the katamari contacts exactly 1 wall and at least 1 floor,
     ///     - the angle between those contacted surface normals is bigger than this value, and
-    ///     - the katamari is moving
-    /// then the katamari is considered stuck.
+    ///     - the katamari moved since the previous frame
     /// default: 3pi/2
     /// offset: 0x716d4
     pub wall_to_floor_angle_stuck_threshold: f32,
 
-    /// If: - the katamari contacts exactly 2 walls
+    /// If the following are true, then the katamari is considered stuck:
+    ///     - the katamari contacts exactly 2 walls
     ///     - the angle between the walls' normals is bigger than this value,
-    /// then the katamari is considered stuck.
     /// default: 5pi/6
     /// offset: 0x716f0
     pub wall_to_wall_angle_stuck_threshold: f32,
