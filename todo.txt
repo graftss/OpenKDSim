@@ -10,16 +10,16 @@ unimplemented
 
 
 features
-  savestates
-    - trait for setting extra fields on structs after deserialization
-
-  resetting
+  custom physics framerate
+    - all frame-based durations would need to be factored out - sounds really fun
+  fast resetting
     - `Reset` interface to reset attempt-specific bits of game state
       - implement it on all parts of `GameState`
       - `derive` it on structs for which all fields are `Resettable`? sounds like a good exercise
 
 refactoring
-  - rename `ticks` -> `frames` everywhere
+  - standardized `ticks`/`frames` everywhere
+    - `timer` vs `duration` vs `count` vs whatever else
   - refactor `ray_idx` into an enum: { CollisionRay(i16), ShellRay(i16) }
   - remove `scale_translation` and `set_translation`, replace with `modify_translation`
     - also rename `modify_translation` -> `assign_translation`
@@ -48,7 +48,7 @@ bugs
       - but this is definitely happening when props are destroyed near the end
         of `Katamari::update_collision`
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
-  - spin sound stopped playing
+  - you lose speed too quickly in mas7 any% start through the bananas
 
 docs
   - glossary of terms

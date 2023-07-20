@@ -8,19 +8,23 @@ use crate::{
         animation::Animation,
         camera::{Camera, CameraState},
         katamari::Katamari,
+        prince::Prince,
         Player,
     },
     props::{config::NamePropConfig, prop::Prop, PropsState},
 };
 
+// TODO_REFACTOR: this seemed like a reasonable idea but it ends up being pretty
+// pointless, with most of the work just being to pass along delegate refs.
+// it should be replaced with something that feels nicer, whenever the requirements
+// of savestates change and this demonstrates more friction.
 /// The `Hydrate` trait is used to perform extra initialization of a `GameState`
 /// after it's been deserialized. This is used to initialize "redundant" struct
 /// fields that are `skip`ped by `serde` serialization (for example, pointers to
 /// props on the `Katamari`), as well as pass along the values of delegates from
 /// the old state.
 /// # Arguments
-/// `old_state`: the original game state, unrelated to the deserialized, loaded state.
-/// `new_state`: the deserialized, *unhydrated* state that is being loaded.
+/// `old_state_ref`: a reference to the previous game state, before a new state was loaded.
 pub trait Hydrate {
     fn hydrate(&mut self, old_state_ref: &RefCell<GameState>);
 }
@@ -102,10 +106,17 @@ impl Hydrate for Katamari {
     }
 }
 
+impl Hydrate for Prince {
+    fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
+        self.set_delegates_ref(&old_state_ref.borrow().delegates);
+    }
+}
+
 impl Hydrate for Player {
     fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
         self.animation.hydrate(old_state_ref);
         self.camera.hydrate(old_state_ref);
         self.katamari.hydrate(old_state_ref);
+        self.prince.hydrate(old_state_ref);
     }
 }
