@@ -32,10 +32,10 @@ pub struct DebugConfig {
 }
 
 // TODO_DEBUG: this should be made editable mid-execution.
-pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
+pub const DEV_CONFIG: DebugConfig = DebugConfig {
     allow_debug_logs: true,
-    log_tick: false,
-    log_nonzero_hit_attribute_hits: false,
+    log_tick: true,
+    log_nonzero_hit_attribute_hits: true,
     log_destroyed_props: true,
     draw_collided_prop_aabb_hits: true,
     draw_collided_prop_mesh: true,
@@ -43,3 +43,21 @@ pub const DEBUG_CONFIG: DebugConfig = DebugConfig {
     kat_draw_collision_rays: true,
     kat_draw_shell_rays: true,
 };
+
+pub const RELEASE_CONFIG: DebugConfig = DebugConfig {
+    allow_debug_logs: false,
+    log_tick: false,
+    log_nonzero_hit_attribute_hits: false,
+    log_destroyed_props: false,
+    draw_collided_prop_aabb_hits: false,
+    draw_collided_prop_mesh: false,
+    draw_collided_prop_tris: false,
+    kat_draw_collision_rays: false,
+    kat_draw_shell_rays: false,
+};
+
+#[cfg(debug_assertions)]
+pub const DEBUG_CONFIG: DebugConfig = DEV_CONFIG;
+
+#[cfg(not(debug_assertions))]
+pub const DEBUG_CONFIG: DebugConfig = RELEASE_CONFIG;

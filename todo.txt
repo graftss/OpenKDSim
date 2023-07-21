@@ -43,6 +43,7 @@ perf
 
 bugs
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
+  - a bunch of non-visible props still not being hidden/unattached/destroyed
 
 docs
   - glossary of terms
