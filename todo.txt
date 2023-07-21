@@ -43,7 +43,6 @@ perf
 
 bugs
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
-  - when gacha count is 0, the first gacha isn't increasing the gacha count (i think?)
 
 docs
   - glossary of terms

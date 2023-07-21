@@ -1056,6 +1056,7 @@ impl Prince {
             // gachas are blocked in all other gamemodes
             _ => true,
         };
+
         if block_gachas {
             return;
         }
@@ -1092,9 +1093,14 @@ impl Prince {
             Some(GachaDir::Left)
         };
 
-        let did_next_gacha = match (new_gacha_direction, self.last_gacha_direction) {
-            (Some(_), None) => true,
-            (Some(new_dir), Some(old_dir)) if new_dir != old_dir => true,
+        let did_next_gacha = match (
+            self.gacha_count,
+            new_gacha_direction,
+            self.last_gacha_direction,
+        ) {
+            (0, Some(_), _) => true,
+            (_, Some(_), None) => true,
+            (_, Some(new_dir), Some(old_dir)) if new_dir != old_dir => true,
             _ => false,
         };
 
