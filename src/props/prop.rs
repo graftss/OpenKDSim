@@ -17,8 +17,8 @@ use crate::{
     debug::DEBUG_CONFIG,
     global::GlobalState,
     macros::{
-        max_to_none, modify_translation, new_mat4_copy, scale_translation, set_translation,
-        temp_debug_log, vec3_from,
+        debug_log, max_to_none, modify_translation, new_mat4_copy, scale_translation,
+        set_translation, vec3_from,
     },
     mission::state::MissionState,
     mono_data::{MonoData, PropAabbs, PropMonoData},
@@ -309,7 +309,7 @@ pub struct Prop {
 
     /// If false, the prop won't be displayed, but it will still be tangible.
     /// offset: 0xa
-    display_on: bool,
+    visible: bool,
 
     /// (??) Presumably, true when the prop is attached to a katamari, but this is redundant
     /// offset: 0xd
@@ -760,7 +760,7 @@ impl Prop {
             global_state: PropGlobalState::Unattached,
             flags2: PropFlags2::default(),
             disabled: false,
-            display_on: false,
+            visible: false,
             alpha: 1.0,
             move_type: max_to_none!(u16, args.mono_move_type),
             hit_on_area: (max_to_none!(u16, args.mono_hit_on_area)).map(|a| a as u8),
@@ -1198,6 +1198,14 @@ impl Prop {
         self.disabled
     }
 
+    pub fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
     pub fn get_attach_life(&self) -> f32 {
         self.attach_life
     }
@@ -1275,7 +1283,7 @@ impl Prop {
         let mut status: u8 = 0;
 
         // status & 1: prop is attached
-        if self.is_attached().into() {
+        if self.is_attached() {
             status |= 0x1;
         }
 
@@ -1294,8 +1302,8 @@ impl Prop {
             status |= 0x8;
         }
 
-        // status & 0x10: prop is hidden
-        if !self.display_on {
+        // status & 0x10: prop is displayed
+        if self.visible {
             status |= 0x10;
         }
 
@@ -1333,7 +1341,7 @@ impl Prop {
     /// offset: 0x4f8e0
     pub fn destroy(&mut self) {
         if DEBUG_CONFIG.log_destroyed_props {
-            temp_debug_log!(
+            debug_log!(
                 "  destroying prop: ctrl_idx={}, name_idx={}",
                 self.ctrl_idx,
                 self.name_idx
@@ -1341,8 +1349,8 @@ impl Prop {
         }
 
         self.disabled = true;
-        self.display_on = false;
-        // TODO: remove this from the list `Katamari::attached_props`
+        self.visible = false;
+
         // TODO_LINKS: `prop_remove_refs_from_props()`
         // TODO_SUBOBJ: `prop_destroy:14-25`
         self.first_subobject = None;

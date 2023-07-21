@@ -356,17 +356,6 @@ impl RaycastState {
                 return None;
             }
 
-            // temp_debug_log!("  ray_hits_triangle hit (flag={tri_in_world_space}):");
-            // temp_debug_log!("    let ray = [{:?}, {:?}];", self.point0, self.point1);
-            // temp_debug_log!("    let triangle = {:?};", triangle);
-            // temp_debug_log!("    let transform = {:?};", transform);
-            // temp_debug_log!("    normal_unit={:?}", normal_unit);
-            // temp_debug_log!(
-            //     "    t={t}, impact_dist={}, impact_point={:?}",
-            //     t * vec3::length(&ray),
-            //     self.triangle_hit_point
-            // );
-
             static HIT_COLOR: Vec4 = [1.0, 0.0, 1.0, 1.0];
             if let Some(delegates) = &self.delegates {
                 delegates

@@ -226,4 +226,15 @@ impl PropsState {
     /// Root function to update all props when in the `Ending` game mode.
     /// offset: 0x259f0 (note: this offset is in the middle of a function in the original simulation)
     pub fn update_ending(&mut self) {}
+
+    /// offset: 0x24be0
+    pub fn update_prop_alphas(&mut self) {
+        // TODO_PROP_ALPHA
+        for prop_ref in self.props.iter_mut() {
+            let mut prop = prop_ref.borrow_mut();
+            if !prop.is_disabled() {
+                prop.set_visible(true);
+            }
+        }
+    }
 }

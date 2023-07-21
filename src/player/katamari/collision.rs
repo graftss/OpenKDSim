@@ -186,6 +186,8 @@ impl Katamari {
         let mut neg_clip_translation = vec3::create();
         vec3::scale(&mut neg_clip_translation, &self.clip_translation, -1.0);
 
+        let mut removed_ctrl_indices = vec![];
+
         for prop_ref in self.attached_props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
             prop.do_attached_translation(&neg_clip_translation);
@@ -195,8 +197,13 @@ impl Katamari {
                 < destroy_props_radius;
 
             if !prop.is_disabled() && in_destroy_range {
+                removed_ctrl_indices.push(prop.get_ctrl_idx());
                 prop.destroy();
             }
+        }
+
+        for &ctrl_idx in removed_ctrl_indices.iter() {
+            self.remove_prop_from_attached_list(ctrl_idx);
         }
 
         self.process_nearby_collectible_props(mission_state);
@@ -205,6 +212,20 @@ impl Katamari {
 
         if self.physics_flags.grounded_ray_type.is_bottom() || self.fc_ray_len < 1.0 {
             self.fc_ray_len = self.radius_cm;
+        }
+    }
+
+    /// Removes the prop with ctrl index `removed_ctrl_idx` from the katamari's lists of attached
+    /// props.
+    pub fn remove_prop_from_attached_list(&mut self, removed_ctrl_idx: u16) {
+        let attach_idx = self
+            .attached_prop_ctrl_indices
+            .iter()
+            .position(|&ctrl_idx| ctrl_idx == removed_ctrl_idx);
+
+        if let Some(attach_idx) = attach_idx {
+            self.attached_prop_ctrl_indices.remove(attach_idx);
+            self.attached_props.remove(attach_idx);
         }
     }
 
@@ -656,7 +677,6 @@ impl Katamari {
         _prop_ref: PropRef,
         _prop: &mut Prop,
     ) {
-        // temp_debug_log!("... ctrl_idx={}", prop.get_ctrl_idx());
         // let root_prop = if prop.has_parent() {
         //     let root_ref = prop.get_root_ref(props);
         //     root_ref.clone().borrow_mut()

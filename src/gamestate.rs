@@ -392,7 +392,6 @@ impl GameState {
             } else {
                 diam_m
             };
-            // TODO: update prop alpha based on distance from katamari
         } else {
             self.global.updating_player = 1;
             self.players[1].update_camera(&self.mission_state);
@@ -407,6 +406,7 @@ impl GameState {
 
         if !is_vs_mode {
             // TODO: `update_game:176-255` (selectively update props based on their alpha)
+            self.props.update_prop_alphas();
         } else {
             // TODO: `update_game:258-267` (idk vs mode crap)
         }

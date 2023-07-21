@@ -42,15 +42,7 @@ perf
     - yes, just call `include_bytes!` in a non-static scope so that it's dropped lol
 
 bugs
-  - sometimes a bunch of attached props stop updating and freeze in place while the katamari
-    continues moving away from them
-    - it's possible that this is just those props getting disabled, but this code doesn't set their
-      alpha to 0 to they remain visible.
-      - it's not *entirely* that though, since it can happen with very few props attached
-      - but this is definitely happening when props are destroyed near the end
-        of `Katamari::update_collision`
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`
-  - destroyed props still aren't being hidden
   - when gacha count is 0, the first gacha isn't increasing the gacha count (i think?)
 
 docs
