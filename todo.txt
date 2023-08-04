@@ -40,6 +40,8 @@ perf
   - is it possible to drop the static `include_bytes!` data after
     reading it into tables? (e.g. for stage config table)
     - yes, just call `include_bytes!` in a non-static scope so that it's dropped lol
+  - are `vec3::create()` and `mat4::create()` calls bad since the entire matrix has to be
+    passed by value? (potentially)
 
 bugs
   - actually remove `detached_indices` from `attached_props` in `Katamari::detach_props`

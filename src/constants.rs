@@ -87,6 +87,12 @@ pub const FRAC_1_3: f32 = f32::from_bits(0x3eaaaaab);
 /// PI/2
 pub const FRAC_PI_2: f32 = f32::from_bits(0x3fc90fdb);
 
+/// PI/45
+pub const FRAC_PI_45: f32 = f32::from_bits(0x3d8efa35);
+
+/// PI/180
+pub const FRAC_PI_180: f32 = f32::from_bits(0x3c8efa35);
+
 /// PI/750, used because reasons
 /// offset: 0x71544
 pub const FRAC_PI_750: f32 = f32::from_bits(0x1f42893b);

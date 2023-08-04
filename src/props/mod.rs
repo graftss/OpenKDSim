@@ -133,7 +133,7 @@ impl PropsState {
             );
         }
 
-        let prop = Prop::new(
+        let prop = Prop::new_ref(
             ctrl_idx,
             args,
             area,
@@ -141,6 +141,7 @@ impl PropsState {
             global,
             &mut self.comments,
             &mut self.random,
+            mission_state,
         );
         self.props.push(prop);
     }

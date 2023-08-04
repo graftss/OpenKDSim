@@ -430,19 +430,97 @@ unsafe fn print_square_dish_mesh() {
     }
 }
 
-fn wrapping_test(b: u8) {
-    let a = 128 as u8;
-    // let b = 129 as u8;
-
-    let c = Wrapping(a) + Wrapping(b);
-    println!("c: {c:?}");
+#[derive(Debug)]
+struct MockProp {
+    pub value: u8,
+    pub motion: Option<PropMotion>,
 }
 
-fn serialize_test() {
-    let mut p = Prince::default();
-    p.gacha_count = 87;
-    let serialized = serde_json::to_string(&p).unwrap();
-    println!("serialized: {serialized:?}");
+trait MotionUpdate {
+    fn update(prop: &mut MockProp);
+}
+
+#[derive(Debug)]
+enum PropMotion {
+    Oscillate(Oscillate),
+}
+
+// master update that switches on every type of motion
+impl MotionUpdate for PropMotion {
+    fn update(prop: &mut MockProp) {
+        match &prop.motion {
+            Some(PropMotion::Oscillate(_)) => Oscillate::update(prop),
+            None => {}
+        }
+    }
+}
+
+#[derive(Debug)]
+enum OscillateState {
+    GoUp,
+    Chill,
+    GoDown,
+}
+
+#[derive(Debug)]
+struct Oscillate {
+    pub state: OscillateState,
+    pub chill_timer: u8,
+}
+
+impl Default for Oscillate {
+    fn default() -> Self {
+        Self {
+            state: OscillateState::GoUp,
+            chill_timer: 0,
+        }
+    }
+}
+
+impl MotionUpdate for Oscillate {
+    fn update(prop: &mut MockProp) {
+        if let Some(PropMotion::Oscillate(ref mut motion)) = prop.motion {
+            match motion.state {
+                OscillateState::GoUp => {
+                    prop.value += 1;
+                    if prop.value > 3 {
+                        motion.state = OscillateState::Chill;
+                        motion.chill_timer = 4;
+                    }
+                }
+                OscillateState::Chill => {
+                    motion.chill_timer -= 1;
+                    if motion.chill_timer <= 0 {
+                        if prop.value > 3 {
+                            motion.state = OscillateState::GoDown;
+                        } else {
+                            motion.state = OscillateState::GoUp;
+                        }
+                    }
+                }
+                OscillateState::GoDown => {
+                    prop.value -= 1;
+                    if prop.value < 1 {
+                        motion.state = OscillateState::Chill;
+                        motion.chill_timer = 2;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn prop_motion_test() {
+    let motion = Oscillate::default();
+    let mut prop = MockProp {
+        value: 0,
+        motion: Some(PropMotion::Oscillate(motion)),
+    };
+
+    for i in 0..20 {
+        PropMotion::update(&mut prop);
+        println!("step {:?}: {:?}", i, prop);
+    }
 }
 
 fn main() {
@@ -453,6 +531,6 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
     {
-        serialize_test();
+        prop_motion_test();
     }
 }

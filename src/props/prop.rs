@@ -17,19 +17,25 @@ use crate::{
     debug::DEBUG_CONFIG,
     global::GlobalState,
     macros::{
-        debug_log, max_to_none, modify_translation, new_mat4_copy, scale_translation,
-        set_translation, vec3_from,
+        debug_log, max_to_none, modify_translation, new_mat4_copy, panic_log, scale_translation,
+        set_translation, temp_debug_log, vec3_from,
     },
     mission::state::MissionState,
     mono_data::{MonoData, PropAabbs, PropMonoData},
     player::{katamari::Katamari, Player},
-    props::config::NamePropConfig,
+    props::{
+        config::NamePropConfig,
+        motion::{
+            data::move_types::MissionMoveType, get_behavior_motion_actions,
+            get_mission_move_type_data,
+        },
+    },
     util::scale_sim_transform,
 };
 
 use super::{
     comments::KingCommentState,
-    motion::{behavior::PropBehavior, RotationAxis},
+    motion::{actions::MotionAction, name_idx::NameIndexMotion, RotationAxis},
     random::RandomPropsState,
     PropsState,
 };
@@ -265,6 +271,9 @@ bitflags::bitflags! {
         /// "Judo Contest" and "Sumo Bout" objects.
         const SpinningFight = 0x10;
 
+        /// (??) True if the prop has behavior type 0x15 (yaw spin) or 0x20 (sway)
+        const Motion0x40 = 0x40;
+
         /// (??) Seems like something to do with parent/child links.
         const Unknown0x80 = 0x80;
     }
@@ -381,7 +390,7 @@ pub struct Prop {
 
     /// The prop's rotation as Euler angles.
     /// offset: 0xa0
-    rotation_vec: Vec3,
+    pub rotation_vec: Vec3,
 
     /// The prop's scale. (unused in simulation)
     /// offset: 0xb0
@@ -413,6 +422,8 @@ pub struct Prop {
     /// offset: 0x190
     motion_transform: Mat4,
 
+    pub motion: Option<MotionAction>,
+
     /// A pointer to the prop's first subobject.
     /// offset: 0x558
     // TODO_SUBOBJ: make this a vector of subobjects
@@ -428,8 +439,7 @@ pub struct Prop {
     /// The prop's motion script, if it has one.
     /// offset: 0x568
     // TODO_PROP_MOTION: make this an enum that determines which script to call
-    #[serde(skip)]
-    motion_script: Option<Box<PropScript>>,
+    name_index_motion: NameIndexMotion,
 
     /// The prop's innate script, if it has one.
     /// offset: 0x570
@@ -462,17 +472,17 @@ pub struct Prop {
 
     /// The prop's concrete motion action.
     /// offset: 0x584
-    motion_action_type: Option<u16>,
+    motion_action: Option<u16>,
 
     /// (??) The prop's behavior type, which encodes the primary motion action, the alternate motion
     /// action, and the (???)
     /// offset: 0x585
-    behavior_type: Option<PropBehavior>,
+    behavior: Option<i16>,
 
     /// The prop's alternate concrete motion action, which can be triggered by various events
     /// (e.g. katamari gets close, or katamari collects this prop's parent, etc.)
     /// offset: 0x586
-    alt_motion_action_type: Option<u16>,
+    alt_motion_action: Option<u16>,
 
     /// (??) The prop's state while it's unattached.
     /// offset: 0x588
@@ -692,6 +702,31 @@ impl Display for Prop {
 }
 
 impl Prop {
+    pub fn new_ref(
+        ctrl_idx: u16,
+        args: &AddPropArgs,
+        area: u8,
+        mono_data: &MonoData,
+        global: &mut GlobalState,
+        comments: &mut KingCommentState,
+        random: &mut RandomPropsState,
+        mission_state: &MissionState,
+    ) -> PropRef {
+        Rc::new(RefCell::new(Prop::new(
+            ctrl_idx,
+            args,
+            area,
+            mono_data,
+            global,
+            comments,
+            random,
+            mission_state,
+        )))
+    }
+
+    /// Create a new `Prop` object.
+    /// Mostly follows the function `prop_init`.
+    /// offset: 0x4e950
     pub fn new(
         ctrl_idx: u16,
         args: &AddPropArgs,
@@ -700,23 +735,7 @@ impl Prop {
         global: &mut GlobalState,
         comments: &mut KingCommentState,
         random: &mut RandomPropsState,
-    ) -> PropRef {
-        Rc::new(RefCell::new(Prop::new_node(
-            ctrl_idx, args, area, mono_data, global, comments, random,
-        )))
-    }
-
-    /// Create a new `Prop` object.
-    /// Mostly follows the function `prop_init`.
-    /// offset: 0x4e950
-    pub fn new_node(
-        ctrl_idx: u16,
-        args: &AddPropArgs,
-        area: u8,
-        mono_data: &MonoData,
-        global: &mut GlobalState,
-        comments: &mut KingCommentState,
-        random: &mut RandomPropsState,
+        mission_state: &MissionState,
     ) -> Self {
         // if the prop belongs to a random group, determine its name index by sampling
         // the random group
@@ -828,12 +847,12 @@ impl Prop {
 
             first_subobject: None, // TODO
             script_0x560: None,    // TODO
-            motion_script: None,   // TODO
+            name_index_motion: NameIndexMotion::Normal,
             innate_script: None,
-            tree_id: None,                // TODO
-            motion_action_type: None,     // TODO
-            behavior_type: None,          // TODO
-            alt_motion_action_type: None, // TODO
+            tree_id: None,           // TODO
+            motion_action: None,     // TODO
+            behavior: None,          // TODO
+            alt_motion_action: None, // TODO
             twin_prop: None,
             mono_data: None,
 
@@ -846,7 +865,52 @@ impl Prop {
             attached_transform: [0.0; 16],
             collision_mesh: None,
             trajectory_velocity: [0.0; 3],
+            motion: None,
         };
+
+        // from the prop's `move_type`, we can infer its other motion types from the game data
+        if let Some(move_type) = result.move_type {
+            // TODO_VS: handle vs mission
+            if let Some(move_type_data) =
+                get_mission_move_type_data(mission_state.mission, move_type)
+            {
+                if ctrl_idx == 0x1a0 {
+                    temp_debug_log!(" data={move_type_data:?}, ");
+                }
+                let MissionMoveType {
+                    default_action,
+                    path_idx: _,
+                    behavior,
+                } = move_type_data;
+
+                if behavior < 0 {
+                    // a negative behavior (always encoded as -1) indicates that the default action
+                    // of the `MissionMoveType` should be used, with no alt action.
+                    result.motion_action = Some(match default_action {
+                        0..=2 => default_action + 1,
+                        _ => {
+                            panic_log!("unexpected default action: {default_action}");
+                        }
+                    });
+                    result.alt_motion_action = None;
+                } else {
+                    let motion_actions = get_behavior_motion_actions(behavior);
+                    result.behavior = Some(behavior);
+                    result.motion_action = Some(motion_actions[0]);
+                    result.alt_motion_action = Some(motion_actions[1]);
+                }
+            }
+        }
+
+        // map the `motion_action` computed above to the associated `MotionAction` state
+        if let Some(motion_action) = result.motion_action {
+            result.motion = Some(MotionAction::parse_id(motion_action));
+        } else {
+            result.alt_motion_action = None;
+            result.motion_action = None;
+            result.behavior = None;
+            result.motion = None;
+        }
 
         let prop_mono_data = &mono_data.props[name_idx as usize];
         result.init_mono_data_fields(prop_mono_data, config);
@@ -1063,10 +1127,6 @@ impl Prop {
         self.move_type
     }
 
-    pub fn get_behavior_type(&self) -> Option<PropBehavior> {
-        self.behavior_type
-    }
-
     pub fn get_stationary(&self) -> bool {
         self.stationary
     }
@@ -1098,6 +1158,11 @@ impl Prop {
 
     pub fn get_unattached_transform(&self) -> &Mat4 {
         &self.unattached_transform
+    }
+
+    // TODO_REFACTOR
+    pub fn get_aabb_max_y(&self) -> f32 {
+        self.aabb_mesh.as_ref().unwrap().sectors[0].aabb.max[1]
     }
 
     pub fn do_attached_translation(&mut self, translation: &Vec3) {
@@ -1212,6 +1277,10 @@ impl Prop {
 
     pub fn set_attach_life(&mut self, attach_life: f32) {
         self.attach_life = attach_life;
+    }
+
+    pub fn get_name_index_motion(&mut self) -> NameIndexMotion {
+        self.name_index_motion
     }
 
     pub fn set_no_parent(&mut self) {
@@ -1494,9 +1563,7 @@ impl Prop {
 
         self.update_child_link();
 
-        if let Some(_script) = self.motion_script.as_ref() {
-            // TODO_PROP_MOTION: `props_update_nonending:55-68`
-        }
+        self.update_name_index_motion();
 
         if let Some(_script) = self.innate_script.as_ref() {
             // TODO_PROP_MOTION: call `innate_script`
