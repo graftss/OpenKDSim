@@ -16,6 +16,20 @@ use crate::{
 static PROP_PATH_POINTS: &[u8] = include_bytes_align_as!(f32, "./bin/prop_path_points.bin");
 static PROP_PATHS: &[u8] = include_bytes_align_as!(PropPath, "./bin/prop_paths.bin");
 
+/// Computes the distance from a path point `$path_pt` to another point `$other_pt`.
+/// This is unqiue because the path points need to be reflected about the origin, so
+/// instead of `$other_pt - $path_pt` it's `$other_pt + $path_pt`
+macro_rules! path_pt_dist {
+    ($path_pt: expr, $other_pt: expr) => {{
+        let diff = [
+            $path_pt[0] + $other_pt[0],
+            $path_pt[1] + $other_pt[1],
+            $path_pt[2] + $other_pt[2],
+        ];
+        (diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]).sqrt()
+    }};
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PathStage {
     House,
@@ -264,6 +278,82 @@ impl PropPathData {
         } else {
             prop.end_motion();
             false
+        }
+    }
+
+    /// Sets the target point index of `motion` to the nearest or second-nearest point along
+    /// the path already loaded in `motion`. Used to initialize the target point of path-following
+    /// motion types.
+    /// offset: 0x382c0
+    pub fn load_initial_target_point_idx(
+        &self,
+        motion: &mut impl PathMotion,
+        prop: &mut Prop,
+        mission: Mission,
+    ) {
+        static UNINIT: u16 = u16::MAX;
+
+        let path_idx = motion.get_path_idx() as usize;
+
+        if let Some(path) = self.get_mission_path(mission, path_idx) {
+            let pos = prop.pos;
+            let mut path_pt = self.points[path.point_idx as usize];
+
+            // initialize the min dist to the point on the path with index 0
+            let mut min_dist = path_pt_dist!(path_pt, pos);
+            let mut min_pt_idx = 0;
+
+            // leave the second smallest dist "uninitialized"
+            let mut second_dist = 0.0;
+            let mut second_pt_idx = UNINIT;
+
+            // start the iteration variable `pt_idx` at the index-1 point, since we already
+            // accounted for the 0th point above.
+            let mut pt_idx = (path.point_idx as u16) + 1;
+            loop {
+                path_pt = self.points[pt_idx as usize];
+
+                // reached the end of the list; decide on a result
+                if path_pt[3] == Self::END_POINT_LIST_SENTINEL {
+                    let mut result = second_pt_idx;
+
+                    // TODO_REFACTOR: it seems like this can probably be simplified, but it doesn't
+                    // seem high priority to do so
+                    if min_pt_idx == 0 {
+                        if second_pt_idx != 1 {
+                            result = min_pt_idx;
+                        }
+                    } else if second_pt_idx == 0 {
+                        if min_pt_idx == 1 {
+                            result = min_pt_idx;
+                        }
+                    } else if second_pt_idx < min_pt_idx {
+                        result = min_pt_idx;
+                    }
+
+                    motion.set_target_point_idx(result);
+                    return;
+                }
+
+                let dist = path_pt_dist!(path_pt, pos);
+                if dist >= min_dist {
+                    // not a new min dist; check if it's a new second smallest dist
+                    if second_pt_idx == UNINIT || dist < second_dist {
+                        second_dist = dist;
+                        second_pt_idx = pt_idx;
+                    }
+                } else {
+                    // new min dist; update min dist, and new second smallest dist is old min dist
+                    second_dist = min_dist;
+                    second_pt_idx = min_pt_idx;
+                    min_dist = dist;
+                    min_pt_idx = pt_idx;
+                }
+
+                pt_idx += 1;
+            }
+        } else {
+            return prop.end_motion();
         }
     }
 }

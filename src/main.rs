@@ -20,10 +20,7 @@ use mono_data::MonoData;
 use player::{katamari::spline::compute_spline_accel_mult, prince::Prince};
 use props::{
     config::NamePropConfig,
-    motion::{
-        data::prop_paths::{PropPathData, PROP_PATH_DATA},
-        get_max_path_indices,
-    },
+    motion::data::prop_paths::{PropPathData, PROP_PATH_DATA},
     prop::AddPropArgs,
 };
 use serde::Serialize;

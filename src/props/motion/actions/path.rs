@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::VEC3_Z_POS,
-    macros::vec3_from,
+    macros::{vec3_from, vec3_unit_xz},
+    math::acos_f32,
     mission::Mission,
     props::{
         config::NamePropConfig,
@@ -144,8 +145,9 @@ pub struct FollowPath {
     /// offset: 0xe0
     vel_to_target_unit: Vec3,
 
+    /// (??) The constant vector <0,0,1>, i.e. the forward direction in the prop's local space
     /// offset: 0xf0
-    up: Vec3,
+    forward: Vec3,
 }
 
 impl FollowPath {
@@ -203,7 +205,7 @@ impl FollowPath {
 
         self.path_idx =
             MISSION_MOVE_TYPES[mission as usize][prop.move_type.unwrap() as usize].path_idx;
-        // TODO: `pmot_init_path_subroutine()`
+        PROP_PATH_DATA.load_initial_target_point_idx(self, prop, mission);
         vec3::copy(&mut self.init_pos, &prop.pos);
 
         let failed_getting_point = PROP_PATH_DATA.get_mission_path_point(
@@ -224,7 +226,7 @@ impl FollowPath {
             &self.vel_to_target_unit,
             self.speed,
         );
-        vec3::copy(&mut self.up, &VEC3_Z_POS);
+        vec3::copy(&mut self.forward, &VEC3_Z_POS);
 
         let aabb_top = prop.get_aabb_max_y();
         self.target_point[1] += aabb_top;
@@ -255,6 +257,21 @@ impl FollowPath {
         } else {
             path.speed
         };
+
+        PROP_PATH_DATA.load_next_target_point(self, prop, mission);
+
+        // TODO: `pmot_current_facing_angle(prop)` is called here, but seemingly unused?
+        // TODO: rest of function
+    }
+
+    /// offset: 0x37a20
+    fn yaw_towards_target(&self, start: &Vec3, end: &Vec3) -> f32 {
+        // TODO: should the first argument be `end` and the second be `start`, since we're doing
+        // `start - end` here, and computing the vector from end to start?
+        let lateral_target_unit = vec3_unit_xz!(vec3_from!(-, start, end));
+        let similarity = vec3::dot(&lateral_target_unit, &self.forward);
+        let angle = acos_f32(similarity);
+        angle
     }
 }
 
