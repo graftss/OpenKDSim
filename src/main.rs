@@ -20,7 +20,10 @@ use mono_data::MonoData;
 use player::{katamari::spline::compute_spline_accel_mult, prince::Prince};
 use props::{
     config::NamePropConfig,
-    motion::{data::prop_paths::PropPathData, get_max_path_indices},
+    motion::{
+        data::prop_paths::{PropPathData, PROP_PATH_DATA},
+        get_max_path_indices,
+    },
     prop::AddPropArgs,
 };
 use serde::Serialize;
@@ -527,6 +530,31 @@ fn prop_motion_test() {
     }
 }
 
+fn reformat_prop_paths() -> std::io::Result<()> {
+    let old_data = PROP_PATH_DATA.paths;
+    let new_file_path = "bin/prop_paths.bin";
+
+    let mut file = File::create(new_file_path)?;
+
+    for (idx, path) in old_data.iter().enumerate() {
+        // println!("point_ptr: {:?}", path.point_ptr);
+        if idx == 84 || idx == 9 || idx == 144 || idx == 125 || idx == 76 || idx == 112 {
+            file.write(&u32::MAX.to_le_bytes())?;
+        } else {
+            file.write(&path.point_idx.to_le_bytes())?;
+        }
+        file.write(&path.speed.to_bits().to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
+fn test_prop_path_data() {
+    let x = PROP_PATH_DATA.get_num_path_points(Mission::Eternal3, 16);
+    let y = PROP_PATH_DATA.get_num_path_points(Mission::Eternal3, 49);
+    println!("{x:?}, {y:?}");
+}
+
 fn main() {
     println!("start");
 
@@ -534,5 +562,8 @@ fn main() {
 
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
-    {}
+    {
+        // reformat_prop_paths();
+        test_prop_path_data();
+    }
 }
