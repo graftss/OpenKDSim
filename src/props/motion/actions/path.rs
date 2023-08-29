@@ -1,10 +1,24 @@
 use gl_matrix::{common::Vec3, mat4, vec3};
 use serde::{Deserialize, Serialize};
 
-use crate::props::{
-    motion::global_path::{GlobalPathFlags, GlobalPathState},
-    prop::{Prop, PropAnimationType, PropFlags2},
+use crate::{
+    constants::VEC3_Z_POS,
+    macros::vec3_from,
+    math::vec3_inplace_normalize,
+    mission::Mission,
+    props::{
+        motion::{
+            data::{
+                move_types::MISSION_MOVE_TYPES,
+                prop_paths::{PathStage, PROP_PATH_DATA},
+            },
+            global_path::{GlobalPathFlags, GlobalPathState},
+        },
+        prop::{Prop, PropAnimationType, PropFlags2},
+    },
 };
+
+const PROP_PATH_SPEEDS: [f32; 11] = [0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 20.0, 40.0, 200.0];
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 enum FollowPathState {
@@ -94,7 +108,7 @@ pub struct FollowPath {
     direction: PathDirection,
 
     /// offset: 0x16
-    path_index: u16,
+    path_idx: u16,
 
     /// (??) next path point index after reversing?
     /// offset: 0x18
@@ -103,8 +117,24 @@ pub struct FollowPath {
     /// offset: 0x32
     do_alt_motion: bool,
 
+    /// (??) Set to the prop's position when the path motion is initialized.
+    /// offset: 0xb0
+    init_pos: Vec3,
+
+    /// The next target point along the path. The prop moves in a straight line towards this point.
     /// offset: 0xc0
     target_point: Vec3,
+
+    /// The prop's velocity towards the next target point along the path.
+    /// offset: 0xd0
+    vel_to_target: Vec3,
+
+    /// The prop's unit velocity towards the next target point along the path.
+    /// offset: 0xe0
+    vel_to_target_unit: Vec3,
+
+    /// offset: 0xf0
+    up: Vec3,
 }
 
 impl FollowPath {
@@ -116,7 +146,7 @@ impl FollowPath {
         }
 
         // propagate the path's global state's reversed-ness to each prop on that path
-        let global_path = global_path_state.get_path(self.path_index as usize);
+        let global_path = global_path_state.get_path(self.path_idx as usize);
         let global_reverse = global_path.flags.contains(GlobalPathFlags::Reversing);
 
         if global_reverse != Into::<bool>::into(self.direction) {
@@ -140,17 +170,66 @@ impl FollowPath {
         }
     }
 
-    fn update_by_state(&mut self, prop: &mut Prop, global_path_state: GlobalPathState) {
+    fn update_by_state(
+        &mut self,
+        prop: &mut Prop,
+        global_path_state: GlobalPathState,
+        mission: Mission,
+    ) {
         match self.state {
-            FollowPathState::Init => self.update_state_init(prop, global_path_state),
+            FollowPathState::Init => self.update_state_init(prop, global_path_state, mission),
         }
     }
 
-    fn update_state_init(&mut self, prop: &mut Prop, _global_path_state: GlobalPathState) {
+    /// offset: 0x3a330
+    fn generic_init_path(&mut self, prop: &mut Prop, mission: Mission) {
+        self.target_point_idx = 0;
+        if !PathStage::has_paths(mission) {
+            // no path data exists for this motion, so just give up trying to initialize the path
+            return prop.end_motion();
+        }
+        self.path_idx =
+            MISSION_MOVE_TYPES[mission as usize][prop.move_type.unwrap() as usize].path_idx;
+        // TODO: `pmot_init_path_subroutine()`
+        vec3::copy(&mut self.init_pos, &prop.pos);
+
+        let failed_getting_point = PROP_PATH_DATA.get_mission_path_point(
+            &mut self.target_point,
+            mission,
+            self.target_point_idx as usize,
+            self.path_idx as usize,
+        );
+
+        if failed_getting_point {
+            return prop.end_motion();
+        }
+
+        let to_target = vec3_from!(-, self.target_point, prop.pos);
+        vec3::normalize(&mut self.vel_to_target_unit, &to_target);
+        vec3::scale(
+            &mut self.vel_to_target,
+            &self.vel_to_target_unit,
+            self.speed,
+        );
+        vec3::copy(&mut self.up, &VEC3_Z_POS);
+
+        // TODO: does this actually agree with `prop.aabb_vertices[1].y`?
+        let aabb_top = prop.get_aabb_max_y();
+        self.target_point[1] += aabb_top;
+    }
+
+    /// State 0 update behavior. Initializes the path-based motion.
+    /// offset: 0x39b50
+    fn update_state_init(
+        &mut self,
+        prop: &mut Prop,
+        _global_path_state: GlobalPathState,
+        mission: Mission,
+    ) {
         self.do_alt_motion = false;
         mat4::identity(&mut prop.rotation_mat);
         mat4::identity(&mut prop.init_rotation_mat);
-        // TODO: `prop_motion_2/23_subroutine`
+        self.generic_init_path(prop, mission);
         prop.animation_type = PropAnimationType::MovingForward;
         vec3::copy(&mut prop.pos, &self.target_point);
     }

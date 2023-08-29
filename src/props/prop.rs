@@ -330,7 +330,7 @@ pub struct Prop {
 
     /// (??) The type of movement that this prop performs.
     /// offset: 0x16
-    move_type: Option<u16>,
+    pub move_type: Option<u16>,
 
     /// The prop is intangible until the player loads this area.
     /// offset: 0x1a
@@ -358,7 +358,7 @@ pub struct Prop {
 
     /// True if the prop's motion action applies any translation.
     /// offset: 0x21
-    has_motion: bool,
+    pub has_motion: bool,
 
     /// The next sibling of this prop in its family tree.
     /// NOTE: the original simulation keeps a pointer to the prop, but we only store
@@ -1281,6 +1281,11 @@ impl Prop {
 
     pub fn get_name_index_motion(&mut self) -> NameIndexMotion {
         self.name_index_motion
+    }
+
+    pub fn end_motion(&mut self) {
+        self.has_motion = false;
+        self.move_type = None;
     }
 
     pub fn set_no_parent(&mut self) {

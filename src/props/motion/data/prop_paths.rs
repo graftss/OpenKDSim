@@ -10,35 +10,6 @@ use crate::{
 static PROP_PATH_POINTS: &[u8] = include_bytes_align_as!(f32, "./bin/prop_path_points.bin");
 static PROP_PATHS: &[u8] = include_bytes_align_as!(PropPath, "./bin/prop_paths.bin");
 
-/// A path that can be travelled by a prop.
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct PropPath {
-    /// An index into the `PropPathData::points` vector indicating the first point on this path.
-    pub point_idx: u32,
-
-    /// (??) A global multiplier on the speed of the path.
-    /// (But this is usually -1, which probably indicates "normal speed"?)
-    pub speed: f32,
-}
-
-impl PropPath {
-    /// The "null pointer" values of `point_idx` in the original simulation are encoded
-    /// here as `u32::MAX`.
-    const NULL_POINT_IDX: u32 = u32::MAX;
-
-    fn has_null_point_idx(&self) -> bool {
-        self.point_idx == Self::NULL_POINT_IDX
-    }
-}
-
-/// The collection of all data that parameterizes prop paths, as it is stored (roughly)
-/// in the original simulation.
-pub struct PropPathData {
-    pub paths: &'static [PropPath],
-    pub points: &'static [Vec4],
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PathStage {
     House,
@@ -92,6 +63,44 @@ impl TryFrom<Mission> for PathStage {
             _ => Err(()),
         }
     }
+}
+
+impl PathStage {
+    /// Returns `true` if `mission` is associated to some `PathStage`, which means that
+    /// there are paths defined for that mission.
+    pub fn has_paths(mission: Mission) -> bool {
+        TryInto::<PathStage>::try_into(mission).is_ok()
+    }
+}
+
+/// A path that can be travelled by a prop.
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct PropPath {
+    /// An index into the `PropPathData::points` vector indicating the first point on this path.
+    pub point_idx: u32,
+
+    /// If positive, a fixed speed that props following this path will have.
+    /// However, most values of this field are -1, which means that props moving along
+    /// this path inherit their speed from their `name_idx`.
+    pub speed: f32,
+}
+
+impl PropPath {
+    /// The "null pointer" values of `point_idx` in the original simulation are encoded
+    /// here as `u32::MAX`.
+    const NULL_POINT_IDX: u32 = u32::MAX;
+
+    fn has_null_point_idx(&self) -> bool {
+        self.point_idx == Self::NULL_POINT_IDX
+    }
+}
+
+/// The collection of all data that parameterizes prop paths, as it is stored (roughly)
+/// in the original simulation.
+pub struct PropPathData {
+    pub paths: &'static [PropPath],
+    pub points: &'static [Vec4],
 }
 
 impl PropPathData {

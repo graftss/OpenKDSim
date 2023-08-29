@@ -37,8 +37,10 @@ pub struct NamePropConfig {
     /// offset: 0x15
     pub num_vault_pts: u8,
 
-    /// The prop's movement speed index, both along paths and when fleeing.
-    /// The value is an index into another table (TODO_PROP_MOTION: where is it)
+    /// The prop's movement speed index, which applies to both its movement along paths and
+    /// when fleeing from the katamari.
+    /// This value is not the actual speed, but an index into the
+    /// `motion::path::PROP_PATH_SPEEDS` table, which does contain the actual speed.
     /// offset: 0x17
     pub move_speed_idx: u8,
 
