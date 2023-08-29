@@ -549,11 +549,7 @@ fn reformat_prop_paths() -> std::io::Result<()> {
     Ok(())
 }
 
-fn test_prop_path_data() {
-    let x = PROP_PATH_DATA.get_num_path_points(Mission::Eternal3, 16);
-    let y = PROP_PATH_DATA.get_num_path_points(Mission::Eternal3, 49);
-    println!("{x:?}, {y:?}");
-}
+fn test_prop_path_data() {}
 
 fn main() {
     println!("start");

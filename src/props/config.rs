@@ -42,7 +42,7 @@ pub struct NamePropConfig {
     /// This value is not the actual speed, but an index into the
     /// `motion::path::PROP_PATH_SPEEDS` table, which does contain the actual speed.
     /// offset: 0x17
-    pub move_speed_idx: u8,
+    pub speed_idx: u8,
 
     /// The prop's type of innate motion action (e.g. spherical objects do an inelastic collision
     /// when collided with, "fight" objects spin around, etc).
@@ -130,7 +130,7 @@ impl NamePropConfig {
             config.lock_pitch = read_bool!(table, base + 0x10);
             config.can_flee = read_bool!(table, base + 0x12);
             config.num_vault_pts = read_u8!(table, base + 0x15);
-            config.move_speed_idx = read_u8!(table, base + 0x17);
+            config.speed_idx = read_u8!(table, base + 0x17);
             config.innate_motion_type = read_u8!(table, base + 0x18);
             config.cannot_wobble = read_bool!(table, base + 0x1b);
             config.use_aabb_for_collision = read_bool!(table, base + 0x1d);

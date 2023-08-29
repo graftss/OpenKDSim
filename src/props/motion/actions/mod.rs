@@ -4,8 +4,8 @@ use crate::props::prop::Prop;
 
 use self::sway::SwayAction;
 
-mod path;
-mod sway;
+pub mod path;
+pub mod sway;
 
 pub trait ActionUpdate {
     fn update(&mut self, prop: &mut Prop);

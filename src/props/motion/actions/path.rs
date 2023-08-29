@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     constants::VEC3_Z_POS,
     macros::vec3_from,
-    math::vec3_inplace_normalize,
     mission::Mission,
     props::{
+        config::NamePropConfig,
         motion::{
             data::{
                 move_types::MISSION_MOVE_TYPES,
@@ -18,7 +18,17 @@ use crate::{
     },
 };
 
-const PROP_PATH_SPEEDS: [f32; 11] = [0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 20.0, 40.0, 200.0];
+const INNATE_PROP_PATH_SPEEDS: [f32; 11] =
+    [0.0, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 20.0, 40.0, 200.0];
+
+pub trait PathMotion {
+    fn get_flags(&self) -> FollowPathFlags;
+    fn get_path_idx(&self) -> u16;
+    fn set_path_idx(&mut self, value: u16);
+    fn get_target_point_idx(&self) -> u16;
+    fn set_target_point_idx(&mut self, value: u16);
+    fn set_target_point(&mut self, value: &Vec3);
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 enum FollowPathState {
@@ -71,6 +81,7 @@ bitflags::bitflags! {
     pub struct FollowPathFlags: u8 {
         const Reversed = 0x1;
         const Unk_0x2 = 0x2;
+        const Unk_0x8 = 0x8;
     }
 }
 
@@ -184,10 +195,12 @@ impl FollowPath {
     /// offset: 0x3a330
     fn generic_init_path(&mut self, prop: &mut Prop, mission: Mission) {
         self.target_point_idx = 0;
+
         if !PathStage::has_paths(mission) {
             // no path data exists for this motion, so just give up trying to initialize the path
             return prop.end_motion();
         }
+
         self.path_idx =
             MISSION_MOVE_TYPES[mission as usize][prop.move_type.unwrap() as usize].path_idx;
         // TODO: `pmot_init_path_subroutine()`
@@ -213,7 +226,6 @@ impl FollowPath {
         );
         vec3::copy(&mut self.up, &VEC3_Z_POS);
 
-        // TODO: does this actually agree with `prop.aabb_vertices[1].y`?
         let aabb_top = prop.get_aabb_max_y();
         self.target_point[1] += aabb_top;
     }
@@ -232,5 +244,42 @@ impl FollowPath {
         self.generic_init_path(prop, mission);
         prop.animation_type = PropAnimationType::MovingForward;
         vec3::copy(&mut prop.pos, &self.target_point);
+
+        let path = PROP_PATH_DATA
+            .get_mission_path(mission, self.path_idx as usize)
+            .unwrap();
+
+        self.speed = if path.speed < 0.0 {
+            let speed_idx = NamePropConfig::get(prop.get_name_idx()).speed_idx;
+            INNATE_PROP_PATH_SPEEDS[speed_idx as usize]
+        } else {
+            path.speed
+        };
+    }
+}
+
+impl PathMotion for FollowPath {
+    fn get_flags(&self) -> FollowPathFlags {
+        self.flags
+    }
+
+    fn get_path_idx(&self) -> u16 {
+        self.path_idx
+    }
+
+    fn set_path_idx(&mut self, value: u16) {
+        self.path_idx = value;
+    }
+
+    fn get_target_point_idx(&self) -> u16 {
+        self.target_point_idx
+    }
+
+    fn set_target_point_idx(&mut self, value: u16) {
+        self.target_point_idx = value;
+    }
+
+    fn set_target_point(&mut self, point: &Vec3) {
+        vec3::copy(&mut self.target_point, point);
     }
 }
