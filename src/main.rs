@@ -2,7 +2,7 @@
 #![feature(vec_into_raw_parts)]
 #![allow(non_snake_case, dead_code, unused_imports)]
 
-use std::{cell::RefCell, num::Wrapping, ops::Range, rc::Rc};
+use std::{cell::RefCell, fs::File, io::Write, num::Wrapping, ops::Range, rc::Rc};
 
 use collision::raycast_state::ray_hits_aabb;
 use constants::{FRAC_PI_2, FRAC_PI_90, PI};
@@ -18,7 +18,11 @@ use math::{
 use mission::{config::MissionConfig, Mission};
 use mono_data::MonoData;
 use player::{katamari::spline::compute_spline_accel_mult, prince::Prince};
-use props::{config::NamePropConfig, prop::AddPropArgs};
+use props::{
+    config::NamePropConfig,
+    motion::{data::prop_paths::PropPathData, get_max_path_indices},
+    prop::AddPropArgs,
+};
 use serde::Serialize;
 
 use crate::{
@@ -530,7 +534,5 @@ fn main() {
 
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
-    {
-        prop_motion_test();
-    }
+    {}
 }

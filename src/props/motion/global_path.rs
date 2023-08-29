@@ -2,13 +2,22 @@ use serde::{Deserialize, Serialize};
 
 const NUM_GLOBAL_PATH_STATES: usize = 256;
 
+bitflags::bitflags! {
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(transparent)]
+    pub struct GlobalPathFlags: u8 {
+        const Reversing = 0x1;
+        const Unk_0x2 = 0x2;
+    }
+}
+
 /// State about a single path, which may have multiple props moving along it at once.
 /// Updating this state allows individual props on the path to affect all such props.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GlobalPath {
     /// Flags: &1:reversed, &2:stalled.
     /// offset: 0x0
-    pub flags: u8,
+    pub flags: GlobalPathFlags,
 
     /// (??) If >0, all objects on the path are stalled.
     /// offset: 0x1
@@ -36,6 +45,8 @@ impl GlobalPathState {
             self.paths.push(GlobalPath::default());
         }
     }
-}
 
-impl GlobalPathState {}
+    pub fn get_path(&self, path_index: usize) -> &GlobalPath {
+        &self.paths[path_index]
+    }
+}

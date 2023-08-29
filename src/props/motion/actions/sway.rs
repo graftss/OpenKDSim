@@ -12,6 +12,7 @@ use super::ActionUpdate;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct SwayAction {
+    /// offset: 0x0
     initialized: bool,
 
     /// Unused?

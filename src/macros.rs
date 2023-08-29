@@ -248,9 +248,42 @@ macro_rules! mark_call {
     };
 }
 
+// copied from https://users.rust-lang.org/t/can-i-conveniently-compile-bytes-into-a-rust-program-with-a-specific-alignment/24049/2
+#[repr(C)] // guarantee 'bytes' comes after '_align'
+pub struct AlignedAs<Align, Bytes: ?Sized> {
+    pub _align: [Align; 0],
+    pub bytes: Bytes,
+}
+
+macro_rules! include_bytes_align_as {
+    ($align_ty:ty, $path:literal) => {{
+        // const block expression to encapsulate the static
+        use $crate::macros::AlignedAs;
+
+        // this assignment is made possible by CoerceUnsized
+        static ALIGNED: &AlignedAs<$align_ty, [u8]> = &AlignedAs {
+            _align: [],
+            bytes: *include_bytes!($path),
+        };
+
+        &ALIGNED.bytes
+    }};
+}
+
+macro_rules! transmute_included_bytes {
+    ($bytes:ident, $align_ty:ty, $expect_len: expr) => {{
+        let (prefix, result, suffix) = $bytes.align_to::<$align_ty>();
+        assert!(prefix.is_empty());
+        assert!(suffix.is_empty());
+        assert_eq!(result.len(), $expect_len);
+        result
+    }};
+}
+
 #[allow(unused_imports)]
 pub(crate) use {
     debug_log,
+    include_bytes_align_as,
     internal_mark_address,
     inv_lerp,
     inv_lerp_clamp,
@@ -276,6 +309,7 @@ pub(crate) use {
     set_y,
     temp_debug_log,
     temp_debug_write,
+    transmute_included_bytes,
     vec3_from,
     vec3_unit_xz,
 };

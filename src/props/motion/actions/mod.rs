@@ -1,12 +1,10 @@
-
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    props::prop::{Prop},
-};
+use crate::props::prop::Prop;
 
 use self::sway::SwayAction;
 
+mod path;
 mod sway;
 
 pub trait ActionUpdate {
@@ -29,9 +27,7 @@ impl MotionAction {
             _ => Self::Unimplemented(action_id),
         }
     }
-}
 
-impl MotionAction {
     fn update(&mut self, prop: &mut Prop) {
         match self {
             MotionAction::MiscSway(sway) => sway.update(prop),

@@ -142,7 +142,7 @@ impl Default for PropUnattachedState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-enum PropAnimationType {
+pub enum PropAnimationType {
     Waiting = 0,
     MovingForward = 1,
     Animation2 = 2,
@@ -382,7 +382,7 @@ pub struct Prop {
 
     /// The prop's rotation as a matrix.
     /// offset: 0x50
-    rotation_mat: Mat4,
+    pub rotation_mat: Mat4,
 
     /// The prop's position.
     /// offset: 0x90
@@ -416,7 +416,7 @@ pub struct Prop {
 
     /// The prop's initial rotation matrix when it loaded.
     /// offset: 0x150
-    init_rotation_mat: Mat4,
+    pub init_rotation_mat: Mat4,
 
     /// (??) the transform when moving?
     /// offset: 0x190
@@ -490,7 +490,7 @@ pub struct Prop {
 
     /// The prop's animation type.
     /// offset: 0x589
-    animation_type: PropAnimationType,
+    pub animation_type: PropAnimationType,
 
     /// The ID of the king message that's played when this prop is collected, if any.
     /// offset: 0x58a
@@ -1541,6 +1541,10 @@ impl Prop {
             self.flags2.insert(PropFlags2::UnderTrajectory);
         }
     }
+
+    /// TODO
+    /// offset: 0x5aad0
+    pub fn update_somethings_coming(&mut self) {}
 }
 
 impl Prop {
