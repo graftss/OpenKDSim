@@ -2,9 +2,9 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    constants::VEC3_Z_POS,
+    constants::{PI, VEC3_Z_POS},
     macros::{vec3_from, vec3_unit_xz},
-    math::{acos_f32, normalize_bounded_angle},
+    math::{acos_f32, normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize},
     mission::Mission,
     props::{
         config::NamePropConfig,
@@ -87,6 +87,7 @@ bitflags::bitflags! {
         const Reversed = 0x1;
         const Unk_0x2 = 0x2;
         const Unk_0x8 = 0x8;
+        const UpdatePitch = 0x10;
     }
 }
 
@@ -108,7 +109,7 @@ pub struct FollowPath {
     speed: f32,
 
     /// offset: 0x8
-    yaw_angle: f32,
+    yaw_current: f32,
 
     /// offset: 0xc
     yaw_target: f32,
@@ -171,19 +172,125 @@ fn yaw_angle_to_target(forward: &Vec3, pos: &Vec3, target: &Vec3) -> f32 {
 }
 
 impl FollowPath {
-    fn move_along_path(&mut self, _prop: &mut Prop) {}
+    /// Returns `true` if the prop's `speed` (the distance it will move this tick)
+    /// is greater than the distance to its target point.
+    /// offset: 0x37610
+    fn will_reach_target_pt(&mut self, prop: &mut Prop, speed: f32) -> bool {
+        let dist_to_target = vec3::distance(&self.target_point, &prop.pos);
+        return speed >= dist_to_target;
+    }
+
+    /// Apply the motion's yaw speed to its yaw angle, with the result of turning a prop
+    /// slightly towards its target point.
+    /// Returns the updated yaw angle.
+    /// offset: 0x379a0
+    fn apply_yaw_speed(&mut self) -> f32 {
+        // TODO_PARAM: 0.5 is really `30.0 * FRAME_TIME`
+        self.yaw_current += self.yaw_speed * 0.5;
+
+        let done_turning = if self.yaw_speed > 0.0 {
+            self.yaw_current >= self.yaw_target
+        } else {
+            self.yaw_current <= self.yaw_target
+        };
+
+        if done_turning && self.yaw_target != self.yaw_current {
+            self.yaw_current = self.yaw_target;
+            self.yaw_speed = 0.0;
+        }
+
+        return normalize_bounded_angle(self.yaw_current);
+    }
+
+    /// Move the prop towards its target point.
+    /// offset: 0x39440
+    fn move_towards_target(
+        &mut self,
+        prop: &mut Prop,
+        gps: GlobalPathState,
+        mission: Mission,
+    ) -> bool {
+        // TODO_PARAM: 0.5 is really `30.0 * FRAME_TIME`
+        let mut speed = self.speed * 0.5;
+        if gps.get_path(self.path_idx as usize).double_speed {
+            speed = speed + speed;
+        }
+
+        if self.flags.contains(FollowPathFlags::UpdatePitch) {
+            // TODO: `self.pmot_path_update_pitch_if_flag_0x10(prop)`
+        }
+
+        if self.will_reach_target_pt(prop, speed) {
+            // if we will reach the next target point, load the next target point
+            let found_next_target = PROP_PATH_DATA.load_next_target_point(self, prop, mission);
+            if !found_next_target {
+                return false;
+            }
+
+            if !NamePropConfig::get(prop.get_name_idx()).lock_pitch {
+                // TODO: `self.pmot_update_pitch(prop)`
+            } else {
+                self.flags.remove(FollowPathFlags::UpdatePitch);
+            }
+
+            let yaw_current = yaw_angle_to_target(&self.forward, &prop.pos, &prop.last_pos);
+            self.yaw_current = yaw_current;
+
+            let yaw_target = yaw_angle_to_target(&self.forward, &prop.pos, &self.target_point);
+            self.yaw_target = yaw_target;
+
+            // compute the total change in yaw that the prop is required to make as it moves towards
+            // its target. this value (along with the target yaw angle) is normalized to lie within
+            // [-PI, PI].
+            // TODO: this might not be right
+            // TODO_REFACTOR: also can't we just do `normalize_bounded_angle(yaw_target - yaw_current)`?
+            let mut yaw_remain = yaw_target - yaw_current;
+            if yaw_current > 0.0 && yaw_target < 0.0 && (yaw_target - yaw_current < -PI) {
+                yaw_remain += 2.0 * PI;
+                self.yaw_target += 2.0 * PI;
+            } else if yaw_current < 0.0 && yaw_target > 0.0 && (yaw_target - yaw_current > PI) {
+                yaw_remain -= 2.0 * PI;
+                self.yaw_target -= 2.0 * PI;
+            }
+
+            let len_to_target = vec3::distance(&self.target_point, &prop.pos);
+            let time_to_target = if speed == 0.0 {
+                len_to_target / 30.0
+            } else {
+                len_to_target / speed
+            };
+
+            self.yaw_speed = if time_to_target != 0.0 {
+                yaw_remain / time_to_target
+            } else {
+                yaw_remain
+            };
+        }
+
+        let next_yaw = self.apply_yaw_speed();
+        // TODO: is this right? if it is, then this PI could probably be added in `apply_yaw_speed`.
+        prop.rotation_vec[1] = normalize_bounded_angle(next_yaw + PI);
+
+        let mut vel_to_target_unit = vec3_from!(-, self.target_point, prop.pos);
+        vec3_inplace_normalize(&mut vel_to_target_unit);
+        self.vel_to_target_unit = vel_to_target_unit;
+        vec3::scale(&mut self.vel_to_target, &self.vel_to_target_unit, speed);
+        vec3_inplace_add_vec(&mut prop.pos, &self.vel_to_target);
+
+        true
+    }
 }
 
 impl FollowPath {
     /// The main update behavior for the `FollowPath` action.
     /// ofset: 0x399c0
-    fn update(&mut self, prop: &mut Prop, global_path_state: GlobalPathState) {
+    fn update(&mut self, prop: &mut Prop, gps: GlobalPathState) {
         if prop.get_move_type().is_none() {
             return;
         }
 
         // propagate the path's global state's reversed-ness to each prop on that path
-        let global_path = global_path_state.get_path(self.path_idx as usize);
+        let global_path = gps.get_path(self.path_idx as usize);
         let global_reverse = global_path.flags.contains(GlobalPathFlags::Reversing);
 
         if global_reverse != Into::<bool>::into(self.direction) {
@@ -207,15 +314,12 @@ impl FollowPath {
         }
     }
 
-    fn update_by_state(
-        &mut self,
-        prop: &mut Prop,
-        global_path_state: GlobalPathState,
-        mission: Mission,
-    ) {
+    fn update_by_state(&mut self, prop: &mut Prop, gps: GlobalPathState, mission: Mission) {
         match self.state {
-            FollowPathState::Init => self.update_state_init(prop, global_path_state, mission),
-            FollowPathState::MoveTowardsTarget => self.update_state_move_towards_target(prop),
+            FollowPathState::Init => self.update_state_init(prop, gps, mission),
+            FollowPathState::MoveTowardsTarget => {
+                self.update_state_move_towards_target(prop, gps, mission)
+            }
             FollowPathState::TurnInPlace => todo!(),
             FollowPathState::WaitWhileFlag0x2 => todo!(),
         }
@@ -261,12 +365,7 @@ impl FollowPath {
 
     /// State 0 update behavior. Initializes the path-based motion.
     /// offset: 0x39b50
-    fn update_state_init(
-        &mut self,
-        prop: &mut Prop,
-        _global_path_state: GlobalPathState,
-        mission: Mission,
-    ) {
+    fn update_state_init(&mut self, prop: &mut Prop, _gps: GlobalPathState, mission: Mission) {
         self.do_alt_motion = false;
         mat4::identity(&mut prop.rotation_mat);
         mat4::identity(&mut prop.init_rotation_mat);
@@ -293,7 +392,7 @@ impl FollowPath {
 
         self.yaw_speed = 0.0;
         self.yaw_target = init_yaw;
-        self.yaw_angle = init_yaw;
+        self.yaw_current = init_yaw;
         // TODO_PARAM: the 0.1 is KatamariParams::prop_attach_vol_ratio
         self.scary_kat_vol_m3 = prop.get_compare_vol_m3() / 0.1;
         prop.is_following_path = true;
@@ -303,7 +402,12 @@ impl FollowPath {
 
     /// State 1 update behavior. The "main" state that drives movement along the path.
     /// offset: 0x39ce0
-    fn update_state_move_towards_target(&mut self, prop: &mut Prop) {
+    fn update_state_move_towards_target(
+        &mut self,
+        prop: &mut Prop,
+        gps: GlobalPathState,
+        mission: Mission,
+    ) {
         if self.flags.contains(FollowPathFlags::Unk_0x2) {
             self.state = FollowPathState::WaitWhileFlag0x2;
         } else if self.reversing {
@@ -311,7 +415,7 @@ impl FollowPath {
             self.state = FollowPathState::TurnInPlace;
             self.reversing = false;
         } else {
-            self.move_along_path(prop);
+            self.move_towards_target(prop, gps, mission);
         }
     }
 
