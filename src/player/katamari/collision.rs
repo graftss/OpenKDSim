@@ -1701,7 +1701,7 @@ impl Katamari {
             }
         }
 
-        // TODO_HIGH: remove `detached_indices` from `attached_props`
+        // TODO_BUG: remove `detached_indices` from `attached_props`
     }
 
     /// Detach a prop from the katamari with the speed `detach_speed`.

@@ -267,7 +267,7 @@ impl GameState {
     /// Mimicks the `MonoInitEnd` API function.
     pub fn mono_init_end(&mut self) {
         // TODO_PROPS: init_cache_gemini_twins();
-        self.props.global_paths.init();
+        self.props.gps.init();
         self.global.props_initialized = true;
     }
 

@@ -38,7 +38,7 @@ pub struct PropsState {
     pub props: Vec<PropRef>,
     pub prop_motions: Vec<Option<MotionAction>>,
 
-    pub global_paths: GlobalPathState,
+    pub gps: GlobalPathState,
 
     /// NOTE: the simulation sort of tracks comment groups, but they aren't actually
     /// used since unity also tracks them and doesn't query the simulation's data.
@@ -63,7 +63,7 @@ impl PropsState {
     pub fn reset(&mut self) {
         self.props.clear();
         self.prop_motions.clear();
-        self.global_paths.init();
+        self.gps.init();
         self.random.reset();
         self.config = Some(&NAME_PROP_CONFIGS);
     }
@@ -160,7 +160,7 @@ impl PropsState {
     }
 
     pub fn change_next_area(&mut self, area: u8) {
-        // TODO_HIGH: we can't `retain` here without ruining the property that `ctrl_idx` is an index
+        // TODO_BUG: we can't `retain` here without ruining the property that `ctrl_idx` is an index
         // into `self.props`
         // destroy props which have the new area as their "display off" area.
         self.props.retain(|prop_ref| {
@@ -226,13 +226,13 @@ impl PropsState {
         if mission_state.is_ending() {
             self.update_ending();
         } else {
-            self.update_nonending(player);
+            self.update_nonending(player, mission_state);
         }
     }
 
     /// Root function to update all props when not in the `Ending` game mode.
     /// offset: 0x50050
-    pub fn update_nonending(&mut self, player: &Player) {
+    pub fn update_nonending(&mut self, player: &Player, mission_state: &MissionState) {
         for prop_ref in self.props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
             if prop.is_disabled() {
@@ -245,7 +245,7 @@ impl PropsState {
             prop.update_last_pos_and_rotation();
             prop.update_global_state();
             prop.update_child_link();
-            prop.update_name_index_motion(motion_action);
+            prop.update_name_index_motion(motion_action, &self.gps, mission_state);
 
             // if let Some(_script) = prop.innate_script.as_ref() {
             //     // TODO_PROP_MOTION: call `innate_script`

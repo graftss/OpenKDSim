@@ -20,16 +20,20 @@ use mono_data::MonoData;
 use player::{katamari::spline::compute_spline_accel_mult, prince::Prince};
 use props::{
     config::NamePropConfig,
-    motion::data::prop_paths::{PropPathData, PROP_PATH_DATA},
-    prop::AddPropArgs,
+    motion::{
+        actions::path::{FollowPath, PathMotion},
+        data::prop_paths::{PropPathData, PROP_PATH_DATA},
+    },
+    prop::{AddPropArgs, Prop},
 };
 use serde::Serialize;
 
 use crate::{
     collision::raycast_state::RaycastState,
-    constants::VEC3_ZERO,
-    macros::{max, min, set_translation, temp_debug_log, vec3_from},
+    constants::{VEC3_ZERO, VEC3_Z_POS},
+    macros::{f32_close_enough, max, min, set_translation, temp_debug_log, vec3_from},
     math::{vec3_inplace_zero_small, vec3_times_mat4},
+    props::motion::actions::path::yaw_angle_to_target,
 };
 
 // reference this first so it's available to all other modules
@@ -546,7 +550,49 @@ fn reformat_prop_paths() -> std::io::Result<()> {
     Ok(())
 }
 
-fn test_prop_path_data() {}
+fn reformat_prop_points() -> std::io::Result<()> {
+    let old_data = PROP_PATH_DATA.points;
+    let new_file_path = "bin/prop_path_points.bin";
+
+    let mut file = File::create(new_file_path)?;
+
+    for (_idx, point) in old_data.iter().enumerate() {
+        file.write(&(-point[0]).to_bits().to_le_bytes())?;
+        file.write(&(-point[1]).to_bits().to_le_bytes())?;
+        file.write(&(-point[2]).to_bits().to_le_bytes())?;
+        file.write(&point[3].to_bits().to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
+fn test_prop_path_data() {
+    let mission = Mission::MAS1;
+    let path_idx = 10;
+    let points = &PROP_PATH_DATA.get_mission_path_points(mission, path_idx);
+    println!("{:?}", points);
+}
+
+fn test_ant_init() {
+    let mission = Mission::MAS1;
+
+    let mut motion = FollowPath::default();
+    motion.set_path_idx(10);
+
+    let mut ant0 = Prop::default();
+    ant0.debug_set_ctrl_idx(69);
+    ant0.pos = [160.7232, -65.5534, 137.2686];
+
+    let mut ant1 = Prop::default();
+    ant1.debug_set_ctrl_idx(69);
+    ant1.pos = [161.1982, -65.5534, 143.1274];
+
+    PROP_PATH_DATA.load_initial_target_point_idx(&mut motion, &mut ant0, mission);
+    println!("ant0 (expect 32): {:?}", motion.get_target_point_idx());
+
+    PROP_PATH_DATA.load_initial_target_point_idx(&mut motion, &mut ant1, mission);
+    println!("ant1 (expect 71): {:?}", motion.get_target_point_idx());
+}
 
 fn main() {
     println!("start");
@@ -556,7 +602,6 @@ fn main() {
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
     {
-        // reformat_prop_paths();
-        test_prop_path_data();
+        test_ant_init();
     }
 }

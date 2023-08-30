@@ -18,7 +18,7 @@ use crate::{
     global::GlobalState,
     macros::{
         debug_log, max_to_none, modify_translation, new_mat4_copy, panic_log, scale_translation,
-        set_translation, temp_debug_log, vec3_from,
+        set_translation, vec3_from,
     },
     mission::state::MissionState,
     mono_data::{MonoData, PropAabbs, PropMonoData},
@@ -875,9 +875,6 @@ impl Prop {
             if let Some(move_type_data) =
                 get_mission_move_type_data(mission_state.mission, move_type)
             {
-                if ctrl_idx == 0x1a0 {
-                    temp_debug_log!(" data={move_type_data:?}, ");
-                }
                 let MissionMoveType {
                     default_action,
                     path_idx: _,
@@ -1001,6 +998,10 @@ impl Prop {
 
     pub fn get_name_idx(&self) -> u16 {
         self.name_idx
+    }
+
+    pub fn debug_set_ctrl_idx(&mut self, ctrl_idx: u16) {
+        self.ctrl_idx = ctrl_idx;
     }
 
     pub fn get_ctrl_idx(&self) -> u16 {

@@ -9,6 +9,7 @@ pub struct MissionMoveType {
 
 lazy_static! {
     pub static ref MISSION_MOVE_TYPES: Vec<Vec<MissionMoveType>> = vec![
+        vec![],
         vec![
             MissionMoveType {
                 default_action: 0,

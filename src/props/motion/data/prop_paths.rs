@@ -3,7 +3,6 @@ use lazy_static::lazy_static;
 
 use crate::{
     macros::{include_bytes_align_as, transmute_included_bytes},
-    math::vec3_inplace_scale,
     mission::Mission,
     props::{
         motion::actions::path::{FollowPathFlags, PathMotion},
@@ -20,11 +19,11 @@ static PROP_PATHS: &[u8] = include_bytes_align_as!(PropPath, "./bin/prop_paths.b
 macro_rules! path_pt_dist {
     ($path_pt: expr, $other_pt: expr) => {{
         let diff = [
-            $path_pt[0] + $other_pt[0],
-            $path_pt[1] + $other_pt[1],
-            $path_pt[2] + $other_pt[2],
+            $path_pt[0] - $other_pt[0],
+            $path_pt[1] - $other_pt[1],
+            $path_pt[2] - $other_pt[2],
         ];
-        (diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]).sqrt()
+        (diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2])
     }};
 }
 
@@ -135,6 +134,15 @@ impl PropPathData {
         Self { points, paths }
     }
 
+    /// Get a slice of all points on the `path_idx`-th path in `mission`.
+    pub fn get_mission_path_points(&self, mission: Mission, path_idx: usize) -> Option<&[Vec4]> {
+        self.get_mission_path(mission, path_idx).map(|path| {
+            let start = path.point_idx as usize;
+            let end = start + self.get_last_path_point_idx(mission, path_idx).unwrap() as usize;
+            &self.points[start..end + 1]
+        })
+    }
+
     /// The first index in the `paths` array corresponding to the paths in `stage`.
     /// For example, the path with index 17 in the `House` stage is at index
     /// 85 + 17 = 102 in `paths`.
@@ -151,8 +159,8 @@ impl PropPathData {
     }
 
     /// Get the `stage_path_idx`-th path in `stage`, if it exists.
-    fn get_stage_path(&self, stage: PathStage, stage_path_idx: usize) -> Option<&PropPath> {
-        let path_idx = Self::path_stage_init_idx(stage) + stage_path_idx;
+    fn get_stage_path(&self, stage: PathStage, path_idx: usize) -> Option<&PropPath> {
+        let path_idx = Self::path_stage_init_idx(stage) + path_idx;
         let path = &self.paths[path_idx];
         if path.has_null_point_idx() {
             None
@@ -162,38 +170,32 @@ impl PropPathData {
     }
 
     /// Get the `mission_path_idx`-th path in `mission`, if it exists.
-    pub fn get_mission_path(&self, mission: Mission, mission_path_idx: usize) -> Option<&PropPath> {
+    pub fn get_mission_path(&self, mission: Mission, path_idx: usize) -> Option<&PropPath> {
         TryInto::<PathStage>::try_into(mission)
             .ok()
-            .and_then(|stage| self.get_stage_path(stage, mission_path_idx))
+            .and_then(|stage| self.get_stage_path(stage, path_idx))
     }
 
     /// Get the `point_idx`-th point on the `path_idx`-th path in `stage`.
-    /// This method reflects the point across the origin to transform it from the original
-    /// simulation's coordinate space to the Unity coordinate space.
     /// Returns `true` if no such path exists (for some reason), and `false` if it does.
     fn get_stage_path_point(
         &self,
         out: &mut Vec3,
         stage: PathStage,
         point_idx: usize,
-        stage_path_idx: usize,
+        path_idx: usize,
     ) -> bool {
-        self.get_stage_path(stage, stage_path_idx)
-            .map_or(true, |path| {
-                let pt = self.points[path.point_idx as usize + point_idx];
-                out[0] = pt[0];
-                out[1] = pt[1];
-                out[2] = pt[2];
-                // note the reflection here to transform the original simulation points to unity space
-                vec3_inplace_scale(out, -1.0);
-                false
-            })
+        self.get_stage_path(stage, path_idx).map_or(true, |path| {
+            let pt = self.points[path.point_idx as usize + point_idx];
+            out[0] = pt[0];
+            out[1] = pt[1];
+            out[2] = pt[2];
+            false
+        })
     }
 
     /// Get the `point_idx`-th point on the `path_idx`-th path in `mission`.
-    /// This method reflects the point across the origin to transform it from the original
-    /// simulation's coordinate space to the Unity coordinate space.
+    ///
     /// Returns `true` if no such path exists (for some reason), and `false` if it does.
     /// offset: 0x37720
     pub fn get_mission_path_point(
@@ -201,10 +203,10 @@ impl PropPathData {
         out: &mut Vec3,
         mission: Mission,
         point_idx: usize,
-        mission_path_idx: usize,
+        path_idx: usize,
     ) -> bool {
         if let Ok(stage) = TryInto::<PathStage>::try_into(mission) {
-            self.get_stage_path_point(out, stage, point_idx, mission_path_idx)
+            self.get_stage_path_point(out, stage, point_idx, path_idx)
         } else {
             true
         }
@@ -216,17 +218,18 @@ impl PropPathData {
     /// rather than specifically checking for the sentinel.
     const END_POINT_LIST_SENTINEL: f32 = 255.0;
 
-    /// Compute the last point index on the `path_idx`-th path in `mission`.
+    /// Compute the last point index on the `path_idx`-th path in `mission`. This is the
+    /// **largest valid** point index for the path.
     /// If no such path exists, returns `None`.
     /// offset: 0x37790
-    pub fn get_last_point_idx(&self, mission: Mission, mission_path_idx: usize) -> Option<u16> {
+    pub fn get_last_path_point_idx(&self, mission: Mission, path_idx: usize) -> Option<u16> {
         if let Ok(stage) = TryInto::<PathStage>::try_into(mission) {
-            if let Some(path) = self.get_stage_path(stage, mission_path_idx) {
+            if let Some(path) = self.get_stage_path(stage, path_idx) {
                 let mut point_idx = path.point_idx as usize;
                 let mut result = 0;
                 loop {
                     if self.points[point_idx][3] == Self::END_POINT_LIST_SENTINEL {
-                        return Some(result);
+                        return Some(result - 1);
                     }
                     point_idx += 1;
                     result += 1;
@@ -247,20 +250,20 @@ impl PropPathData {
         let path_idx = motion.get_path_idx() as usize;
 
         if self.get_mission_path(mission, path_idx).is_some() {
-            let last_pt_idx = self.get_last_point_idx(mission, path_idx).unwrap();
+            let last_pt_idx = self.get_last_path_point_idx(mission, path_idx).unwrap();
             let flags = motion.get_flags();
             let reversed = flags.contains(FollowPathFlags::Reversed);
 
-            // set the next target point index
+            // compute and set the next target point index
             let next_pt_idx = match (reversed, motion.get_target_point_idx()) {
-                (true, point_idx) if point_idx == last_pt_idx => 0,
-                (true, point_idx) => point_idx + 1,
-                (false, 0) => last_pt_idx,
-                (false, point_idx) => point_idx - 1,
+                (false, point_idx) if point_idx == last_pt_idx => 0,
+                (false, point_idx) => point_idx + 1,
+                (true, 0) => last_pt_idx,
+                (true, point_idx) => point_idx - 1,
             };
             motion.set_target_point_idx(next_pt_idx);
 
-            // set the next target point
+            // compute and set the next target point
             let mut next_pt = [0.0; 3];
             self.get_mission_path_point(&mut next_pt, mission, next_pt_idx as usize, path_idx);
 
@@ -282,7 +285,9 @@ impl PropPathData {
     /// Sets the target point index of `motion` to the nearest or second-nearest point along
     /// the path already loaded in `motion`. Used to initialize the target point of path-following
     /// motion types.
-    /// offset: 0x382c0
+    /// offset: 0x372c0
+    // TODO_REFACTOR: make this take `path_idx` as input and return the `Option<u16>` target point
+    // idx as output
     pub fn load_initial_target_point_idx(
         &self,
         motion: &mut impl PathMotion,
@@ -299,7 +304,9 @@ impl PropPathData {
 
             // initialize the min dist to the point on the path with index 0
             let mut min_dist = path_pt_dist!(path_pt, pos);
-            let mut min_pt_idx = 0;
+            let mut min_pt_idx = path.point_idx as u16;
+
+            println!("??????? {pos:?} {min_dist}");
 
             // leave the second smallest dist "uninitialized"
             let mut second_dist = 0.0;
@@ -315,8 +322,7 @@ impl PropPathData {
                 if path_pt[3] == Self::END_POINT_LIST_SENTINEL {
                     let mut result = second_pt_idx;
 
-                    // TODO_REFACTOR: it seems like this can probably be simplified, but it doesn't
-                    // seem high priority to do so
+                    // TODO_REFACTOR: it seems like this can probably be simplified
                     if min_pt_idx == 0 {
                         if second_pt_idx != 1 {
                             result = min_pt_idx;
@@ -329,7 +335,7 @@ impl PropPathData {
                         result = min_pt_idx;
                     }
 
-                    motion.set_target_point_idx(result);
+                    motion.set_target_point_idx(result - path.point_idx as u16);
                     return;
                 }
 
@@ -348,6 +354,8 @@ impl PropPathData {
                     min_pt_idx = pt_idx;
                 }
 
+                println!("dist={dist}, min_dist={min_dist}, min_idx={}, 2nd_dist={second_dist}, 2nd_idx={}, pt={:?}", min_pt_idx-path.point_idx as u16, second_pt_idx - path.point_idx as u16, path_pt);
+
                 pt_idx += 1;
             }
         } else {
@@ -357,6 +365,7 @@ impl PropPathData {
 }
 
 lazy_static! {
+    /// Global static interface for prop path data.
     pub static ref PROP_PATH_DATA: PropPathData = PropPathData::from_bin();
 }
 
@@ -368,11 +377,11 @@ mod test {
     fn test_get_last_point_idx() {
         assert_eq!(
             Some(168),
-            PROP_PATH_DATA.get_last_point_idx(Mission::Eternal3, 16)
+            PROP_PATH_DATA.get_last_path_point_idx(Mission::Eternal3, 16)
         );
         assert_eq!(
             Some(12),
-            PROP_PATH_DATA.get_last_point_idx(Mission::Eternal3, 49)
+            PROP_PATH_DATA.get_last_path_point_idx(Mission::Eternal3, 49)
         );
     }
 }

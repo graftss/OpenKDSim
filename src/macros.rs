@@ -280,9 +280,17 @@ macro_rules! transmute_included_bytes {
     }};
 }
 
+#[allow(unused_macros)]
+macro_rules! f32_close_enough {
+    ($observed:expr, $expected:expr) => {
+        ((($observed) - ($expected)).abs() < 0.0001)
+    };
+}
+
 #[allow(unused_imports)]
 pub(crate) use {
     debug_log,
+    f32_close_enough,
     include_bytes_align_as,
     internal_mark_address,
     inv_lerp,
