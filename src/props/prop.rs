@@ -350,7 +350,7 @@ pub struct Prop {
 
     /// True if the prop's motion action follows a path.
     /// offset: 0x1f
-    is_following_path: bool,
+    pub is_following_path: bool,
 
     /// If true, the prop cannot wobble.
     /// offset: 0x20

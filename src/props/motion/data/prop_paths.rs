@@ -1,6 +1,4 @@
-use gl_matrix::{
-    common::{Vec3, Vec4},
-};
+use gl_matrix::common::{Vec3, Vec4};
 use lazy_static::lazy_static;
 
 use crate::{

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     constants::VEC3_Z_POS,
     macros::{vec3_from, vec3_unit_xz},
-    math::acos_f32,
+    math::{acos_f32, normalize_bounded_angle},
     mission::Mission,
     props::{
         config::NamePropConfig,
@@ -34,6 +34,10 @@ pub trait PathMotion {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 enum FollowPathState {
     Init = 0,
+    MoveTowardsTarget = 1,
+    TurnInPlace = 2,
+    // TODO: rename this when i understand what flag 0x2 means
+    WaitWhileFlag0x2 = 3,
 }
 
 impl Default for FollowPathState {
@@ -148,6 +152,26 @@ pub struct FollowPath {
     /// (??) The constant vector <0,0,1>, i.e. the forward direction in the prop's local space
     /// offset: 0xf0
     forward: Vec3,
+
+    /// If a katamari with at least this volume comes near the prop, the prop will be scared.
+    /// offset: 0x100
+    scary_kat_vol_m3: f32,
+}
+
+/// (??) Computes the (yaw) angle from the `forward` vector at the point `pos` to the point `target`.
+/// offset: 0x37a20
+fn yaw_angle_to_target(forward: &Vec3, pos: &Vec3, target: &Vec3) -> f32 {
+    // TODO: should the first argument be `end` and the second be `start`, since we're doing
+    // `start - end` here, and computing the vector from end to start?
+    let lateral_target_unit = vec3_unit_xz!(vec3_from!(-, pos, target));
+    let similarity = vec3::dot(&lateral_target_unit, forward);
+    let angle = acos_f32(similarity);
+    // TODO: `pmot_direction_towards_target(angle, forward, lateral_target_unit)` call
+    angle
+}
+
+impl FollowPath {
+    fn move_along_path(&mut self, _prop: &mut Prop) {}
 }
 
 impl FollowPath {
@@ -191,6 +215,9 @@ impl FollowPath {
     ) {
         match self.state {
             FollowPathState::Init => self.update_state_init(prop, global_path_state, mission),
+            FollowPathState::MoveTowardsTarget => self.update_state_move_towards_target(prop),
+            FollowPathState::TurnInPlace => todo!(),
+            FollowPathState::WaitWhileFlag0x2 => todo!(),
         }
     }
 
@@ -260,18 +287,50 @@ impl FollowPath {
 
         PROP_PATH_DATA.load_next_target_point(self, prop, mission);
 
-        // TODO: `pmot_current_facing_angle(prop)` is called here, but seemingly unused?
-        // TODO: rest of function
+        // TODO_LOW: `pmot_current_facing_angle(prop)` is called here, but seemingly unused?
+
+        let init_yaw = yaw_angle_to_target(&self.forward, &prop.pos, &self.target_point);
+
+        self.yaw_speed = 0.0;
+        self.yaw_target = init_yaw;
+        self.yaw_angle = init_yaw;
+        // TODO_PARAM: the 0.1 is KatamariParams::prop_attach_vol_ratio
+        self.scary_kat_vol_m3 = prop.get_compare_vol_m3() / 0.1;
+        prop.is_following_path = true;
+        prop.has_motion = true;
+        self.state = FollowPathState::MoveTowardsTarget;
     }
 
-    /// offset: 0x37a20
-    fn yaw_towards_target(&self, start: &Vec3, end: &Vec3) -> f32 {
-        // TODO: should the first argument be `end` and the second be `start`, since we're doing
-        // `start - end` here, and computing the vector from end to start?
-        let lateral_target_unit = vec3_unit_xz!(vec3_from!(-, start, end));
-        let similarity = vec3::dot(&lateral_target_unit, &self.forward);
-        let angle = acos_f32(similarity);
-        angle
+    /// State 1 update behavior. The "main" state that drives movement along the path.
+    /// offset: 0x39ce0
+    fn update_state_move_towards_target(&mut self, prop: &mut Prop) {
+        if self.flags.contains(FollowPathFlags::Unk_0x2) {
+            self.state = FollowPathState::WaitWhileFlag0x2;
+        } else if self.reversing {
+            // TODO: `pmot_turn_towards_path_target(prop, false)`
+            self.state = FollowPathState::TurnInPlace;
+            self.reversing = false;
+        } else {
+            self.move_along_path(prop);
+        }
+    }
+
+    /// State 2 update behavior. Turns the prop laterally without moving it.
+    /// offset: 0x39d20
+    fn update_state_turn_in_place(&mut self, prop: &mut Prop) {
+        // TODO: `let angle = self.pmot_path_update_yaw() + PI`
+        let angle = 0.0;
+        prop.rotation_vec[1] = normalize_bounded_angle(angle);
+        if self.yaw_speed == 0.0 {
+            self.state = FollowPathState::MoveTowardsTarget;
+        }
+    }
+
+    fn update_state_wait_while_flag_0x2(&mut self, prop: &mut Prop) {
+        if !self.flags.contains(FollowPathFlags::Unk_0x2) {
+            prop.animation_type = PropAnimationType::MovingForward;
+            self.state = FollowPathState::MoveTowardsTarget;
+        }
     }
 }
 
