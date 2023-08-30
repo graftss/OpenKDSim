@@ -35,8 +35,8 @@ pub struct DebugConfig {
 pub const DEV_CONFIG: DebugConfig = DebugConfig {
     allow_debug_logs: true,
     log_tick: false,
-    log_nonzero_hit_attribute_hits: true,
-    log_destroyed_props: true,
+    log_nonzero_hit_attribute_hits: false,
+    log_destroyed_props: false,
     draw_collided_prop_aabb_hits: true,
     draw_collided_prop_mesh: true,
     draw_collided_prop_tris: true,

@@ -15,7 +15,7 @@ use crate::{
 use self::{
     comments::KingCommentState,
     config::{NamePropConfig, NAME_PROP_CONFIGS},
-    motion::global_path::GlobalPathState,
+    motion::{actions::MotionAction, global_path::GlobalPathState},
     params::PropParams,
     prop::{AddPropArgs, Prop, PropRef},
     random::RandomPropsState,
@@ -32,8 +32,11 @@ pub mod random;
 /// State of all props in the current mission.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PropsState {
+    // TODO_REFACTOR: group `props` and `prop_motions` (and any other `ctrl_idx`-indexed data)
+    // into a separate `Props` struct
     // TODO: replace `PropRef` with `Prop` here
     pub props: Vec<PropRef>,
+    pub prop_motions: Vec<Option<MotionAction>>,
 
     pub global_paths: GlobalPathState,
 
@@ -59,6 +62,7 @@ impl PropsState {
     /// Reset ephemeral fields of the props state between attempts.
     pub fn reset(&mut self) {
         self.props.clear();
+        self.prop_motions.clear();
         self.global_paths.init();
         self.random.reset();
         self.config = Some(&NAME_PROP_CONFIGS);
@@ -133,7 +137,7 @@ impl PropsState {
             );
         }
 
-        let prop = Prop::new_ref(
+        let prop_ref = Prop::new_ref(
             ctrl_idx,
             args,
             area,
@@ -143,10 +147,21 @@ impl PropsState {
             &mut self.random,
             mission_state,
         );
-        self.props.push(prop);
+
+        self.add_prop_motion(&prop_ref);
+        self.props.push(prop_ref);
+    }
+
+    fn add_prop_motion(&mut self, prop_ref: &PropRef) {
+        let prop = prop_ref.borrow();
+
+        let motion_action = prop.get_motion_action().map(MotionAction::parse_id);
+        self.prop_motions.push(motion_action);
     }
 
     pub fn change_next_area(&mut self, area: u8) {
+        // TODO_HIGH: we can't `retain` here without ruining the property that `ctrl_idx` is an index
+        // into `self.props`
         // destroy props which have the new area as their "display off" area.
         self.props.retain(|prop_ref| {
             let prop_cell = prop_ref.clone();
@@ -211,7 +226,7 @@ impl PropsState {
         if mission_state.is_ending() {
             self.update_ending();
         } else {
-            self.update_nonending(player)
+            self.update_nonending(player);
         }
     }
 
@@ -220,8 +235,28 @@ impl PropsState {
     pub fn update_nonending(&mut self, player: &Player) {
         for prop_ref in self.props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
-            prop.update_nonending(player);
+            if prop.is_disabled() {
+                continue;
+            }
+
+            let ctrl_idx = prop.get_ctrl_idx();
+            let motion_action = self.prop_motions[ctrl_idx as usize].as_mut();
+
+            prop.update_last_pos_and_rotation();
+            prop.update_global_state();
+            prop.update_child_link();
+            prop.update_name_index_motion(motion_action);
+
+            // if let Some(_script) = prop.innate_script.as_ref() {
+            //     // TODO_PROP_MOTION: call `innate_script`
+            // }
+
+            prop.cache_distance_to_players(player);
+            prop.update_delta_pos();
+            prop.update_transform_unattached();
         }
+
+        // TODO: `props_update_nonending:142-` (updating global path state flags)
     }
 
     /// Root function to update all props when in the `Ending` game mode.

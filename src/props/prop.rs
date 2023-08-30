@@ -35,7 +35,7 @@ use crate::{
 
 use super::{
     comments::KingCommentState,
-    motion::{actions::MotionAction, name_idx::NameIndexMotion, RotationAxis},
+    motion::{name_idx::NameIndexMotion, RotationAxis},
     random::RandomPropsState,
     PropsState,
 };
@@ -402,7 +402,7 @@ pub struct Prop {
 
     /// The prop's rotation as Euler angles on the previous tick.
     /// offset: 0xd0
-    last_rotation_vec: Vec3,
+    pub last_rotation_vec: Vec3,
 
     /// The prop's velocity while under a trajectory, which can be imparted either
     /// by the katamari (when hit by the katamari or detached from the katamari),
@@ -422,7 +422,9 @@ pub struct Prop {
     /// offset: 0x190
     motion_transform: Mat4,
 
-    pub motion: Option<MotionAction>,
+    /// Moved to a separate vector of `Option<MotionAction>` data in `PropsState`.
+    /// offset: 0x3b8
+    // pub motion: Option<MotionAction>,
 
     /// A pointer to the prop's first subobject.
     /// offset: 0x558
@@ -865,7 +867,6 @@ impl Prop {
             attached_transform: [0.0; 16],
             collision_mesh: None,
             trajectory_velocity: [0.0; 3],
-            motion: None,
         };
 
         // from the prop's `move_type`, we can infer its other motion types from the game data
@@ -902,14 +903,10 @@ impl Prop {
             }
         }
 
-        // map the `motion_action` computed above to the associated `MotionAction` state
-        if let Some(motion_action) = result.motion_action {
-            result.motion = Some(MotionAction::parse_id(motion_action));
-        } else {
+        if result.motion_action.is_none() {
             result.alt_motion_action = None;
             result.motion_action = None;
             result.behavior = None;
-            result.motion = None;
         }
 
         let prop_mono_data = &mono_data.props[name_idx as usize];
@@ -1327,6 +1324,10 @@ impl Prop {
         }
     }
 
+    pub fn get_motion_action(&self) -> Option<u16> {
+        self.motion_action
+    }
+
     /// Add `child` as a child of this prop by adding it to the end of the
     /// sibling list.
     pub fn add_child(&mut self, props: &PropsState, child_ctrl_idx: u16) {
@@ -1557,42 +1558,33 @@ impl Prop {
     pub fn update_somethings_coming(&mut self) {}
 }
 
+/// Substeps of `Props::update_nonending`, the main update logic for props.
 impl Prop {
-    /// Update a prop when not in the ending mission, i.e. the "normal" prop update logic.
-    /// offset: 0x50050 (note: that offset's function loops over all props, and this function is
-    ///                  one iteration of that loop.)
-    pub fn update_nonending(&mut self, player: &Player) {
-        if self.disabled {
-            return;
-        }
-
+    pub fn update_last_pos_and_rotation(&mut self) {
         vec3::copy(&mut self.last_pos, &self.pos);
         vec3::copy(&mut self.last_rotation_vec, &self.rotation_vec);
+    }
 
+    pub fn update_global_state(&mut self) {
         match self.global_state {
             PropGlobalState::Unattached => self.update_unattached(),
             PropGlobalState::Attached => self.update_attached(),
             PropGlobalState::AirborneIntangible => self.update_airborne_intangible(),
         }
+    }
 
-        self.update_child_link();
-
-        self.update_name_index_motion();
-
-        if let Some(_script) = self.innate_script.as_ref() {
-            // TODO_PROP_MOTION: call `innate_script`
-        }
-
-        self.cache_distance_to_players(player);
-
+    pub fn update_delta_pos(&mut self) {
         let delta_pos = vec3_from!(-, self.pos, self.last_pos);
         vec3::normalize(&mut self.delta_pos_unit, &delta_pos);
+    }
 
+    pub fn update_transform_unattached(&mut self) {
         if self.global_state != PropGlobalState::Attached {
             // TODO_LINKS: `props_update_nonending:96-133` (different transform logic for linked props)
-            // if (self.flags & 2) != 0 {
+            // if (prop.flags & 2) != 0 {
             //     // if prop is wobbling (??)
             // }
+
             // TODO_LINKS: this value should depend on the above code
             let transform_state = UnattachedTransformState::Normal;
 
@@ -1612,7 +1604,9 @@ impl Prop {
             }
         }
     }
+}
 
+impl Prop {
     // TODO_PROPS
     /// Update logic for a prop that's not attached to the katamari.
     /// offset: 0x50f10
@@ -1658,7 +1652,7 @@ impl Prop {
 
     /// Update logic for props which have a parent.
     /// offset: 0x2e030
-    fn update_child_link(&mut self) {
+    pub fn update_child_link(&mut self) {
         if self.parent.is_none() {
             self.flags.remove(PropFlags1::HasParent);
             return;
@@ -1670,7 +1664,7 @@ impl Prop {
     /// Compute the distance from this prop to other players and cache those
     /// distances on the prop for later use.
     /// offset: 0x50290
-    fn cache_distance_to_players(&mut self, player: &Player) {
+    pub fn cache_distance_to_players(&mut self, player: &Player) {
         self.last_dist_to_p0 = self.dist_to_p0;
         self.dist_to_p0 = vec3::distance(&self.pos, player.katamari.get_center());
 

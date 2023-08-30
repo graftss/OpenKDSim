@@ -37,17 +37,12 @@ impl MotionAction {
 }
 
 impl Prop {
-    pub fn update_motion_action(&mut self) {
-        if let Some(motion) = self.motion.clone() {
-            let next_motion = match motion {
-                MotionAction::MiscSway(mut sway) => {
-                    sway.update(self);
-                    MotionAction::MiscSway(sway)
-                }
-                MotionAction::Unimplemented(_) => motion,
-            };
-
-            self.motion = Some(next_motion);
+    pub fn update_motion_action(&mut self, motion: &mut MotionAction) {
+        match motion {
+            MotionAction::MiscSway(sway) => {
+                sway.update(self);
+            }
+            MotionAction::Unimplemented(_) => (),
         }
     }
 }
