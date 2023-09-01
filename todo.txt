@@ -6,6 +6,7 @@ unimplemented
   - prop motion
   - dynamic prop alphas
   - props with subobjects - where does rotation come from?
+  - moving props impacting the katamari
   - a billion other things
 
 

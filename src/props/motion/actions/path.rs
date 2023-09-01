@@ -4,10 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     constants::{PI, VEC3_Z_POS},
     macros::{vec3_from, vec3_unit_xz},
-    math::{
-        acos_f32, normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize,
-        vec3_inplace_zero_small,
-    },
+    math::{acos_f32, normalize_bounded_angle, vec3_inplace_add_vec, vec3_inplace_normalize},
     mission::Mission,
     props::{
         config::NamePropConfig,
@@ -22,8 +19,7 @@ use crate::{
     },
 };
 
-const INNATE_PROP_PATH_SPEEDS: [f32; 11] =
-    [0.3, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 20.0, 40.0, 200.0];
+use super::common::is_not_facing_target;
 
 pub trait PathMotion {
     fn get_flags(&self) -> FollowPathFlags;
@@ -94,7 +90,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct FollowPath {
     /// offset: 0x0
     state: FollowPathState,
@@ -169,29 +165,11 @@ pub fn yaw_angle_to_target(forward: &Vec3, pos: &Vec3, target: &Vec3) -> f32 {
     let similarity = vec3::dot(&to_target_unit, forward);
     let mut angle = acos_f32(similarity);
 
-    if yaw_direction_to_target(angle, forward, &to_target_unit) {
+    if is_not_facing_target(angle, forward, &to_target_unit) {
         angle *= -1.0;
     }
 
     angle
-}
-
-/// (??)
-/// offset: 0x37150
-fn yaw_direction_to_target(angle: f32, forward: &Vec3, to_target_unit: &Vec3) -> bool {
-    let mut yaw_rot = [0.0; 16];
-    mat4::from_y_rotation(&mut yaw_rot, angle);
-
-    // TODO_DOC: I have no idea what to call this.
-    let mut forward2 = [0.0; 3];
-    vec3::transform_mat4(&mut forward2, &forward, &yaw_rot);
-
-    forward2[0] -= to_target_unit[0];
-    forward2[2] -= to_target_unit[2];
-
-    vec3_inplace_zero_small(&mut forward2, 0.00001);
-
-    !(forward2[0] == 0.0 && forward2[2] == 0.0)
 }
 
 impl FollowPath {
@@ -221,23 +199,21 @@ impl FollowPath {
         );
 
         if !prop.get_flags2().contains(PropFlags2::Wobble) {
-            self.update_by_state(prop, gps, mission);
+            match self.state {
+                FollowPathState::Init => self.update_state_init(prop, mission),
+                FollowPathState::MoveTowardsTarget => {
+                    self.update_state_move_towards_target(prop, gps, mission)
+                }
+                FollowPathState::TurnInPlace => todo!(),
+                FollowPathState::WaitWhileFlag0x2 => todo!(),
+            }
+
             prop.update_somethings_coming();
             // TODO: check if alt action should be applied
         }
     }
 
-    fn update_by_state(&mut self, prop: &mut Prop, gps: &GlobalPathState, mission: Mission) {
-        match self.state {
-            FollowPathState::Init => self.update_state_init(prop, mission),
-            FollowPathState::MoveTowardsTarget => {
-                self.update_state_move_towards_target(prop, gps, mission)
-            }
-            FollowPathState::TurnInPlace => todo!(),
-            FollowPathState::WaitWhileFlag0x2 => todo!(),
-        }
-    }
-
+    /// Shared behaviour between several path-based motions.
     /// offset: 0x3a330
     fn generic_init_path(&mut self, prop: &mut Prop, mission: Mission) {
         self.target_point_idx = 0;
@@ -275,7 +251,7 @@ impl FollowPath {
         self.target_point[1] += aabb_top;
     }
 
-    /// State 0 update behavior. Initializes the path-based motion.
+    /// State 0 update behavior. Initializes the `FollowPath` motion.
     /// offset: 0x39b50
     fn update_state_init(&mut self, prop: &mut Prop, mission: Mission) {
         self.do_alt_motion = false;
@@ -290,8 +266,7 @@ impl FollowPath {
             .unwrap();
 
         self.speed = if path.speed < 0.0 {
-            let speed_idx = NamePropConfig::get(prop.get_name_idx()).speed_idx;
-            INNATE_PROP_PATH_SPEEDS[speed_idx as usize]
+            NamePropConfig::get(prop.get_name_idx()).get_innate_move_speed()
         } else {
             path.speed
         };

@@ -1291,6 +1291,10 @@ impl Prop {
         self.move_type = None;
     }
 
+    pub fn get_behavior(&self) -> Option<i16> {
+        self.behavior
+    }
+
     pub fn set_no_parent(&mut self) {
         self.flags.remove(PropFlags1::HasParent);
         self.parent = None;

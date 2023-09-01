@@ -21,7 +21,10 @@ use player::{katamari::spline::compute_spline_accel_mult, prince::Prince};
 use props::{
     config::NamePropConfig,
     motion::{
-        actions::path::{FollowPath, PathMotion},
+        actions::{
+            common::is_not_facing_target,
+            path::{FollowPath, PathMotion},
+        },
         data::prop_paths::{PropPathData, PROP_PATH_DATA},
     },
     prop::{AddPropArgs, Prop},
@@ -594,6 +597,25 @@ fn test_ant_init() {
     println!("ant1 (expect 71): {:?}", motion.get_target_point_idx());
 }
 
+fn test_is_not_facing_target() {
+    let forward_unit = &[0.0, 0.0, 1.0];
+    let to_target_unit = &[-1.0, 0.0, 0.0];
+
+    let N = 100000;
+    for i in 0..N - 1 {
+        let angle = 2.0 * PI * (i as f32) / (N as f32);
+        let result = is_not_facing_target(angle, forward_unit, to_target_unit);
+        if !result {
+            println!(
+                "i={}, angle (deg)={}, result={}",
+                i,
+                angle * 180.0 / PI,
+                result
+            );
+        }
+    }
+}
+
 fn main() {
     println!("start");
 
@@ -601,7 +623,5 @@ fn main() {
 
     // let rc_delegate = Rc::new(delegate);
     // let mut raycast_state = crate::collision::raycast_state::RaycastState::default();
-    {
-        test_ant_init();
-    }
+    {}
 }

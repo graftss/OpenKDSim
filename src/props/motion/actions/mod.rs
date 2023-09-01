@@ -6,7 +6,9 @@ use self::{path::FollowPath, sway::SwayAction};
 
 use super::global_path::GlobalPathState;
 
+pub mod common;
 pub mod path;
+pub mod roam;
 pub mod sway;
 
 pub trait ActionUpdate {
@@ -14,7 +16,7 @@ pub trait ActionUpdate {
     fn should_do_alt_motion(&self) -> bool;
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum MotionAction {
     FollowPath(FollowPath),
     // TODO_LINK: in `pmot_misc_init` the prop decides if it's `stationary` based on its root prop's
@@ -27,6 +29,8 @@ impl MotionAction {
     pub fn parse_id(action_id: u16) -> Self {
         match action_id {
             0x2 => Self::FollowPath(FollowPath::default()),
+            // TODO_BUG: there are several misc actions with `action_id` 0x16. this function also needs
+            // access to the behavior id to distinguish between these misc actions.
             0x16 => Self::MiscSway(SwayAction::default()),
             _ => Self::Unimplemented(action_id),
         }

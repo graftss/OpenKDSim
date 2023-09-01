@@ -104,6 +104,15 @@ pub struct NamePropConfig {
 }
 
 impl NamePropConfig {
+    pub fn get_innate_move_speed(&self) -> f32 {
+        const INNATE_PROP_PATH_SPEEDS: [f32; 11] =
+            [0.3, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0, 15.0, 20.0, 40.0, 200.0];
+
+        INNATE_PROP_PATH_SPEEDS[self.speed_idx as usize]
+    }
+}
+
+impl NamePropConfig {
     pub fn mono_data_offset_exists(&self) -> bool {
         self.mono_data_offset_idx != u16::MAX
     }
