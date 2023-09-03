@@ -287,6 +287,22 @@ macro_rules! f32_close_enough {
     };
 }
 
+macro_rules! md_read {
+    ($md: ident, $type: ty, $offset: expr) => {
+        *($md.offset($offset).cast::<$type>().as_ref().unwrap())
+    };
+
+    ($md: ident, $type: ty, $offset: expr) => {
+        *($md.offset($offset).cast::<$type>().as_ref().unwrap())
+    };
+}
+
+macro_rules! md_follow_offset {
+    ($md: ident, $offset: expr) => {
+        $md.offset(md_read!($md, u32, $offset).try_into().unwrap())
+    };
+}
+
 #[allow(unused_imports)]
 pub(crate) use {
     debug_log,
@@ -302,6 +318,8 @@ pub(crate) use {
     mark_call,
     max,
     max_to_none,
+    md_follow_offset,
+    md_read,
     min,
     modify_translation,
     new_mat4_copy,

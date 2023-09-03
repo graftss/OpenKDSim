@@ -3,30 +3,11 @@ use std::rc::Rc;
 use gl_matrix::common::Vec3;
 
 use crate::{
-    collision::{
-        aabb::Aabb,
-        mesh::{Mesh, MeshSector, TriGroup, TriVertex},
-    },
+    collision::{aabb::Aabb, mesh::Mesh},
     constants::NUM_NAME_PROPS,
-    macros::{max, min},
+    macros::{max, md_follow_offset, md_read, min},
     props::config::NamePropConfig,
 };
-
-macro_rules! md_read {
-    ($md: ident, $type: ty, $offset: expr) => {
-        *($md.offset($offset).cast::<$type>().as_ref().unwrap())
-    };
-
-    ($md: ident, $type: ty, $offset: expr) => {
-        *($md.offset($offset).cast::<$type>().as_ref().unwrap())
-    };
-}
-
-macro_rules! md_follow_offset {
-    ($md: ident, $offset: expr) => {
-        $md.offset(md_read!($md, u32, $offset).try_into().unwrap())
-    };
-}
 
 #[derive(Debug, Default)]
 pub struct PropAabbs {
@@ -36,6 +17,22 @@ pub struct PropAabbs {
 }
 
 impl PropAabbs {
+    /// Parses the AABBs of the prop and its subobjects (if it has any) from a raw pointer.
+    unsafe fn from_raw(mono_data: *const u8) -> PropAabbs {
+        let num_aabbs = md_read!(mono_data, u8, 0);
+        let mut aabbs = vec![];
+
+        for i in 0..num_aabbs as isize {
+            let aabb_offset = md_read!(mono_data, u32, i * 4 + 4) as isize;
+            let min = md_read!(mono_data, Vec3, aabb_offset);
+            let max = md_read!(mono_data, Vec3, aabb_offset + 0x10);
+
+            aabbs.push(Aabb { min, max });
+        }
+
+        PropAabbs { aabbs }
+    }
+
     /// Get the prop's AABB.
     pub fn get_prop_aabb(&self) -> &Aabb {
         &self.aabbs[0]
@@ -106,30 +103,14 @@ impl PropMonoData {
         PropMonoData {
             ptrs,
             aabbs: ptrs[0]
-                .map(|ptr| PropMonoData::parse_aabbs(ptr as *const u8))
+                .map(|ptr| PropAabbs::from_raw(ptr as *const u8))
                 .map(Rc::new),
             collision_mesh: ptrs[7]
-                .map(|ptr| PropMonoData::parse_mesh(ptr as *const u8))
+                .map(|ptr| Mesh::from_raw(ptr as *const u8))
                 .map(Rc::new),
             vault_points: ptrs[8]
                 .map(|ptr| PropMonoData::parse_vault_points(ptr as *const u8, name_idx)),
         }
-    }
-
-    /// Parses the AABBs of the prop and its subobjects (if it has any).
-    unsafe fn parse_aabbs(mono_data: *const u8) -> PropAabbs {
-        let num_aabbs = md_read!(mono_data, u8, 0);
-        let mut aabbs = vec![];
-
-        for i in 0..num_aabbs as isize {
-            let aabb_offset = md_read!(mono_data, u32, i * 4 + 4) as isize;
-            let min = md_read!(mono_data, Vec3, aabb_offset);
-            let max = md_read!(mono_data, Vec3, aabb_offset + 0x10);
-
-            aabbs.push(Aabb { min, max });
-        }
-
-        PropAabbs { aabbs }
     }
 
     /// Parse a list of vault points from mono data.
@@ -145,93 +126,27 @@ impl PropMonoData {
 
         result
     }
-
-    /// Parse a triangle mesh from mono data.
-    /// The argument `mono_data` should point to the first byte of the triangle mesh.
-    unsafe fn parse_mesh(mono_data: *const u8) -> Mesh {
-        // parse the number of sectors (mesh offset 0)
-        let num_sectors = md_read!(mono_data, u8, 0);
-
-        // for each sector:
-        let mut sectors = vec![];
-        for sector_idx in 0..num_sectors as isize {
-            // parse the offset where sector starts
-            let sector_offset = md_read!(mono_data, u32, sector_idx * 4 + 4) as isize;
-
-            // parse the sector's AABB
-            let aabb_offset = sector_offset + sector_idx * 0x18 + 8;
-            let mut aabb = Aabb {
-                min: md_read!(mono_data, Vec3, aabb_offset),
-                max: md_read!(mono_data, Vec3, aabb_offset + 12),
-            };
-            aabb.negate_coords();
-
-            // parse the offset of the first triangle group
-            let mut tri_group_offset = md_read!(mono_data, u32, sector_idx * 4 + 8) as isize;
-
-            // parse the contiguous list of triangle groups in the sector
-            let mut tri_groups = vec![];
-            loop {
-                // parse the 1-byte header before the vertex list, which encodes:
-                //   - whether the vertex list is a triangle strip or not
-                //   - the number of encoded vertices following the header
-                let vertex_header: u32 = md_read!(mono_data, u8, tri_group_offset).into();
-
-                let is_tri_strip = vertex_header & 0x80 != 0;
-                let num_vertices = if is_tri_strip {
-                    (vertex_header & 0x7f) + 2
-                } else {
-                    (vertex_header & 0x7f) * 3
-                };
-
-                // parse the list of vertices
-                let mut vertices = vec![];
-                let mut vertex_offset = tri_group_offset + 8;
-                for _ in 0..num_vertices as isize {
-                    vertices.push(TriVertex {
-                        point: md_read!(mono_data, Vec3, vertex_offset),
-                        metadata: md_read!(mono_data, u32, vertex_offset + 0xc),
-                    });
-                    vertex_offset += 0x10;
-                }
-
-                // create the triangle group
-                tri_groups.push(TriGroup {
-                    is_tri_strip,
-                    vertices,
-                });
-
-                // update the triangle group offset to the beginning of the next group
-                tri_group_offset += 0xc + 0x10 * (num_vertices as isize);
-
-                // parse the vifcode to detect the end of the sector
-                let vif = md_read!(mono_data, u8, tri_group_offset - 1);
-                if vif == 0x97 {
-                    break;
-                }
-            }
-
-            sectors.push(MeshSector { aabb, tri_groups });
-        }
-
-        Mesh { sectors }
-    }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct MonoData {
-    pub zones: MonoDataPtr,
-    pub areas: [MonoDataPtr; 5],
+    pub zone_ptr: MonoDataPtr,
+    pub zone_mesh: Mesh,
+    pub area_ptrs: [MonoDataPtr; 5],
     pub props: Vec<Rc<PropMonoData>>,
 }
 
 impl MonoData {
     pub unsafe fn init_from_raw(&mut self, mono_data: *const u8) {
         // read zone pointer
-        self.zones = Some(md_follow_offset!(mono_data, 0x4) as usize);
+        let zone_ptr = md_follow_offset!(mono_data, 0x4) as usize;
+        self.zone_ptr = Some(zone_ptr);
+
+        // parse zone into mesh
+        self.zone_mesh = Mesh::from_raw(zone_ptr as *const u8);
 
         // read area pointers
-        self.areas = [
+        self.area_ptrs = [
             Some(md_follow_offset!(mono_data, 0x14) as usize),
             Some(md_follow_offset!(mono_data, 0x18) as usize),
             Some(md_follow_offset!(mono_data, 0x1c) as usize),

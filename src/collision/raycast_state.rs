@@ -152,6 +152,7 @@ impl RaycastState {
     }
 
     /// Load a ray into the raycast state for further collision checks.
+    /// offset: 0x10350
     pub fn load_ray(&mut self, point0: &Vec3, point1: &Vec3) {
         self.point0 = point0.clone();
         self.point1 = point1.clone();
@@ -606,6 +607,28 @@ impl RaycastState {
                 .draw_tri_group(&tri_group, transform, &TRIANGLE_HIT_COLOR);
         }
     }
+
+    /// offset: 0x36d70
+    pub fn find_zone_below_point(
+        &mut self,
+        pos: &Vec3,
+        radius: f32,
+        transform: &Mat4,
+    ) -> Option<u8> {
+        let below_pos = vec3_from!(-, pos, [0.0, radius + radius, 0.0]);
+        self.load_ray(&pos, &below_pos);
+
+        if self.ray_hits_zone(transform) != 0 {
+            self.get_closest_hit().map(|hit| hit.metadata as u8)
+        } else {
+            None
+        }
+    }
+
+    fn ray_hits_zone(&mut self, _transform: &Mat4) -> i32 {
+        // self.ray_hits_mesh(mesh, transform, ray_in_mesh_coords)
+        -1
+    }
 }
 
 /// Returns `true` if the line segment from `p0` to `p1` meets the AABB with opposite corner points
@@ -613,13 +636,7 @@ impl RaycastState {
 /// The `out` writes an intersection point if one exists - possibly the one furthest from `p0`.
 /// `out` doesn't seem to be used by the simulation.
 /// offset: 0x106b0
-pub fn ray_hits_aabb(
-    p0: &Vec3,
-    p1: &Vec3,
-    aabb_min: &Vec3,
-    aabb_max: &Vec3,
-    out: &mut Vec3,
-) -> bool {
+fn ray_hits_aabb(p0: &Vec3, p1: &Vec3, aabb_min: &Vec3, aabb_max: &Vec3, out: &mut Vec3) -> bool {
     let [min_x, min_y, min_z] = *aabb_min;
     let [max_x, max_y, max_z] = *aabb_max;
     let [p0x, p0y, p0z] = *p0;

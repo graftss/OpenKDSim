@@ -4,7 +4,6 @@
 
 use std::{cell::RefCell, fs::File, io::Write, num::Wrapping, ops::Range, rc::Rc};
 
-use collision::raycast_state::ray_hits_aabb;
 use constants::{FRAC_PI_2, FRAC_PI_90, PI};
 use gamestate::GameState;
 use gl_matrix::{
@@ -36,6 +35,7 @@ use crate::{
     constants::{VEC3_ZERO, VEC3_Z_POS},
     macros::{f32_close_enough, max, min, set_translation, temp_debug_log, vec3_from},
     math::{vec3_inplace_zero_small, vec3_times_mat4},
+    mono_data::PropMonoData,
     props::motion::actions::path::yaw_angle_to_target,
 };
 
