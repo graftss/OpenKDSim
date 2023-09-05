@@ -1,0 +1,3 @@
+# fix lint errors that can be fixed
+
+cargo fix --lib -p openkdsim

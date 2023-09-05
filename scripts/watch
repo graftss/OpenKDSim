@@ -1,0 +1,3 @@
+# automatic compilation on file change during development
+
+cargo watch -x build
