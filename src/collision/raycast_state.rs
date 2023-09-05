@@ -61,6 +61,7 @@ pub struct RaycastState {
     /// offset: 0xb3230
     triangle_hit_point: Vec3,
 
+    zone_mesh: Option<Rc<Mesh>>,
     // END fields not in the original simulation
     /// Initial point of the collision ray.
     /// offset: 0x0
@@ -289,7 +290,7 @@ impl RaycastState {
     /// If this raycast's state cached ray hits the triangle `triangle`
     /// Adapted from https://en.m.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     /// offset: 0x11d70
-    pub fn ray_hits_triangle(
+    fn ray_hits_triangle(
         &mut self,
         triangle: &[Vec3; 3],
         transform: &Mat4,
@@ -608,26 +609,29 @@ impl RaycastState {
         }
     }
 
+    /// Checks if the ray of length `2 * dist` straight down from `pos` intersects a zone.
+    /// If it does, returns that zone's id.
     /// offset: 0x36d70
     pub fn find_zone_below_point(
         &mut self,
         pos: &Vec3,
-        radius: f32,
+        dist: f32,
         transform: &Mat4,
+        zone_mesh: &Mesh,
     ) -> Option<u8> {
-        let below_pos = vec3_from!(-, pos, [0.0, radius + radius, 0.0]);
+        let below_pos = vec3_from!(-, pos, [0.0, dist + dist, 0.0]);
         self.load_ray(&pos, &below_pos);
 
-        if self.ray_hits_zone(transform) != 0 {
+        if self.ray_hits_zone(transform, zone_mesh) != 0 {
             self.get_closest_hit().map(|hit| hit.metadata as u8)
         } else {
             None
         }
     }
 
-    fn ray_hits_zone(&mut self, _transform: &Mat4) -> i32 {
-        // self.ray_hits_mesh(mesh, transform, ray_in_mesh_coords)
-        -1
+    /// offset: 0x276e0
+    fn ray_hits_zone(&mut self, transform: &Mat4, zone_mesh: &Mesh) -> i32 {
+        self.ray_hits_mesh(zone_mesh, transform, true)
     }
 }
 

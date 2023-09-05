@@ -280,63 +280,6 @@ fn replicate_init_vault() {
     println!("new_vel_accel: {:?}", new_vel_accel);
 }
 
-fn replicate_triangle_hit() {
-    let mut raycast_state = RaycastState::default();
-    let ray_pts = [
-        [-7.9008, -63.08491516, -164.3920288],
-        [-9.870688438, -62.24033737, -165.6983337],
-    ];
-    let triangle = [
-        [1.71, 3.0645614, 1.71],
-        [1.71, -3.0645616, -1.71],
-        [1.71, -3.0645614, 1.71],
-    ];
-    let transform = [
-        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -11.2581, -61.9546, -166.1094,
-        1.0,
-    ];
-
-    let mut transformed_tri: [[f32; 3]; 3] = Default::default();
-    for i in 0..3 {
-        vec3::transform_mat4(&mut transformed_tri[i], &triangle[i], &transform);
-    }
-    println!("transformed_tri: {:?}", transformed_tri);
-
-    let real_impact_point = [-10.19229221, -62.24033737, -165.6983337];
-
-    let ray = vec3_from!(-, ray_pts[1], ray_pts[0]);
-    let ray_len = vec3::length(&ray);
-    let mut ray_unit = vec3::create();
-    vec3::normalize(&mut ray_unit, &ray);
-
-    raycast_state.load_ray(&ray_pts[0], &ray_pts[1]);
-    let _t = raycast_state.ray_hits_triangle(&triangle, &transform, false);
-
-    let hit = raycast_state.ray_to_triangle_hit;
-    let mut normal_unit = hit.normal_unit;
-    vec3_inplace_zero_small(&mut normal_unit, 0.00001);
-
-    let impact_dist = hit.impact_point[2];
-    let impact_dist_ratio = impact_dist / ray_len;
-
-    let ray_dot_normal = vec3::dot(&normal_unit, &ray_unit);
-    let clip_len = (1.0 - impact_dist_ratio - 0.0005) * ray_len;
-
-    println!("impact_dist: {impact_dist}, impact_dist_ratio: {impact_dist_ratio}");
-    println!("dot: {ray_dot_normal}, clip_len: {clip_len}");
-
-    let mut impact_point = vec3::create();
-    vec3::scale_and_add(
-        &mut impact_point,
-        &ray_pts[1],
-        &normal_unit,
-        clip_len * ray_dot_normal,
-    );
-    let diff = vec3_from!(-, impact_point, real_impact_point);
-    println!("impact point: {:?}, diff: {:?}", impact_point, diff);
-    println!("normal_unit: {:?}", normal_unit);
-}
-
 fn replicate_flip_camera() {
     let kat_center = [-22.700000762939, -24.060358047485, 28.0];
     let kat_to_pos = [0.0, 7.1999998092651, -22.39999961853];
@@ -427,18 +370,6 @@ fn replicate_flip_camera() {
     ];
 
     println!("final target: {target:?}");
-}
-
-unsafe fn print_square_dish_mesh() {
-    let mut md = MonoData::default();
-    md.init_from_raw(MAS1_MONO_DATA.as_ptr());
-
-    for (name_idx, prop_md) in md.props.iter().enumerate() {
-        let config = NamePropConfig::get(name_idx as u16);
-        if config.use_aabb_for_collision && prop_md.collision_mesh.is_none() {
-            println!("uhoh: {name_idx}");
-        }
-    }
 }
 
 #[derive(Debug)]

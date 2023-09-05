@@ -130,23 +130,22 @@ impl PropMonoData {
 
 #[derive(Debug, Default, Clone)]
 pub struct MonoData {
-    pub zone_ptr: MonoDataPtr,
+    pub zone_ptr: Option<usize>,
     pub zone_mesh: Mesh,
-    pub area_ptrs: [MonoDataPtr; 5],
+    pub area_ptrs: [Option<usize>; 5],
     pub props: Vec<Rc<PropMonoData>>,
 }
 
 impl MonoData {
-    pub unsafe fn init_from_raw(&mut self, mono_data: *const u8) {
+    pub unsafe fn from_raw(mono_data: *const u8) -> Rc<MonoData> {
         // read zone pointer
         let zone_ptr = md_follow_offset!(mono_data, 0x4) as usize;
-        self.zone_ptr = Some(zone_ptr);
 
         // parse zone into mesh
-        self.zone_mesh = Mesh::from_raw(zone_ptr as *const u8);
+        let zone_mesh = Mesh::from_raw(zone_ptr as *const u8);
 
         // read area pointers
-        self.area_ptrs = [
+        let area_ptrs = [
             Some(md_follow_offset!(mono_data, 0x14) as usize),
             Some(md_follow_offset!(mono_data, 0x18) as usize),
             Some(md_follow_offset!(mono_data, 0x1c) as usize),
@@ -154,9 +153,17 @@ impl MonoData {
             Some(md_follow_offset!(mono_data, 0x24) as usize),
         ];
 
+        let mut props = vec![];
         for name_idx in 0..NUM_NAME_PROPS {
             let prop_data = PropMonoData::new(mono_data, name_idx);
-            self.props.push(Rc::new(prop_data));
+            props.push(Rc::new(prop_data));
         }
+
+        Rc::new(MonoData {
+            zone_ptr: Some(zone_ptr),
+            zone_mesh,
+            area_ptrs,
+            props,
+        })
     }
 }

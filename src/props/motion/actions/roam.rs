@@ -170,7 +170,7 @@ impl Roam {
         self.last_turn_direction = None;
         self.turn_timer = compute_rand_turn_timer(global_state.rng.get_rng1(), prop.get_ctrl_idx());
 
-        // TODO: self.zone = find_zone_below(prop, &prop.pos, prop.get_radius());
+        // TODO: self.zone = find_zone_below(prop, &prop.pos, prop.get_radius(), &prop.unattached_transform, );
         self.zone = None;
         if self.zone.is_none() {
             // TODO_LOW: can we actually return from here? the original simulation doesn't, but

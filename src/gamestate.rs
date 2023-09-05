@@ -7,7 +7,7 @@ use crate::{
     delegates::Delegates,
     global::GlobalState,
     macros::{debug_log, panic_log},
-    mission::{config::MissionConfig, state::MissionState, vsmode::VsModeState, GameMode},
+    mission::{state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
     props::{prop::AddPropArgs, PropsState},
@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GameState {
-    /// State unique to a particular player.
+    /// State unique to each player.
     pub players: PlayersState,
 
     /// Global, mutable state (like the number of ticks that have occurred
@@ -36,7 +36,7 @@ pub struct GameState {
     /// simulation from unity (e.g. prop collision meshes, prop random
     /// roam zones).
     #[serde(skip)]
-    pub mono_data: MonoData,
+    pub mono_data: Rc<MonoData>,
 }
 
 impl GameState {
@@ -45,9 +45,9 @@ impl GameState {
         self.global.reset();
         self.props.reset();
         self.mission_state = MissionState::default();
-        self.mono_data = MonoData::default();
+        self.mono_data = Rc::new(MonoData::default());
 
-        // TODO: find a better place to put this
+        // TODO_REFACTOR: find a better place to put this
         self.props.delegates = Some(self.delegates.clone());
     }
 
@@ -57,11 +57,6 @@ impl GameState {
 
     pub fn get_mut_player(&mut self, player_idx: usize) -> &mut Player {
         self.players.get_mut(player_idx).unwrap()
-    }
-
-    /// The `MissionConfig` for the current mission.
-    pub fn get_mission_config(&self) -> &MissionConfig {
-        &self.mission_state.mission_config
     }
 
     /// Mimicks `SetKatamariSpeed` API function.
@@ -206,7 +201,7 @@ impl GameState {
         self.mission_state.mono_init_start(mission, area, stage);
 
         // read the mission's `MonoData` data from the `mono_data` raw pointer.
-        self.mono_data.init_from_raw(mono_data);
+        self.mono_data = MonoData::from_raw(mono_data);
 
         // TODO_PROPS: init subobjects
         self.props.comments.reset();
