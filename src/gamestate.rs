@@ -3,8 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    collision::raycast_state::RaycastRef,
     debug::DEBUG_CONFIG,
-    delegates::Delegates,
+    delegates::{has_delegates::HasDelegates, Delegates},
     global::GlobalState,
     macros::{debug_log, panic_log},
     mission::{state::MissionState, vsmode::VsModeState, GameMode},
@@ -37,10 +38,15 @@ pub struct GameState {
     /// roam zones).
     #[serde(skip)]
     pub mono_data: Rc<MonoData>,
+
+    #[serde(skip)]
+    pub raycast: RaycastRef,
 }
 
 impl GameState {
     pub fn reset(&mut self) {
+        self.raycast.borrow_mut().set_delegates_ref(&self.delegates);
+
         self.players = PlayersState::default();
         self.global.reset();
         self.props.reset();
@@ -320,6 +326,7 @@ impl GameState {
             &self.delegates,
             mission_state,
             override_init_size,
+            self.raycast.clone(),
         );
 
         self.global.map_loop_rate = 0.0;

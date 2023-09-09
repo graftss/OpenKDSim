@@ -109,7 +109,7 @@ pub struct Katamari {
     // We don't need to serialize the raycast state, since all of its computation is temporary
     // (and within a single frame), and thus irrelevant to saving state between frames.
     #[serde(skip)]
-    pub raycast_state: RaycastState,
+    pub raycasts: RaycastState, //TODO: Option<RaycastRef>,
 
     /// The number of props attached to the katamari (including unloaded ones).
     /// Obsolete, since we can just read the length of the `attached_props` vector.
@@ -982,7 +982,8 @@ impl Katamari {
     ) {
         // extra stuff not in the original simulation
         self.max_prop_rays = self.params.max_prop_collision_rays;
-        self.raycast_state.set_delegates(delegates_ref);
+        // TODO: self.raycasts = Some(raycasts);
+        self.raycasts.set_delegates_ref(delegates_ref);
         self.set_delegates_ref(delegates_ref);
         // end extra stuff
 

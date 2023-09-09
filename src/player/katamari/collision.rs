@@ -151,15 +151,15 @@ impl Katamari {
             self.update_vault_and_climb(prince, camera, global, mission_state);
             mark_address!("0x13052");
 
-            if self.physics_flags.airborne && self.raycast_state.closest_hit_idx.is_some() {
+            if self.physics_flags.airborne && self.raycasts.closest_hit_idx.is_some() {
                 let mut top = [0.0, self.radius_cm + self.radius_cm, 0.0];
                 vec3_inplace_add_vec(&mut top, &self.center);
-                self.raycast_state.load_ray(&self.center, &top);
+                self.raycasts.load_ray(&self.center, &top);
                 let found_hit = self
-                    .raycast_state
+                    .raycasts
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
-                if let Some(hit) = self.raycast_state.get_closest_hit() {
+                if let Some(hit) = self.raycasts.get_closest_hit() {
                     if found_hit && (hit.metadata == HitAttribute::SpecialCamera as i32) {
                         self.hit_flags.special_camera = true;
                     }
@@ -449,9 +449,9 @@ impl Katamari {
 
             let mut found_hit = false;
             for i in 0..5 {
-                self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
+                self.raycasts.load_ray(&shell_inits[i], &shell_ends[i]);
                 let hit_prop = self
-                    .raycast_state
+                    .raycasts
                     .ray_hits_mesh(&prop_mesh, prop_transform, false);
 
                 if hit_prop == 0 {
@@ -486,7 +486,7 @@ impl Katamari {
                     _ => {}
                 }
 
-                if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                if let Some(hit) = self.raycasts.get_closest_hit_mut() {
                     // TODO_BUG: in the original sum, if `hit_shell_ray` wasn't assigned above
                     // (which happens when the only shell ray hit is when `i` is 0)
                     let shell_ray_idx = match self.physics_flags.hit_shell_ray {
@@ -495,7 +495,7 @@ impl Katamari {
                     };
 
                     vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_ray);
-                    vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_ray);
+                    vec3_inplace_subtract_vec(&mut self.raycasts.point1, &shell_ray);
 
                     let record_result =
                         self.record_surface_contact(shell_ray_idx, Some(prop_ref.clone()));
@@ -538,9 +538,9 @@ impl Katamari {
         vec3::add(&mut shell_ends[4], &shell_end_base, &self.shell_top_right);
 
         for i in 0..5 {
-            self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
+            self.raycasts.load_ray(&shell_inits[i], &shell_ends[i]);
             let found_hit = self
-                .raycast_state
+                .raycasts
                 .ray_hits_mesh(&prop_mesh, &prop_transform, false);
 
             if found_hit == 0 {
@@ -578,9 +578,9 @@ impl Katamari {
                 _ => {}
             }
 
-            if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+            if let Some(hit) = self.raycasts.get_closest_hit_mut() {
                 vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_ray);
-                vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_ray);
+                vec3_inplace_subtract_vec(&mut self.raycasts.point1, &shell_ray);
 
                 let ray_idx = self
                     .physics_flags
@@ -602,10 +602,10 @@ impl Katamari {
         let rays = self.collision_rays.clone();
         for (ray_idx, ray) in rays.iter().enumerate() {
             let ray_endpoint = vec3_from!(+, self.center, ray.kat_to_endpoint);
-            self.raycast_state.load_ray(&self.center, &ray_endpoint);
+            self.raycasts.load_ray(&self.center, &ray_endpoint);
 
             let found_hit = self
-                .raycast_state
+                .raycasts
                 .ray_hits_mesh(&prop_mesh, &prop_transform, false);
 
             if found_hit == 0 {
@@ -616,7 +616,7 @@ impl Katamari {
             prop.set_katamari_contact(self.player);
             found_any_hit = true;
 
-            if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+            if let Some(hit) = self.raycasts.get_closest_hit_mut() {
                 vec3_inplace_zero_small(&mut hit.normal_unit, 0.00001);
             }
 
@@ -803,8 +803,8 @@ impl Katamari {
             -kat_sphere_rad,
         );
 
-        self.raycast_state.load_ray(&self.center, &ray_endpoint);
-        let num_hit_tris = self.raycast_state.ray_hits_mesh(
+        self.raycasts.load_ray(&self.center, &ray_endpoint);
+        let num_hit_tris = self.raycasts.ray_hits_mesh(
             &prop.get_aabb_mesh().unwrap(),
             prop.get_unattached_transform(),
             false,
@@ -966,11 +966,11 @@ impl Katamari {
         let center = self.center.clone();
         let mut below = center.clone();
         vec3_inplace_subtract(&mut below, 0.0, dist_down, 0.0);
-        self.raycast_state.load_ray(&center, &below);
+        self.raycasts.load_ray(&center, &below);
 
         // check for unity hits straight down.
         let found_hit = self
-            .raycast_state
+            .raycasts
             .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
         // update shadow position
@@ -978,7 +978,7 @@ impl Katamari {
             // if there's no surface below, set the shadow position to the katamari top (idk why)
             vec3::copy(&mut self.shadow_pos, &self.center);
             self.shadow_pos[1] += self.radius_cm;
-        } else if let Some(hit) = self.raycast_state.get_closest_hit() {
+        } else if let Some(hit) = self.raycasts.get_closest_hit() {
             // if there's a surface below, set the shadow position to the surface point below.
             vec3::copy(&mut self.shadow_pos, &hit.impact_point);
 
@@ -1018,9 +1018,9 @@ impl Katamari {
             };
 
             for i in 0..max_idx {
-                self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
+                self.raycasts.load_ray(&shell_inits[i], &shell_ends[i]);
                 let found_hit = self
-                    .raycast_state
+                    .raycasts
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
                 if !found_hit {
@@ -1055,13 +1055,13 @@ impl Katamari {
                     }
                 }
 
-                if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                if let Some(hit) = self.raycasts.get_closest_hit_mut() {
                     let shell_ray_idx = match self.physics_flags.hit_shell_ray {
                         Some(shell_ray) => -(shell_ray as i16),
                         None => 0,
                     };
                     vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_base_pt);
-                    vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_base_pt);
+                    vec3_inplace_subtract_vec(&mut self.raycasts.point1, &shell_base_pt);
 
                     mark_address!("0x14558");
                     let record_result = self.record_surface_contact(shell_ray_idx, None);
@@ -1115,9 +1115,9 @@ impl Katamari {
             self.debug_draw_shell_rays(&shell_inits, &shell_ends);
 
             for i in 0..5 {
-                self.raycast_state.load_ray(&shell_inits[i], &shell_ends[i]);
+                self.raycasts.load_ray(&shell_inits[i], &shell_ends[i]);
                 let found_hit = self
-                    .raycast_state
+                    .raycasts
                     .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
                 if !found_hit {
@@ -1153,10 +1153,10 @@ impl Katamari {
                     }
                 }
 
-                if let Some(hit) = self.raycast_state.get_closest_hit_mut() {
+                if let Some(hit) = self.raycasts.get_closest_hit_mut() {
                     let shell_ray_idx = -(self.physics_flags.hit_shell_ray.unwrap() as i16);
                     vec3_inplace_subtract_vec(&mut hit.impact_point, &shell_base_pt);
-                    vec3_inplace_subtract_vec(&mut self.raycast_state.point1, &shell_base_pt);
+                    vec3_inplace_subtract_vec(&mut self.raycasts.point1, &shell_base_pt);
                     mark_address!("0x14b32");
                     self.record_surface_contact(shell_ray_idx, None);
                 }
@@ -1167,9 +1167,9 @@ impl Katamari {
         let center = self.center;
         let rays = &self.collision_rays.clone();
         for (ray_idx, ray) in rays.iter().enumerate() {
-            self.raycast_state.load_ray(&center, &ray.endpoint);
+            self.raycasts.load_ray(&center, &ray.endpoint);
             let found_hit = self
-                .raycast_state
+                .raycasts
                 .find_nearest_unity_hit(RaycastCallType::Objects, false);
 
             if found_hit {
@@ -1190,9 +1190,9 @@ impl Katamari {
         ray_idx: i16,
         prop: Option<PropRef>,
     ) -> RecordSurfaceContactResult {
-        let hit = self.raycast_state.get_closest_hit().unwrap_or_else(|| {
+        let hit = self.raycasts.get_closest_hit().unwrap_or_else(|| {
             panic_log!(
-                "`Katamari::record_surface_contact`: tried to record a nonexistent surface contact: {:?}", self.raycast_state
+                "`Katamari::record_surface_contact`: tried to record a nonexistent surface contact: {:?}", self.raycasts
             );
         });
 
@@ -1213,9 +1213,9 @@ impl Katamari {
             RecordSurfaceContactResult::Wall
         };
 
-        let dot = vec3::dot(&normal_unit, &self.raycast_state.ray_unit);
-        let ray_clip_len = (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant)
-            * self.raycast_state.ray_len;
+        let dot = vec3::dot(&normal_unit, &self.raycasts.ray_unit);
+        let ray_clip_len =
+            (1.0 - hit.impact_dist_ratio - self.params.clip_len_constant) * self.raycasts.ray_len;
 
         let mut clip_normal = vec3::clone(&normal_unit);
         vec3_inplace_scale(&mut clip_normal, dot * ray_clip_len);
@@ -1313,16 +1313,16 @@ impl Katamari {
             }
         };
 
-        let closest_hit = self.raycast_state.get_closest_hit().unwrap();
+        let closest_hit = self.raycasts.get_closest_hit().unwrap();
 
         // write the new data to the added surface
         added_surface.normal_unit = *normal_unit;
         added_surface.clip_normal = clip_normal;
-        added_surface.ray = self.raycast_state.ray;
+        added_surface.ray = self.raycasts.ray;
         added_surface.contact_point = closest_hit.impact_point;
         added_surface.clip_normal_len = clip_normal_len;
         added_surface.impact_dist_ratio = closest_hit.impact_dist_ratio;
-        added_surface.ray_len = self.raycast_state.ray_len;
+        added_surface.ray_len = self.raycasts.ray_len;
         added_surface.ray_idx = ray_idx;
         added_surface.hit_attr = closest_hit.metadata.into();
         added_surface.prop = prop;

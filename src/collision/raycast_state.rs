@@ -50,6 +50,8 @@ pub struct RaycastTriHit {
     pub impact_dist: f32,
 }
 
+pub type RaycastRef = Rc<RefCell<RaycastState>>;
+
 /// Stores a single ray so that multiple raycasts can be performed on it.
 /// offset: 0x1941e0 (it's allocated in the heap, but this offset holds a pointer to it)
 #[derive(Debug, Default)]
@@ -148,10 +150,6 @@ impl Into<i32> for RaycastCallType {
 }
 
 impl RaycastState {
-    pub fn set_delegates(&mut self, delegates: &Rc<RefCell<Delegates>>) {
-        self.delegates = Some(delegates.clone());
-    }
-
     /// Load a ray into the raycast state for further collision checks.
     /// offset: 0x10350
     pub fn load_ray(&mut self, point0: &Vec3, point1: &Vec3) {
@@ -726,6 +724,36 @@ fn ray_hits_aabb(p0: &Vec3, p1: &Vec3, aabb_min: &Vec3, aabb_max: &Vec3, out: &m
     }
 
     false
+}
+
+pub trait Raycasts {
+    fn get_raycasts(&self) -> Option<RaycastRef>;
+    fn set_raycasts(&mut self, raycasts: RaycastRef);
+
+    fn load_ray(&mut self, start: &Vec3, end: &Vec3) {
+        if let Some(raycasts) = self.get_raycasts() {
+            raycasts.borrow_mut().load_ray(start, end);
+        }
+    }
+
+    // fn get_closest_hit(&mut self) -> Option<&RaycastTriHit> {
+    //     self.get_raycasts()
+    //         .map(|raycasts| &raycasts.borrow().tri_hits[0])
+    // }
+
+    fn get_closest_hit_idx(&mut self) -> Option<u8> {
+        self.get_raycasts()
+            .and_then(|raycasts| raycasts.borrow().closest_hit_idx)
+    }
+
+    fn get_closest_hit_y(&mut self) -> Option<f32> {
+        self.get_raycasts().and_then(|raycasts| {
+            raycasts
+                .borrow()
+                .get_closest_hit()
+                .map(|hit| hit.impact_point[1])
+        })
+    }
 }
 
 // #[cfg(test)]

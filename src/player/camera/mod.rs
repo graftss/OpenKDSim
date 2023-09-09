@@ -5,7 +5,7 @@ use gl_matrix::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    collision::raycast_state::{RaycastCallType, RaycastState},
+    collision::raycast_state::{RaycastCallType, RaycastRef, Raycasts},
     constants::{FRAC_PI_2, UNITY_TO_SIM_SCALE, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_POS},
     delegates::{has_delegates::HasDelegates, sound_id::SoundId, DelegatesRef},
     macros::{max, min, set_y, vec3_from, vec3_unit_xz},
@@ -76,7 +76,7 @@ pub struct CameraState {
     override_type: Option<CamOverrideType>,
 
     #[serde(skip)]
-    pub raycast_state: RaycastState,
+    pub raycasts: Option<RaycastRef>,
 
     #[serde(skip)]
     delegates_ref: Option<DelegatesRef>,
@@ -251,6 +251,16 @@ pub struct CameraState {
     pub changing_special_camera: bool,
 }
 
+impl Raycasts for CameraState {
+    fn get_raycasts(&self) -> Option<RaycastRef> {
+        self.raycasts.as_ref().map(|raycasts| raycasts.clone())
+    }
+
+    fn set_raycasts(&mut self, raycasts: RaycastRef) {
+        self.raycasts = Some(raycasts);
+    }
+}
+
 impl HasDelegates for CameraState {
     fn get_delegates_ref(&self) -> Option<&DelegatesRef> {
         self.delegates_ref.as_ref()
@@ -306,7 +316,7 @@ impl CameraState {
                 let mut ray_end = pos;
                 ray_end[1] += r1_jump_height;
 
-                self.raycast_state.load_ray(&ray_start, &ray_end);
+                self.load_ray(&ray_start, &ray_end);
                 let delegates = self.delegates_ref.as_ref().unwrap();
                 let hits = delegates.borrow().call_do_hit(
                     &ray_start,
@@ -318,8 +328,8 @@ impl CameraState {
                 let peak_height = if hits == 0 {
                     r1_jump_height
                 } else {
-                    let closest_hit = self.raycast_state.get_closest_hit().unwrap();
-                    (closest_hit.impact_point[1] - above_cam).abs() + kat_to_cam_y
+                    let hit_y = self.get_closest_hit_y().unwrap();
+                    (hit_y - above_cam).abs() + kat_to_cam_y
                 };
 
                 self.r1_jump_peak_height = peak_height;
@@ -740,8 +750,8 @@ impl CameraState {
         }
 
         // TODO: `camera_update_normal:103-173` (check if noclip camera clipped)
-        // self.raycast_state.load_ray(katamari.get_center(), &noclip_pos);
-        // if self.raycast_state.find_nearest_unity_hit(RaycastCallType::Stage, true) {
+        // self.raycasts.load_ray(katamari.get_center(), &noclip_pos);
+        // if self.raycasts.find_nearest_unity_hit(RaycastCallType::Stage, true) {
 
         // }
 
@@ -795,7 +805,7 @@ impl CameraState {
                 let mut ray_end = init_pos;
                 ray_end[1] += self.kat_offset_ctrl_pt.r1_jump_height;
 
-                self.raycast_state.load_ray(&ray_start, &ray_end);
+                self.load_ray(&ray_start, &ray_end);
                 self.r1_jump_peak_height = if let Some(delegates) = &self.delegates_ref {
                     let found_hits = delegates.borrow().call_do_hit(
                         &ray_start,
@@ -807,8 +817,8 @@ impl CameraState {
                     if found_hits == 0 {
                         self.kat_offset_ctrl_pt.r1_jump_height
                     } else {
-                        let closest_hit = self.raycast_state.get_closest_hit().unwrap();
-                        let peak_height = closest_hit.impact_point[1] - ray_start[1];
+                        let hit_y = self.get_closest_hit_y().unwrap();
+                        let peak_height = hit_y - ray_start[1];
                         peak_height.abs() + ray_start_delta_y
                     }
                 } else {
@@ -1004,10 +1014,12 @@ impl Camera {
         katamari: &Katamari,
         prince: &Prince,
         mission_config: &MissionConfig,
+        raycasts: RaycastRef,
     ) {
+        // TODO_REFACTOR: use `HasDelegates`
         self.state.delegates_ref = Some(delegates.clone());
 
-        self.init_state(katamari, prince);
+        self.init_state(katamari, prince, raycasts);
         self.set_mode(CameraMode::Normal, Some(katamari), Some(prince));
         self.init_transform();
         self.reset_state(katamari, prince);
@@ -1017,7 +1029,7 @@ impl Camera {
 
     /// Initialize the `CameraState` struct.
     /// offset: 0xb410
-    pub fn init_state(&mut self, katamari: &Katamari, prince: &Prince) {
+    pub fn init_state(&mut self, katamari: &Katamari, prince: &Prince, raycasts: RaycastRef) {
         let mut pos = vec3::create();
         let mut target = vec3::create();
 
@@ -1026,6 +1038,7 @@ impl Camera {
         self.state.last_pos = pos;
         self.state.target = target;
         self.state.last_target = target;
+        self.state.raycasts = Some(raycasts.clone());
     }
 
     /// Reset the camera state. This is performed at the start of every mission

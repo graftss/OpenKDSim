@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{delegates::DelegatesRef, gamestate::GameState, mission::state::MissionState};
+use crate::{
+    collision::raycast_state::RaycastRef, delegates::DelegatesRef, gamestate::GameState,
+    mission::state::MissionState,
+};
 
 use self::{
     animation::Animation,
@@ -36,6 +39,7 @@ impl Player {
         delegates: &DelegatesRef,
         mission_state: &MissionState,
         override_init_size: f32,
+        raycasts: RaycastRef,
     ) {
         // first initialize the katamari
         let init_pos = &mut mission_state.mission_config.init_kat_pos[player as usize].clone();
@@ -60,6 +64,7 @@ impl Player {
             &self.katamari,
             &self.prince,
             &mission_state.mission_config,
+            raycasts,
         );
 
         // then initialize the animation state

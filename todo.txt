@@ -36,6 +36,7 @@ refactoring
   - merge `delegates` and `has_delegates` modules, make `sound_id` and `vfx_id` top-level
   - replace `Katamari::ray_contact_floor_idxs` (a vector of ray indices that contact a floor)
     with an array [bool; u32], that's true at index i if ray i contacts a floor
+  - move `katamari/collision.rs` -> `katamari/collision/mod.rs`
 
 perf
   - is it possible to drop the static `include_bytes!` data after

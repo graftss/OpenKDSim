@@ -80,7 +80,6 @@ impl Hydrate for MissionState {
 impl Hydrate for CameraState {
     fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
         let delegates = &old_state_ref.borrow().delegates;
-        self.raycast_state.set_delegates_ref(delegates);
         self.set_delegates_ref(delegates);
     }
 }
@@ -101,7 +100,7 @@ impl Hydrate for Katamari {
     fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
         let delegates = &old_state_ref.borrow().delegates;
         self.set_delegates_ref(delegates);
-        self.raycast_state.set_delegates_ref(delegates);
+        self.raycasts.set_delegates_ref(delegates);
         // TODO: delete `attached_props` and `contact_prop` propref fields on `Katamari`
     }
 }

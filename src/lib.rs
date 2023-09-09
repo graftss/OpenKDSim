@@ -34,6 +34,7 @@ use props::{
 use std::cell::RefCell;
 
 use crate::{
+    delegates::has_delegates::HasDelegates,
     macros::{log, panic_log},
     savestate::Hydrate,
 };
@@ -85,7 +86,7 @@ pub extern "C" fn OpenSimTest() {
     STATE.with(|state| {
         let mut raycast_state = RaycastState::default();
         let del = state.borrow().delegates.clone();
-        raycast_state.set_delegates(&del);
+        raycast_state.set_delegates_ref(&del);
         log!("hellooooo before finding hit");
         raycast_state.find_nearest_unity_hit(RaycastCallType::Objects, true);
     });
