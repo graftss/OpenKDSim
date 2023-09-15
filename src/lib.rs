@@ -40,7 +40,7 @@ use crate::{
 };
 
 thread_local! {
-    static STATE: RefCell<GameState> = RefCell::new(GameState::default());
+    static STATE: RefCell<GameState> = RefCell::new(GameState::new());
 }
 
 /// Helper function to read the prop config for name index `name_idx` from the game state.

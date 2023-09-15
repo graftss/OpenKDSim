@@ -3,9 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    collision::raycast_state::RaycastRef,
+    collision::raycast_state::{RaycastRef, RaycastState},
     debug::DEBUG_CONFIG,
-    delegates::{has_delegates::HasDelegates, Delegates},
+    delegates::{has_delegates::HasDelegates, Delegates, DelegatesRef},
     global::GlobalState,
     macros::{debug_log, panic_log},
     mission::{state::MissionState, vsmode::VsModeState, GameMode},
@@ -31,7 +31,7 @@ pub struct GameState {
 
     /// Delegates which call back into unity code.
     #[serde(skip)]
-    pub delegates: Rc<RefCell<Delegates>>,
+    pub delegates: DelegatesRef,
 
     /// Constant, geometric data relating to props that's passed to the
     /// simulation from unity (e.g. prop collision meshes, prop random
@@ -44,6 +44,18 @@ pub struct GameState {
 }
 
 impl GameState {
+    // TODO: use `new` functions to construct a new `GameState` object rather than
+    // `Default::default()`.
+    pub fn new() -> Self {
+        let delegates = Rc::new(RefCell::new(Delegates::default()));
+        let raycasts = Rc::new(RefCell::new(RaycastState::default()));
+
+        Self {
+            props: PropsState::new(delegates, raycasts),
+            ..Default::default()
+        }
+    }
+
     pub fn reset(&mut self) {
         self.raycast.borrow_mut().set_delegates_ref(&self.delegates);
 
@@ -52,9 +64,6 @@ impl GameState {
         self.props.reset();
         self.mission_state = MissionState::default();
         self.mono_data = Rc::new(MonoData::default());
-
-        // TODO_REFACTOR: find a better place to put this
-        self.props.delegates = Some(self.delegates.clone());
     }
 
     pub fn get_player(&self, player_idx: usize) -> &Player {

@@ -4,6 +4,7 @@ use gl_matrix::common::Mat4;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    collision::raycast_state::RaycastRef,
     constants::ZERO,
     delegates::{has_delegates::HasDelegates, DelegatesRef},
     global::GlobalState,
@@ -56,9 +57,20 @@ pub struct PropsState {
 
     #[serde(skip)]
     pub delegates: Option<DelegatesRef>,
+
+    #[serde(skip)]
+    pub raycasts: Option<RaycastRef>,
 }
 
 impl PropsState {
+    pub fn new(delegates: DelegatesRef, raycasts: RaycastRef) -> Self {
+        Self {
+            delegates: Some(delegates),
+            raycasts: Some(raycasts),
+            ..Default::default()
+        }
+    }
+
     /// Reset ephemeral fields of the props state between attempts.
     pub fn reset(&mut self) {
         self.props.clear();
