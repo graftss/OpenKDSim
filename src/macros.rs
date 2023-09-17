@@ -1,4 +1,4 @@
-/// Log a formatted string to the main debug log file. Used temporarily while debugging.
+/// Log a formatted string to the main debug log file. Used while debugging.
 #[allow(unused_macros)]
 macro_rules! debug_log {
     ($($y: expr),+) => {

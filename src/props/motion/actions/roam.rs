@@ -2,6 +2,7 @@ use gl_matrix::{common::Vec3, mat4, vec3};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    collision::raycast_state::RaycastRef,
     constants::{VEC3_ZERO, VEC3_Z_NEG, VEC3_Z_POS},
     global::GlobalState,
     macros::set_translation,
@@ -9,7 +10,7 @@ use crate::{
     props::{
         config::NamePropConfig,
         motion::actions::common::is_not_facing_target,
-        prop::{Prop, PropAnimationType},
+        prop::{Prop, PropAnimationType, PropFlags2},
     },
 };
 
@@ -134,7 +135,43 @@ mod test {
 }
 
 impl Roam {
-    fn update_state_init(&mut self, prop: &mut Prop, global_state: &mut GlobalState) {
+    /// offset: 0x3ac60
+    pub fn update(
+        &mut self,
+        prop: &mut Prop,
+        global_state: &mut GlobalState,
+        raycasts: RaycastRef,
+    ) {
+        if prop.move_type.is_some() && !prop.get_flags2().contains(PropFlags2::Wobble) {
+            // core motion update depending on the motion's state
+            match self.state {
+                RoamState::InitRoam => self.update_state_init(prop, global_state, raycasts),
+                RoamState::Roam => todo!(),
+                RoamState::InitTurnInPlace => todo!(),
+                RoamState::TurnInPlace => todo!(),
+            }
+
+            prop.update_somethings_coming();
+
+            if prop.get_behavior() != Some(0x1f) {
+                self.check_alt_action_trigger(prop);
+            }
+        }
+    }
+
+    /// offset: 0x3c0b0
+    fn check_alt_action_trigger(&mut self, prop: &mut Prop) {
+        if prop.alt_motion_action.is_some() {
+            // TODO_ALT
+        }
+    }
+
+    fn update_state_init(
+        &mut self,
+        prop: &mut Prop,
+        global_state: &mut GlobalState,
+        raycasts: RaycastRef,
+    ) {
         if prop.get_behavior() != Some(0x1f) {
             self.do_alt_action = false;
         }
@@ -170,8 +207,12 @@ impl Roam {
         self.last_turn_direction = None;
         self.turn_timer = compute_rand_turn_timer(global_state.rng.get_rng1(), prop.get_ctrl_idx());
 
-        // TODO: self.zone = find_zone_below(prop, &prop.pos, prop.get_radius(), &prop.unattached_transform, );
-        self.zone = None;
+        self.zone = raycasts.borrow_mut().find_zone_below_point(
+            &prop.pos,
+            prop.get_radius(),
+            &prop.get_unattached_transform(),
+        );
+
         if self.zone.is_none() {
             // TODO_LOW: can we actually return from here? the original simulation doesn't, but
             // it seems to have the same effect (either way the prop ends its motion);

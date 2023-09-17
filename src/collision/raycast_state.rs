@@ -10,7 +10,7 @@ use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     debug::DEBUG_CONFIG,
     delegates::{has_delegates::HasDelegates, Delegates},
-    macros::{panic_log, vec3_from},
+    macros::{debug_log, panic_log, temp_debug_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
@@ -63,7 +63,8 @@ pub struct RaycastState {
     /// offset: 0xb3230
     triangle_hit_point: Vec3,
 
-    zone_mesh: Option<Rc<Mesh>>,
+    pub zone_mesh: Option<Rc<Mesh>>,
+
     // END fields not in the original simulation
     /// Initial point of the collision ray.
     /// offset: 0x0
@@ -150,6 +151,10 @@ impl Into<i32> for RaycastCallType {
 }
 
 impl RaycastState {
+    pub fn set_zone_mesh(&mut self, zone_mesh: Rc<Mesh>) {
+        self.zone_mesh = Some(zone_mesh);
+    }
+
     /// Load a ray into the raycast state for further collision checks.
     /// offset: 0x10350
     pub fn load_ray(&mut self, point0: &Vec3, point1: &Vec3) {
@@ -610,26 +615,43 @@ impl RaycastState {
     /// Checks if the ray of length `2 * dist` straight down from `pos` intersects a zone.
     /// If it does, returns that zone's id.
     /// offset: 0x36d70
-    pub fn find_zone_below_point(
-        &mut self,
-        pos: &Vec3,
-        dist: f32,
-        transform: &Mat4,
-        zone_mesh: &Mesh,
-    ) -> Option<u8> {
+    pub fn find_zone_below_point(&mut self, pos: &Vec3, dist: f32, transform: &Mat4) -> Option<u8> {
         let below_pos = vec3_from!(-, pos, [0.0, dist + dist, 0.0]);
         self.load_ray(&pos, &below_pos);
 
-        if self.ray_hits_zone(transform, zone_mesh) != 0 {
+        temp_debug_log!("??? ray hits zone: {:?}, {:?}", pos, below_pos);
+
+        if self.ray_hits_zone(transform) != 0 {
             self.get_closest_hit().map(|hit| hit.metadata as u8)
         } else {
+            self.debug_find_zone_below_point(pos, dist, transform, self.get_closest_hit());
             None
         }
     }
 
+    fn debug_find_zone_below_point(
+        &self,
+        pos: &Vec3,
+        dist: f32,
+        transform: &Mat4,
+        hit: Option<&RaycastTriHit>,
+    ) {
+        debug_log!(
+            "  find_zone_below_point: pos={:?}, dist={:?}, transform={:?}",
+            pos,
+            dist,
+            transform
+        );
+        debug_log!("  hit: {:?}", hit);
+    }
+
     /// offset: 0x276e0
-    fn ray_hits_zone(&mut self, transform: &Mat4, zone_mesh: &Mesh) -> i32 {
-        self.ray_hits_mesh(zone_mesh, transform, true)
+    fn ray_hits_zone(&mut self, transform: &Mat4) -> i32 {
+        if let Some(zone_mesh) = self.zone_mesh.as_ref() {
+            self.ray_hits_mesh(&zone_mesh.clone(), transform, true)
+        } else {
+            panic_log!("called `ray_hits_zone` on a raycast state with no zone mesh");
+        }
     }
 }
 

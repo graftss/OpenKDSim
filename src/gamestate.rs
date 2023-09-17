@@ -44,14 +44,18 @@ pub struct GameState {
 }
 
 impl GameState {
-    // TODO: use `new` functions to construct a new `GameState` object rather than
+    // TODO: use `new` functions to construct other fields of the `GameState` object, rather than
     // `Default::default()`.
     pub fn new() -> Self {
         let delegates = Rc::new(RefCell::new(Delegates::default()));
-        let raycasts = Rc::new(RefCell::new(RaycastState::default()));
+        let raycast = Rc::new(RefCell::new(RaycastState::default()));
+
+        let props = PropsState::new(delegates.clone(), raycast.clone());
 
         Self {
-            props: PropsState::new(delegates, raycasts),
+            raycast,
+            delegates,
+            props,
             ..Default::default()
         }
     }
@@ -217,6 +221,9 @@ impl GameState {
 
         // read the mission's `MonoData` data from the `mono_data` raw pointer.
         self.mono_data = MonoData::from_raw(mono_data);
+        self.raycast
+            .borrow_mut()
+            .set_zone_mesh(self.mono_data.zone_mesh.clone());
 
         // TODO_PROPS: init subobjects
         self.props.comments.reset();
@@ -376,7 +383,8 @@ impl GameState {
 
         // TODO_STOREFLAG: `update_game:23-89` (if store flag is on)
         self.global.updating_player = 0;
-        self.props.update(&self.players[0], &self.mission_state);
+        self.props
+            .update(&self.players[0], &self.mission_state, &mut self.global);
         // TODO: `update_game:93-101` (but put this in `props_update`)
         // TODO_TUTORIAL: `tutorial_update_flags`
 

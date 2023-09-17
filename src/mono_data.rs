@@ -131,7 +131,7 @@ impl PropMonoData {
 #[derive(Debug, Default, Clone)]
 pub struct MonoData {
     pub zone_ptr: Option<usize>,
-    pub zone_mesh: Mesh,
+    pub zone_mesh: Rc<Mesh>,
     pub area_ptrs: [Option<usize>; 5],
     pub props: Vec<Rc<PropMonoData>>,
 }
@@ -142,8 +142,7 @@ impl MonoData {
         let zone_ptr = md_follow_offset!(mono_data, 0x4) as usize;
 
         // parse zone into mesh
-        let zone_mesh = Mesh::from_raw(zone_ptr as *const u8);
-
+        let zone_mesh = Rc::new(Mesh::from_raw(zone_ptr as *const u8));
         // read area pointers
         let area_ptrs = [
             Some(md_follow_offset!(mono_data, 0x14) as usize),

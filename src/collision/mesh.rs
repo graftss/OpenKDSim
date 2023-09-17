@@ -93,10 +93,10 @@ impl Mesh {
         let mut sectors = vec![];
         for sector_idx in 0..num_sectors as isize {
             // parse the offset where sector starts
-            let sector_offset = md_read!(mono_data, u32, sector_idx * 4 + 4) as isize;
+            let sector_offset = md_read!(mono_data, u32, 4) as isize;
 
             // parse the sector's AABB
-            let aabb_offset = sector_offset + sector_idx * 0x18 + 8;
+            let aabb_offset = sector_offset + 8 + sector_idx * 0x18;
             let mut aabb = Aabb {
                 min: md_read!(mono_data, Vec3, aabb_offset),
                 max: md_read!(mono_data, Vec3, aabb_offset + 12),

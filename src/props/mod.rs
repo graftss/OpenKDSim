@@ -226,7 +226,12 @@ impl PropsState {
 
     /// Root method to update all props.
     /// offset: 0x259c0
-    pub fn update(&mut self, player: &Player, mission_state: &MissionState) {
+    pub fn update(
+        &mut self,
+        player: &Player,
+        mission_state: &MissionState,
+        global_state: &mut GlobalState,
+    ) {
         // for prop_ref in self.props_iter_mut() {
         //     let mut prop = prop_ref.borrow_mut();
         //     if prop.get_ctrl_idx() != 0x11f {
@@ -238,13 +243,20 @@ impl PropsState {
         if mission_state.is_ending() {
             self.update_ending();
         } else {
-            self.update_nonending(player, mission_state);
+            self.update_nonending(player, mission_state, global_state);
         }
     }
 
     /// Root function to update all props when not in the `Ending` game mode.
     /// offset: 0x50050
-    pub fn update_nonending(&mut self, player: &Player, mission_state: &MissionState) {
+    pub fn update_nonending(
+        &mut self,
+        player: &Player,
+        mission_state: &MissionState,
+        global_state: &mut GlobalState,
+    ) {
+        let raycasts = self.raycasts.as_ref().unwrap();
+
         for prop_ref in self.props.iter_mut() {
             let mut prop = prop_ref.borrow_mut();
             if prop.is_disabled() {
@@ -257,7 +269,13 @@ impl PropsState {
             prop.update_last_pos_and_rotation();
             prop.update_global_state();
             prop.update_child_link();
-            prop.update_name_index_motion(motion_action, &self.gps, mission_state);
+            prop.update_name_index_motion(
+                motion_action,
+                &self.gps,
+                mission_state,
+                global_state,
+                raycasts.clone(),
+            );
 
             // if let Some(_script) = prop.innate_script.as_ref() {
             //     // TODO_PROP_MOTION: call `innate_script`

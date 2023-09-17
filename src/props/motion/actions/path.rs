@@ -199,6 +199,7 @@ impl FollowPath {
         );
 
         if !prop.get_flags2().contains(PropFlags2::Wobble) {
+            // core motion update depending on the motion's state
             match self.state {
                 FollowPathState::Init => self.update_state_init(prop, mission),
                 FollowPathState::MoveTowardsTarget => {

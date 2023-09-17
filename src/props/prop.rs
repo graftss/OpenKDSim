@@ -474,7 +474,7 @@ pub struct Prop {
 
     /// The prop's concrete motion action.
     /// offset: 0x584
-    motion_action: Option<u16>,
+    pub motion_action: Option<u16>,
 
     /// (??) The prop's behavior type, which encodes the primary motion action, the alternate motion
     /// action, and the (???)
@@ -484,7 +484,7 @@ pub struct Prop {
     /// The prop's alternate concrete motion action, which can be triggered by various events
     /// (e.g. katamari gets close, or katamari collects this prop's parent, etc.)
     /// offset: 0x586
-    alt_motion_action: Option<u16>,
+    pub alt_motion_action: Option<u16>,
 
     /// (??) The prop's state while it's unattached.
     /// offset: 0x588

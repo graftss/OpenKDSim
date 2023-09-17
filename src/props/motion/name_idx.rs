@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{mission::state::MissionState, props::prop::Prop};
+use crate::{
+    collision::raycast_state::RaycastRef, global::GlobalState, mission::state::MissionState,
+    props::prop::Prop,
+};
 
 use super::{actions::MotionAction, global_path::GlobalPathState};
 
@@ -22,6 +25,8 @@ impl Prop {
         motion: Option<&mut MotionAction>,
         gps: &GlobalPathState,
         mission_state: &MissionState,
+        global_state: &mut GlobalState,
+        raycasts: RaycastRef,
     ) {
         match self.get_name_index_motion() {
             NameIndexMotion::Normal => {
@@ -30,7 +35,7 @@ impl Prop {
                     // TODO: (*(code *)(&callback3_generic_moving_states)[prop->pstActionState])()
                     if let Some(motion) = motion {
                         // motion.should_do_alt_motion();
-                        motion.update(self, gps, mission_state);
+                        motion.update(self, gps, mission_state, global_state, raycasts);
                     }
                 }
             }

@@ -34,7 +34,7 @@ pub struct DebugConfig {
 // TODO_DEBUG: this should be made editable mid-execution.
 pub const DEV_CONFIG: DebugConfig = DebugConfig {
     allow_debug_logs: true,
-    log_tick: true,
+    log_tick: false,
     log_nonzero_hit_attribute_hits: false,
     log_destroyed_props: false,
     draw_collided_prop_aabb_hits: true,
