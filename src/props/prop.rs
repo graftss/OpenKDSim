@@ -1168,6 +1168,10 @@ impl Prop {
         self.aabb_mesh.as_ref().unwrap().sectors[0].aabb.max[0]
     }
 
+    pub fn get_aabb_max(&self) -> Vec3 {
+        self.aabb_mesh.as_ref().unwrap().sectors[0].aabb.max
+    }
+
     pub fn do_attached_translation(&mut self, translation: &Vec3) {
         modify_translation!(self.attached_transform, +=, translation);
     }

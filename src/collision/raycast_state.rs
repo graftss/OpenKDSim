@@ -647,6 +647,8 @@ impl RaycastState {
 
     /// In the original simulation the argument is a `prop`, but the only piece of its data
     /// used is its `unattached_transform`, which is the `transform` argument here.
+    /// Returns the number of zone triangles hit by the ray loaded into this raycast state.
+    /// Thus, the ray hits a zone if and only if the returned value is >0.
     /// offset: 0x276e0
     pub fn ray_hits_zone(&mut self, transform: &Mat4) -> i32 {
         if let Some(zone_mesh) = self.zone_mesh.as_ref() {
