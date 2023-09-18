@@ -408,7 +408,7 @@ pub struct Prop {
     /// by the katamari (when hit by the katamari or detached from the katamari),
     /// or by a prop behavior (e.g. launched from a vending machine or russian doll).
     /// offset: 0xe0
-    trajectory_velocity: Vec3,
+    pub trajectory_velocity: Vec3,
 
     /// The prop's transform matrix while unattached from the katamari.
     /// offset: 0x110
@@ -510,7 +510,7 @@ pub struct Prop {
     /// True if the prop isn't moving (used when the prop has a move type that makes it
     /// occasionally stop moving, e.g. random roaming movement).
     /// offset: 0x58e
-    stationary: bool,
+    pub stationary: bool,
 
     /// If true, the prop can't wobble when the katamari collides with it.
     /// Temporarily set by motion actions such as hops.

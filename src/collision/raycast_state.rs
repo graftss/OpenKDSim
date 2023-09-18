@@ -645,8 +645,10 @@ impl RaycastState {
         debug_log!("  hit: {:?}", hit);
     }
 
+    /// In the original simulation the argument is a `prop`, but the only piece of its data
+    /// used is its `unattached_transform`, which is the `transform` argument here.
     /// offset: 0x276e0
-    fn ray_hits_zone(&mut self, transform: &Mat4) -> i32 {
+    pub fn ray_hits_zone(&mut self, transform: &Mat4) -> i32 {
         if let Some(zone_mesh) = self.zone_mesh.as_ref() {
             self.ray_hits_mesh(&zone_mesh.clone(), transform, true)
         } else {
