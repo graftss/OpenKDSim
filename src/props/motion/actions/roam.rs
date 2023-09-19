@@ -1,12 +1,18 @@
-use gl_matrix::{common::Vec3, mat4, vec3};
+use gl_matrix::{
+    common::{Mat4, Vec3},
+    mat4, vec3,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     collision::raycast_state::RaycastRef,
-    constants::{FRAC_PI_2, VEC3_ZERO, VEC3_Z_NEG, VEC3_Z_POS},
+    constants::{FRAC_PI_2, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_NEG, VEC3_Z_POS},
     global::GlobalState,
-    macros::{panic_log, set_translation, vec3_from},
-    math::{acos_f32, vec3_inplace_normalize},
+    macros::{panic_log, set_translation, temp_debug_log, vec3_from, vec3_unit_xz},
+    math::{
+        acos_f32, vec3_inplace_add_vec, vec3_inplace_normalize, vec3_inplace_scale,
+        vec3_inplace_zero_small,
+    },
     props::{
         config::NamePropConfig,
         motion::actions::common::is_not_facing_target,
@@ -109,7 +115,7 @@ pub struct Roam {
     forward_unit: Vec3,
 
     /// offset: 0x30
-    forward_unit_copy: Vec3,
+    UNK_lateral_forward_unit: Vec3,
 
     /// offset: 0x40
     right: Vec3,
@@ -228,8 +234,8 @@ impl Roam {
             match self.state {
                 RoamState::Init => self.update_state_init(prop, global_state, raycast_ref),
                 RoamState::Roam => self.update_state_roam(prop, global_state, raycast_ref),
-                RoamState::InitTurnInPlace => todo!(),
-                RoamState::TurnInPlace => todo!(),
+                RoamState::InitTurnInPlace => (),
+                RoamState::TurnInPlace => (),
             }
 
             prop.update_somethings_coming();
@@ -261,7 +267,7 @@ impl Roam {
         mat4::identity(&mut prop.rotation_mat);
         mat4::identity(&mut prop.init_rotation_mat);
         self.forward_unit = VEC3_Z_NEG;
-        self.forward_unit_copy = VEC3_Z_NEG;
+        self.UNK_lateral_forward_unit = VEC3_Z_NEG;
 
         let mut prop_rot = prop.get_unattached_transform().clone();
         set_translation!(prop_rot, VEC3_ZERO);
@@ -277,8 +283,12 @@ impl Roam {
         let mut facing_angle_yawrot = [0.0; 16];
         mat4::from_y_rotation(&mut facing_angle_yawrot, facing_angle);
 
-        let temp = self.forward_unit_copy;
-        vec3::transform_mat4(&mut self.forward_unit_copy, &temp, &facing_angle_yawrot);
+        let temp = self.UNK_lateral_forward_unit;
+        vec3::transform_mat4(
+            &mut self.UNK_lateral_forward_unit,
+            &temp,
+            &facing_angle_yawrot,
+        );
 
         self.right = VEC3_Z_POS;
 
@@ -318,6 +328,7 @@ impl Roam {
         prop.has_motion = true;
     }
 
+    /// offset: 0x3b1e0
     fn update_state_roam(
         &mut self,
         prop: &mut Prop,
@@ -375,7 +386,7 @@ impl Roam {
                 }
 
                 self.yaw_turned = 0.0;
-                self.forward_before_turn_unit = self.forward_unit_copy;
+                self.forward_before_turn_unit = self.UNK_lateral_forward_unit;
 
                 let turn_dir =
                     compute_rand_turn_dir(global_state.rng.get_rng1(), prop.get_ctrl_idx());
@@ -544,7 +555,7 @@ impl Roam {
             if next_pos_in_zone != 0 {
                 prop.pos = raycast.get_closest_hit().unwrap().impact_point;
                 prop.pos[1] += bbox_max_y.abs();
-                self.forward_unit = self.forward_unit_copy;
+                self.forward_unit = self.UNK_lateral_forward_unit;
             } else {
                 prop.pos = prop.last_pos;
                 return true;
@@ -592,8 +603,71 @@ impl Roam {
     }
 
     // offset: 0x30ec0
-    fn unk_align_height_with_zone(&mut self, prop: &mut Prop, raycast_ref: RaycastRef) {}
+    fn unk_align_height_with_zone(&mut self, prop: &mut Prop, raycast_ref: RaycastRef) {
+        let radius = prop.get_radius();
+        let center = prop.pos;
+        let mut pitch = [0.0; 16];
+
+        for i in 1..=8 {
+            let mut top = [0.0; 3];
+            vec3::transform_mat4(&mut top, &VEC3_Y_POS, prop.get_unattached_transform());
+            vec3_inplace_scale(&mut top, (-i as f32) * radius);
+            vec3_inplace_add_vec(&mut top, &center);
+
+            if self.unk_compute_pitch_rotation(prop, &center, &top, &mut pitch, &raycast_ref) {
+                break;
+            }
+
+            if i == 8 {
+                return;
+            }
+        }
+
+        if !NamePropConfig::get(prop.get_name_idx()).lock_pitch {
+            prop.rotation_mat = pitch;
+        }
+
+        vec3::transform_mat4(
+            &mut self.forward_unit,
+            &self.UNK_lateral_forward_unit,
+            &pitch,
+        );
+
+        let raycast = raycast_ref.borrow();
+        let hit = raycast.get_closest_hit().unwrap();
+        prop.pos[1] = hit.normal_unit[1] * prop.get_aabb_max_y().abs() + hit.impact_point[1];
+    }
 
     /// offset: 0x30ba0
-    fn unk_align_height_subroutine(&mut self, prop: &mut Prop, raycast_ref: RaycastRef) {}
+    fn unk_compute_pitch_rotation(
+        &mut self,
+        prop: &mut Prop,
+        center: &Vec3,
+        top: &Vec3,
+        pitch_mat: &mut Mat4,
+        raycast_ref: &RaycastRef,
+    ) -> bool {
+        let mut raycast = raycast_ref.borrow_mut();
+
+        raycast.load_ray(&center, &top);
+        if raycast.ray_hits_zone(prop.get_unattached_transform()) != 0 {
+            let hit = raycast.get_closest_hit().unwrap();
+
+            let mut normal_unit = hit.normal_unit;
+            vec3_inplace_zero_small(&mut normal_unit, 1e-5);
+
+            // TODO_DOC: is it correct to negate the z coordinate?
+            let mut normal_lateral = vec3_unit_xz!(normal_unit);
+            normal_lateral[2] = -normal_lateral[2];
+
+            let pitch_angle = acos_f32(hit.normal_unit[1]);
+            mat4::from_rotation(pitch_mat, -pitch_angle, &normal_lateral);
+
+            return true;
+        } else {
+            mat4::identity(pitch_mat);
+
+            return false;
+        }
+    }
 }
