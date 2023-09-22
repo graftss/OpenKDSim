@@ -10,7 +10,7 @@ use crate::{
     constants::{UNITY_TO_SIM_SCALE, VEC3_Y_POS},
     debug::DEBUG_CONFIG,
     delegates::{has_delegates::HasDelegates, Delegates},
-    macros::{debug_log, panic_log, temp_debug_log, vec3_from},
+    macros::{debug_log, panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
 };
 
@@ -341,10 +341,15 @@ impl RaycastState {
         let t = f * vec3::dot(&edge2, &q);
 
         if t > EPS && t < 1.0 {
-            vec3::scale_and_add(&mut self.triangle_hit_point, &self.point0, &ray, t);
+            vec3::scale_and_add(
+                &mut self.ray_to_triangle_hit.impact_point,
+                &self.point0,
+                &ray,
+                t,
+            );
             let ray_len = vec3::length(&ray);
             let p0_to_impact_len = t * ray_len;
-            self.ray_to_triangle_hit.impact_point[2] = p0_to_impact_len;
+            self.ray_to_triangle_hit.impact_dist = p0_to_impact_len;
 
             // compute unit normal of the triangle
             let mut normal_unit = vec3::create();
@@ -500,7 +505,7 @@ impl RaycastState {
                             if tri_hit_dist < min_tri_hit_dist {
                                 self.closest_hit_idx = Some(self.tri_hits.len() as u8 - 1);
                                 min_tri_hit_dist = tri_hit_dist;
-                                vec3::copy(&mut min_tri_hit_point, &hit.impact_point);
+                                vec3::copy(&mut min_tri_hit_point, &self.triangle_hit_point);
                             }
                             self.num_hit_tris += 1;
                         }
@@ -551,12 +556,7 @@ impl RaycastState {
         // let impact_dist_ratio = self.get_closest_hit().unwrap().impact_dist_ratio;
 
         for hit in self.tri_hits.iter_mut() {
-            // TODO_DOC: undo goofy hack where `ray_hits_triangle` misuses the z coordinate of the
-            // impact point to store the impact distance. why?? who knows
-            let impact_dist = hit.impact_point[2];
-
-            hit.impact_dist = impact_dist;
-            hit.impact_dist_ratio = impact_dist / self.ray_len;
+            hit.impact_dist_ratio = hit.impact_dist / self.ray_len;
 
             // TODO_DOC: no clue what this is doing
             if ray_in_mesh_coords {
@@ -618,8 +618,6 @@ impl RaycastState {
     pub fn find_zone_below_point(&mut self, pos: &Vec3, dist: f32, transform: &Mat4) -> Option<u8> {
         let below_pos = vec3_from!(-, pos, [0.0, dist + dist, 0.0]);
         self.load_ray(&pos, &below_pos);
-
-        temp_debug_log!("??? ray hits zone: {:?}, {:?}", pos, below_pos);
 
         if self.ray_hits_zone(transform) != 0 {
             self.get_closest_hit().map(|hit| hit.metadata as u8)

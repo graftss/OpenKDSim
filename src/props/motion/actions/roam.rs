@@ -305,6 +305,8 @@ impl Roam {
             &prop.get_unattached_transform(),
         );
 
+        temp_debug_log!("zone: {:?}", self.zone);
+
         if self.zone.is_none() {
             // TODO_LOW: can we actually return from here? the original simulation doesn't, but
             // it seems to have the same effect (either way the prop ends its motion);
@@ -336,6 +338,9 @@ impl Roam {
         raycast_ref: RaycastRef,
     ) {
         let mut stationary = false;
+
+        temp_debug_log!("begin roam update");
+        temp_debug_log!("  flags: {:?}", self.wait_flags);
 
         if self.wait_flags.contains(WaitFlags::CanWait) {
             if self.wait_flags.contains(WaitFlags::IsWaiting) {
@@ -370,9 +375,11 @@ impl Roam {
         if !stationary {
             prop.animation_type = PropAnimationType::MovingForward;
             self.update_forward_yaw(prop, global_state);
+            temp_debug_log!("  pos before `update_forward_pos`: {:?}", prop.pos);
             if self.update_forward_pos(prop, false, raycast_ref) {
                 self.state = RoamState::InitTurnInPlace;
             }
+            temp_debug_log!("  pos after `update_forward_pos`: {:?}", prop.pos);
         }
     }
 
@@ -513,11 +520,10 @@ impl Roam {
         unk_flag: bool,
         raycast_ref: RaycastRef,
     ) -> bool {
-        let mut raycast = raycast_ref.borrow_mut();
         let bbox_max = prop.get_aabb_max();
         let bbox_max_y = bbox_max[1];
 
-        // TODO: pmot_roam_align_height_with_zone()
+        self.unk_align_height_with_zone(prop, raycast_ref.clone());
         prop.last_pos = prop.pos;
         vec3::scale(
             &mut prop.trajectory_velocity,
@@ -532,10 +538,10 @@ impl Roam {
 
         prop.pos = next_pos;
 
+        let mut raycast = raycast_ref.borrow_mut();
         raycast.load_ray(&next_pos, &below_next_pos);
-        let pos_in_zone = raycast.ray_hits_zone(prop.get_unattached_transform());
 
-        if pos_in_zone == 0 {
+        if raycast.ray_hits_zone(prop.get_unattached_transform()) == 0 {
             // TODO_DOC: what is the y coordinate bump doing?
             let mut moved_unit = vec3_from!(-, prop.pos, prop.last_pos);
             moved_unit[1] += bbox_max_y + bbox_max_y;
@@ -550,8 +556,8 @@ impl Roam {
             vec3::scale_and_add(&mut ray_end, &pos, &moved_unit, bbox_max[2]);
 
             raycast.load_ray(&ray_start, &ray_end);
-            let next_pos_in_zone = raycast.ray_hits_zone(prop.get_unattached_transform());
 
+            let next_pos_in_zone = raycast.ray_hits_zone(prop.get_unattached_transform());
             if next_pos_in_zone != 0 {
                 prop.pos = raycast.get_closest_hit().unwrap().impact_point;
                 prop.pos[1] += bbox_max_y.abs();
@@ -578,7 +584,6 @@ impl Roam {
 
         // either `next_pos_in_zone != 0` from the if branch above,
         // or `self.zone == current_zone` from the else branch above.
-
         self.moving_duration += 1;
         // TODO_PARAM
         if self.moving_duration > 0x3c {
@@ -593,13 +598,9 @@ impl Roam {
                 angle = -angle;
             }
             prop.rotation_vec[1] = angle;
-
-            return false;
         }
 
-        prop.pos = prop.last_pos;
-
-        true
+        false
     }
 
     // offset: 0x30ec0
