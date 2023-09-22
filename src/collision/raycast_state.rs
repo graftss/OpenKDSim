@@ -12,6 +12,7 @@ use crate::{
     delegates::{has_delegates::HasDelegates, Delegates},
     macros::{debug_log, panic_log, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_zero_small},
+    props::prop::Prop,
 };
 
 use super::{
@@ -653,6 +654,26 @@ impl RaycastState {
             self.ray_hits_mesh(&zone_mesh.clone(), transform, true)
         } else {
             panic_log!("called `ray_hits_zone` on a raycast state with no zone mesh");
+        }
+    }
+
+    /// Computes the zone that would contain `prop` if it had the position `pos`.
+    /// offset: 0x3c110
+    pub fn zone_containing_prop_at(&mut self, prop: &Prop, pos: &Vec3) -> Option<u8> {
+        // TODO_PARAM
+        let radius = prop.get_radius() * 5.0;
+
+        let mut ray_start = pos.clone();
+        ray_start[1] += radius;
+
+        let mut ray_end = pos.clone();
+        ray_end[1] -= radius;
+
+        self.load_ray(&ray_start, &ray_end);
+
+        match self.ray_hits_zone(prop.get_unattached_transform()) {
+            0 => None,
+            _ => Some(self.get_closest_hit().unwrap().metadata as u8),
         }
     }
 }

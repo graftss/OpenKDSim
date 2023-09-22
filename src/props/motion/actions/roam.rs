@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     collision::raycast_state::RaycastRef,
-    constants::{FRAC_PI_2, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_NEG, VEC3_Z_POS},
+    constants::{FRAC_PI_180, FRAC_PI_2, PI, VEC3_Y_POS, VEC3_ZERO, VEC3_Z_NEG, VEC3_Z_POS},
     global::GlobalState,
     macros::{panic_log, set_translation, temp_debug_log, vec3_from, vec3_unit_xz},
     math::{
@@ -234,8 +234,10 @@ impl Roam {
             match self.state {
                 RoamState::Init => self.update_state_init(prop, global_state, raycast_ref),
                 RoamState::Roam => self.update_state_roam(prop, global_state, raycast_ref),
-                RoamState::InitTurnInPlace => (),
-                RoamState::TurnInPlace => (),
+                RoamState::InitTurnInPlace => {
+                    self.update_state_init_turn_in_place(prop, raycast_ref)
+                }
+                RoamState::TurnInPlace => self.update_state_turn_in_place(prop),
             }
 
             prop.update_somethings_coming();
@@ -669,6 +671,137 @@ impl Roam {
             mat4::identity(pitch_mat);
 
             return false;
+        }
+    }
+
+    /// offset: 0x3b340
+    fn update_state_init_turn_in_place(&mut self, prop: &mut Prop, raycast_ref: RaycastRef) {
+        const TURN_ANGLES_DEGREES: [f32; 7] = [45.0, -45.0, 90.0, -90.0, 135.0, -135.0, 180.0];
+        let mut raycast = raycast_ref.borrow_mut();
+
+        self.yaw_target = 0.0;
+        self.forward_before_turn_unit = self.UNK_lateral_forward_unit;
+
+        for turn_angle_deg in TURN_ANGLES_DEGREES {
+            let turn_angle = turn_angle_deg * FRAC_PI_180;
+            self.yaw_target = turn_angle;
+
+            let mut yaw_rot_mat = [0.0; 16];
+            mat4::from_y_rotation(&mut yaw_rot_mat, turn_angle);
+
+            vec3::transform_mat4(
+                &mut self.forward_unit,
+                &self.forward_before_turn_unit,
+                &yaw_rot_mat,
+            );
+
+            raycast.find_zone_below_point(
+                &prop.pos,
+                prop.get_radius(),
+                &prop.get_unattached_transform(),
+            );
+
+            // TODO_PARAM
+            let lookahead_dist = self.forward_speed * 5.0;
+            let mut lookahead_pt = [0.0; 3];
+            vec3::scale_and_add(
+                &mut lookahead_pt,
+                &prop.pos,
+                &self.forward_unit,
+                lookahead_dist,
+            );
+
+            let lookahead_zone = raycast.zone_containing_prop_at(prop, &lookahead_pt);
+            if lookahead_zone == self.zone {
+                break;
+            }
+        }
+
+        let yaw_target = self.yaw_target;
+
+        // TODO_PARAM
+        // the number of frames it will take for the prop's yaw angle to reach its target
+        const TURN_FRAMES: u32 = 12;
+        let yaw_speed = self.yaw_target / (TURN_FRAMES as f32);
+
+        self.yaw_turned = 0.0;
+        self.yaw_speed = yaw_speed;
+
+        self.yaw_turned = if yaw_speed > 0.0 {
+            PI.min(yaw_speed).min(yaw_target)
+        } else {
+            (-PI).max(yaw_speed).max(yaw_target)
+        };
+        temp_debug_log!("yaw_speed = {}, yaw_turned={}", yaw_speed, self.yaw_turned);
+
+        let mut target_rot_mat = [0.0; 16];
+        mat4::from_y_rotation(&mut target_rot_mat, yaw_target);
+
+        vec3::transform_mat4(
+            &mut self.UNK_lateral_forward_unit,
+            &self.forward_before_turn_unit,
+            &target_rot_mat,
+        );
+        vec3_inplace_normalize(&mut self.UNK_lateral_forward_unit);
+
+        self.forward_unit = self.UNK_lateral_forward_unit;
+
+        let lateral_forward_unit = vec3_unit_xz!(self.forward_unit);
+        let similarity = vec3::dot(&lateral_forward_unit, &self.right);
+        let mut facing_angle = acos_f32(similarity);
+
+        if !is_not_facing_target(facing_angle, &lateral_forward_unit, &self.right) {
+            facing_angle = -facing_angle;
+        }
+
+        prop.rotation_vec[1] = facing_angle;
+        self.state = RoamState::TurnInPlace;
+    }
+
+    /// offset: 0x3bcd0
+    fn update_state_turn_in_place(&mut self, prop: &mut Prop) {
+        let next_yaw_turned = self.yaw_turned + self.yaw_speed;
+        let yaw_target = self.yaw_target;
+
+        self.yaw_turned = if self.yaw_speed >= 0.0 {
+            PI.min(next_yaw_turned).min(yaw_target)
+        } else {
+            (-PI).max(next_yaw_turned).max(yaw_target)
+        };
+
+        temp_debug_log!(
+            "  turn_in_place: nyt={}, yt={}, self.yt={}",
+            next_yaw_turned,
+            yaw_target,
+            self.yaw_turned
+        );
+
+        let mut yaw_rot_mat = [0.0; 16];
+        mat4::from_y_rotation(&mut yaw_rot_mat, self.yaw_turned);
+
+        vec3::transform_mat4(
+            &mut self.UNK_lateral_forward_unit,
+            &self.forward_before_turn_unit,
+            &yaw_rot_mat,
+        );
+        vec3_inplace_normalize(&mut self.UNK_lateral_forward_unit);
+
+        self.forward_unit = self.UNK_lateral_forward_unit;
+
+        let lateral_forward_unit = vec3_unit_xz!(self.forward_unit);
+        let similarity = vec3::dot(&lateral_forward_unit, &self.right);
+        let mut facing_angle = acos_f32(similarity);
+
+        if !is_not_facing_target(facing_angle, &lateral_forward_unit, &self.right) {
+            facing_angle = -facing_angle;
+        }
+
+        prop.rotation_vec[1] = facing_angle;
+
+        if self.yaw_turned == self.yaw_target {
+            self.state = RoamState::Roam;
+            self.just_started_moving = true;
+            self.moving_duration = 0;
         }
     }
 }
