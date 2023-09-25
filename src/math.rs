@@ -223,3 +223,38 @@ pub fn acos_f32(value: f32) -> f32 {
 pub fn vol_to_rad(vol: f32) -> f32 {
     (vol * 3.0 / _4PI).powf(FRAC_1_3)
 }
+
+/// The original simulation's implementation of rotation matrix computation.
+/// Unlike the `mat4::from_rotation` implementation used in most of this codebase,
+/// this version doesn't attempt to normalize `axis` to a unit vector.
+/// Doing so ended up causing a bug in the `Roam` motion behavior (offset 0x30ba0),
+/// so we need this implementation too.
+/// offset: 0x5a970
+#[inline]
+pub fn mat4_from_rotation_sim(out: &mut Mat4, angle: f32, axis: &Vec3) {
+    let x = axis[0];
+    let y = axis[1];
+    let z = axis[2];
+
+    let s = f32::sin(angle);
+    let c = f32::cos(angle);
+    let t = 1_f32 - c;
+
+    // Perform rotation-specific matrix multiplication
+    out[0] = x * x * t + c;
+    out[1] = y * x * t + z * s;
+    out[2] = z * x * t - y * s;
+    out[3] = 0.;
+    out[4] = x * y * t - z * s;
+    out[5] = y * y * t + c;
+    out[6] = z * y * t + x * s;
+    out[7] = 0.;
+    out[8] = x * z * t + y * s;
+    out[9] = y * z * t - x * s;
+    out[10] = z * z * t + c;
+    out[11] = 0.;
+    out[12] = 0.;
+    out[13] = 0.;
+    out[14] = 0.;
+    out[15] = 1.;
+}

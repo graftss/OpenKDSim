@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     collision::{mesh::Mesh, util::max_transformed_y},
-    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, VEC3_ZERO, _4PI},
+    constants::{FRAC_1_3, FRAC_PI_750, UNITY_TO_SIM_SCALE, _4PI},
     debug::DEBUG_CONFIG,
     global::GlobalState,
     macros::{
@@ -1150,8 +1150,7 @@ impl Prop {
     }
 
     pub fn get_aabb_min_point(&self) -> &Vec3 {
-        // &self.aabb_mesh.sectors[0].aabb.min
-        &VEC3_ZERO
+        &self.aabb_mesh.as_ref().unwrap().sectors[0].aabb.min
     }
 
     pub fn get_unattached_transform(&self) -> &Mat4 {

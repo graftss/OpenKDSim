@@ -62,6 +62,7 @@ impl Hydrate for PropsState {
     fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
         let old_state = old_state_ref.borrow();
         self.set_delegates_ref(&old_state.delegates);
+        self.raycasts = Some(old_state.raycast.clone());
         self.config = old_state.props.config;
 
         for prop_ref in self.props.iter() {
