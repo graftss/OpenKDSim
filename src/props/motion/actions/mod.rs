@@ -13,6 +13,7 @@ pub mod common;
 pub mod path;
 pub mod roam;
 pub mod sway;
+pub mod zone_trigger;
 
 pub trait ActionUpdate {
     fn update(&mut self, prop: &mut Prop);

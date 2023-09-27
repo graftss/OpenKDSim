@@ -279,6 +279,16 @@ bitflags::bitflags! {
     }
 }
 
+bitflags::bitflags! {
+    /// Definition of the 0x1e offset field of `Prop`, which is a 1-byte bitfield.
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(transparent)]
+    pub struct PropMotionFlags: u8 {
+        // True if the prop is waiting for its alt action-defined trigger.
+        const WaitForTrigger = 0x2;
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PropTrajectoryType {
     Normal,
@@ -347,6 +357,10 @@ pub struct Prop {
     /// The state index of the innate motion action.
     /// offset: 0x1d
     innate_motion_state: u8,
+
+    /// (??) Flags relating to prop motion.
+    /// offset: 0x1e
+    pub motion_flags: PropMotionFlags,
 
     /// True if the prop's motion action follows a path.
     /// offset: 0x1f
@@ -777,9 +791,9 @@ impl Prop {
         let mut result = Prop {
             ctrl_idx,
             name_idx,
-            flags: PropFlags1::default(),
+            flags: PropFlags1::empty(),
             global_state: PropGlobalState::Unattached,
-            flags2: PropFlags2::default(),
+            flags2: PropFlags2::empty(),
             disabled: false,
             visible: false,
             alpha: 1.0,
@@ -795,16 +809,16 @@ impl Prop {
             first_child: None,
             init_area: area,
             init_pos: [args.pos_x, args.pos_y, args.pos_z],
-            rotation_mat: rotation_mat,
+            rotation_mat,
             pos: [args.pos_x, args.pos_y, args.pos_z],
             rotation_vec: [0.0, 0.0, 0.0],
             scale: [1.0, 1.0, 1.0],
             last_pos: [args.pos_x, args.pos_y, args.pos_z],
             last_rotation_vec: [args.rot_x, args.rot_y, args.rot_z],
             init_rotation_vec: [args.rot_x, args.rot_y, args.rot_z],
-            unattached_transform: unattached_transform,
-            init_rotation_mat: init_rotation_mat,
-            init_transform: init_transform,
+            unattached_transform,
+            init_rotation_mat,
+            init_transform,
             motion_transform: [0.0; 16],
             extra_action_type: max_to_none!(u16, args.extra_action_type),
             unique_name_id: max_to_none!(u16, args.unique_name_id),
@@ -867,6 +881,7 @@ impl Prop {
             attached_transform: [0.0; 16],
             collision_mesh: None,
             trajectory_velocity: [0.0; 3],
+            motion_flags: PropMotionFlags::empty(),
         };
 
         // from the prop's `move_type`, we can infer its other motion types from the game data
