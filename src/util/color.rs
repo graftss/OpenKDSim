@@ -4,6 +4,9 @@ use gl_matrix::common::Vec4;
 pub const RED: Vec4 = [1.0, 0.0, 0.0, 1.0];
 pub const RED_TRANS: Vec4 = [1.0, 0.0, 0.0, 0.3];
 
+pub const PINK: Vec4 = [0.98, 0.55, 0.45, 1.0];
+pub const TRANS_PINK: Vec4 = [0.98, 0.55, 0.45, 0.3];
+
 /// The RGBA color (0, 1, 0, 1).
 pub const GREEN: Vec4 = [0.0, 1.0, 0.0, 1.0];
 pub const GREEN_TRANS: Vec4 = [0.0, 1.0, 0.0, 0.3];

@@ -1,6 +1,9 @@
-use gl_matrix::common::Vec4;
+use gl_matrix::common::{Mat4, Vec4};
 
-use crate::util::color::{CLEAR, GREEN, RED_TRANS};
+use crate::{
+    constants::MAT4_ID,
+    util::color::{CLEAR, GREEN, RED_TRANS, TRANS_PINK},
+};
 
 use super::PropsState;
 
@@ -46,6 +49,22 @@ impl PropsState {
                         &GREEN,
                     );
                 }
+            }
+        }
+    }
+
+    /// Request to draw the mesh sector corresponding to the prop zone `zone_id`.
+    pub fn debug_draw_prop_zone(&self, zone_id: u8) {
+        static ZONE_TRI_COLORS: [Vec4; 1] = [TRANS_PINK];
+        static TRANSFORM: Mat4 = MAT4_ID;
+
+        if let (Some(delegates), Some(raycast)) = (&self.delegates, &self.raycasts) {
+            let mut my_delegates = delegates.borrow_mut();
+            let my_raycast = raycast.borrow();
+            if let Some(zone_sector) = my_raycast.get_zone_mesh_sector(zone_id) {
+                my_delegates
+                    .debug_draw
+                    .draw_mesh_sector(zone_sector, &TRANSFORM, &ZONE_TRI_COLORS)
             }
         }
     }

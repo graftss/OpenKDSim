@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
     hit_attribute::HitAttribute,
-    mesh::{Mesh, TriVertex},
+    mesh::{Mesh, MeshSector, TriVertex},
 };
 
 const IMPACT_EPS: f32 = 0.0001;
@@ -675,6 +675,18 @@ impl RaycastState {
             0 => None,
             _ => Some(self.get_closest_hit().unwrap().metadata as u8),
         }
+    }
+
+    /// Find the sector in the `zone_mesh` corresponding to the zone `zone_id`.
+    pub fn get_zone_mesh_sector(&self, zone_id: u8) -> Option<&MeshSector> {
+        self.zone_mesh.as_ref().and_then(|mesh| {
+            let sector = mesh
+                .sectors
+                .iter()
+                .find(|sector| sector.tri_groups[0].vertices[0].metadata == zone_id as u32);
+
+            sector
+        })
     }
 }
 

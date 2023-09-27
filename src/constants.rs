@@ -1,4 +1,4 @@
-use gl_matrix::common::{Vec3, Vec4};
+use gl_matrix::common::{Mat4, Vec3, Vec4};
 
 /// The rescale factor when translating Unity coordinates to simulation coordinates.
 /// (All simulation world space coordinates are 100 times bigger than equivalent Unity coordinates.)
@@ -25,6 +25,11 @@ pub const NUM_STAGES: usize = 16;
 
 /// The maximum number of props in a mission.
 pub const MAX_PROPS: usize = 4000;
+
+/// The identity 4x4 transformation matrix.
+pub const MAT4_ID: Mat4 = [
+    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+];
 
 /// The zero vector.
 pub const VEC4_ZERO: Vec4 = [0.0, 0.0, 0.0, 1.0];
