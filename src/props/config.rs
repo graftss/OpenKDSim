@@ -6,6 +6,7 @@ use crate::{
 };
 
 static NP_0X30_TABLE: &'static [u8] = include_bytes!("bin/name_prop_0x30_table.bin");
+static NP_0X8_TABLE: &'static [u8] = include_bytes!("bin/name_prop_0x8_table.bin");
 static NP_MONO_DATA_OFFSETS: &'static [u8] = include_bytes!("bin/name_prop_mono_data_offsets.bin");
 static NP_INTERNAL_NAMES: &'static str = include_str!("bin/name_prop_internal_names.bin");
 
@@ -98,6 +99,40 @@ pub struct NamePropConfig {
     /////////////////////////////////////////
     // End `name_prop_0x30_table.bin` fields.
     /////////////////////////////////////////
+
+    ///////////////////////////////////////////
+    // Begin `name_prop_0x8_table.bin` fields.
+    ///////////////////////////////////////////
+    /// offset: 0x0
+    np_0x8_field_0x0: u8,
+
+    /// offset: 0x1
+    np_0x8_field_0x1: u8,
+
+    /// The prop's category in the "size chart" collection view, where objects of roughly similar
+    /// size are grouped together.
+    /// The value 0 corresponds to the smallest group ("The Smallest").
+    /// The value 11 corresponds to the largest group ("The Largest").
+    /// offset: 0x2
+    size_chart_size: u8,
+
+    /// offset: 0x3
+    np_0x8_field_0x3: u8,
+
+    /// offset: 0x4
+    np_0x8_field_0x4: u8,
+
+    /// offset: 0x5
+    np_0x8_field_0x5: u8,
+
+    /// offset: 0x6
+    np_0x8_field_0x6: u8,
+
+    /// offset: 0x7
+    np_0x8_field_0x7: u8,
+    ///////////////////////////////////////////
+    // End `name_prop_0x8_table.bin` fields.
+    ///////////////////////////////////////////
     /// (??) Used by `GetMonoDataOffset`.
     /// Read from `name_prop_mono_data_offsets.bin`.
     pub mono_data_offset_idx: u16,
@@ -122,12 +157,32 @@ impl NamePropConfig {
     }
 
     pub fn read_from_data(configs: &mut Vec<NamePropConfig>) {
+        Self::read_name_prop_0x8_table(configs);
         Self::read_name_prop_0x30_table(configs);
         Self::read_name_prop_mono_data_offsets(configs);
         Self::read_name_prop_internal_names(configs);
     }
 
-    /// Copy the `name_prop_0x30_table` file into the `NamePropConfig` array.
+    /// Copy the `name_prop_0x8_table` file into the `NamePropConfig` vector.
+    fn read_name_prop_0x8_table(configs: &mut Vec<NamePropConfig>) {
+        let table = NP_0X8_TABLE;
+        let ENTRY_SIZE = 0x8;
+        let mut base: usize = 0;
+
+        for config in configs.iter_mut() {
+            config.np_0x8_field_0x0 = read_u8!(table, base + 0x0);
+            config.np_0x8_field_0x1 = read_u8!(table, base + 0x1);
+            config.size_chart_size = read_u8!(table, base + 0x2);
+            config.np_0x8_field_0x3 = read_u8!(table, base + 0x3);
+            config.np_0x8_field_0x4 = read_u8!(table, base + 0x4);
+            config.np_0x8_field_0x5 = read_u8!(table, base + 0x5);
+            config.np_0x8_field_0x6 = read_u8!(table, base + 0x6);
+            config.np_0x8_field_0x7 = read_u8!(table, base + 0x7);
+            base += ENTRY_SIZE;
+        }
+    }
+
+    /// Copy the `name_prop_0x30_table` file into the `NamePropConfig` vector.
     fn read_name_prop_0x30_table(configs: &mut Vec<NamePropConfig>) {
         let table = NP_0X30_TABLE;
         let ENTRY_SIZE = 0x30;
@@ -155,7 +210,7 @@ impl NamePropConfig {
         }
     }
 
-    /// Copy the `name_prop_mono_data_offsets.bin` file into the `NamePropConfig` array.
+    /// Copy the `name_prop_mono_data_offsets.bin` file into the `NamePropConfig` vector.
     fn read_name_prop_mono_data_offsets(configs: &mut Vec<NamePropConfig>) {
         let table = NP_MONO_DATA_OFFSETS;
 
@@ -177,4 +232,32 @@ lazy_static! {
         NamePropConfig::read_from_data(&mut configs);
         configs
     };
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_name_prop_configs() {
+        let config = &NAME_PROP_CONFIGS[1];
+        assert_eq!(config.np_0x8_field_0x0, 1);
+        assert_eq!(config.np_0x8_field_0x1, 4);
+        assert_eq!(config.size_chart_size, 2);
+        assert_eq!(config.np_0x8_field_0x3, 7);
+        assert_eq!(config.np_0x8_field_0x4, 1);
+        assert_eq!(config.np_0x8_field_0x5, 0);
+        assert_eq!(config.np_0x8_field_0x6, 0);
+        assert_eq!(config.np_0x8_field_0x7, 0);
+
+        let config = &NAME_PROP_CONFIGS[544];
+        assert_eq!(config.np_0x8_field_0x0, 1);
+        assert_eq!(config.np_0x8_field_0x1, 7);
+        assert_eq!(config.size_chart_size, 3);
+        assert_eq!(config.np_0x8_field_0x3, 0x41);
+        assert_eq!(config.np_0x8_field_0x4, 1);
+        assert_eq!(config.np_0x8_field_0x5, 0);
+        assert_eq!(config.np_0x8_field_0x6, 0);
+        assert_eq!(config.np_0x8_field_0x7, 0);
+    }
 }

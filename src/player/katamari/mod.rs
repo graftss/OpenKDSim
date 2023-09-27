@@ -189,7 +189,7 @@ pub struct Katamari {
 
     /// The maximum prop volume that can be collected (in m^3).
     /// offset: 0x54
-    max_attach_vol_m3: f32,
+    pub max_attach_vol_m3: f32,
 
     /// If colliding with a prop that can use its AABB for collisions,
     /// its AABB can only be used if its (compare) volume is less than this value.
@@ -370,7 +370,7 @@ pub struct Katamari {
 
     /// The center point of the katamari on the current tick.
     /// offset: 0x460
-    center: Vec3,
+    pub center: Vec3,
 
     /// The center point of the katamari on the previous tick.
     /// offset: 0x470

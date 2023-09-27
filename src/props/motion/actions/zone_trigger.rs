@@ -59,7 +59,7 @@ pub struct ZoneTrigger {
 }
 
 impl ActionUpdate for ZoneTrigger {
-    fn update(&mut self, prop: &mut Prop) {
+    fn update(&mut self, _prop: &mut Prop) {
         // TODO
     }
 
@@ -107,6 +107,7 @@ impl ZoneTrigger {
         }
 
         // TODO_HIGH: call alt motion trigger based on behavior type
+        // up next: just add all alt motion triggers, indexed by behavior
         let should_do_alt_motion = false;
 
         if should_do_alt_motion {

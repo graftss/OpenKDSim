@@ -1,5 +1,3 @@
-
-
 use crate::mission::Mission;
 
 use self::data::{
@@ -8,6 +6,7 @@ use self::data::{
 };
 
 pub mod actions;
+mod alt_action;
 pub mod data;
 pub mod global_path;
 pub mod name_idx;
