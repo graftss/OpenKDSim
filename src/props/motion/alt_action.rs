@@ -4,69 +4,79 @@ use crate::{
     macros::{set_y, vec3_from},
     math::{vec3_inplace_normalize, vec3_inplace_scale},
     player::katamari::Katamari,
-    props::prop::Prop,
+    props::{
+        config::NamePropConfig,
+        prop::{Prop, PropGlobalState},
+    },
 };
 
 /// The "scale" of each bucket of props in the size chart (in the in-game collection).
 /// offset: 0x68960
 const SIZE_CHART_PROP_SCALES: [u8; 12] = [0, 0, 0, 1, 2, 3, 3, 4, 4, 4, 4, 4];
 
+// TODO_DOC
 /// Fixed parameters common to all props of a given scale.
 struct PropScaleConfig {
+    // TODO_DOC
     /// offset: 0x0
-    field_0x0: f32,
+    min_alert_dist: f32,
 
+    // TODO_DOC
     /// offset: 0x4
     field_0x4: f32,
 
+    // TODO_DOC
     /// offset: 0x8
     field_0x8: f32,
 
+    // TODO_DOC
     /// offset: 0xc
     field_0xc: f32,
 }
 
 /// Fixed parameters for each prop scale.
+/// Note that the largest two prop scales (index 5 and 6) are apparently unused, since the mapping
+/// of size chart size to scale maxes out at index 4.
 /// offset: 0x7edf0
 const PROP_SCALE_CONFIGS: [PropScaleConfig; 7] = [
     PropScaleConfig {
-        field_0x0: 200.0,
+        min_alert_dist: 200.0,
         field_0x4: 300.0,
         field_0x8: 30.0,
         field_0xc: 10.0,
     },
     PropScaleConfig {
-        field_0x0: 300.0,
+        min_alert_dist: 300.0,
         field_0x4: 500.0,
         field_0x8: 50.0,
         field_0xc: 10.0,
     },
     PropScaleConfig {
-        field_0x0: 500.0,
+        min_alert_dist: 500.0,
         field_0x4: 700.0,
         field_0x8: 100.0,
         field_0xc: 10.0,
     },
     PropScaleConfig {
-        field_0x0: 700.0,
+        min_alert_dist: 700.0,
         field_0x4: 900.0,
         field_0x8: 200.0,
         field_0xc: 10.0,
     },
     PropScaleConfig {
-        field_0x0: 900.0,
+        min_alert_dist: 900.0,
         field_0x4: 1300.0,
         field_0x8: 300.0,
         field_0xc: 10.0,
     },
     PropScaleConfig {
-        field_0x0: 1500.0,
+        min_alert_dist: 1500.0,
         field_0x4: 2000.0,
         field_0x8: 400.0,
         field_0xc: 10.0,
     },
     PropScaleConfig {
-        field_0x0: 1800.0,
+        min_alert_dist: 1800.0,
         field_0x4: 2500.0,
         field_0x8: 500.0,
         field_0xc: 10.0,
@@ -114,20 +124,89 @@ fn compare_lateral_prop_kat_dist(
     }
 }
 
-pub fn check_volume_predicate(prop: &Prop, katamari: &Katamari, min_kat_volume: f32) -> bool {
+/// Used in three volume-based predicates:
+/// offset: 0x35f90 (`min_kat_volume` is offset 0x4 of `motion_state`)
+/// offset: 0x361f0 (`min_kat_volume` is offset 0x80 of `motion_state`)
+/// offset: 0x36420 (`min_kat_volume` is offset 0x100 of `motion_state`, which seems to be pickup volume)
+pub fn vol_and_dist_predicate(prop: &Prop, katamari: &Katamari, min_kat_volume: f32) -> bool {
     if prop.get_compare_vol_m3() > katamari.max_attach_vol_m3 {
         return false;
     }
 
-    if min_kat_volume > katamari.get_vol() {
+    let extra_vol = katamari.get_vol() - min_kat_volume;
+
+    if extra_vol.is_sign_negative() {
         return false;
     }
 
-    // let scale = SIZE_CHART_PROP_SCALES[NamePropConfig::get(prop.get_name_idx())]
-    // let scale_config = PROP_SCALE_CONFIGS
+    let size_chart_idx = NamePropConfig::get(prop.get_name_idx()).size_chart_idx as usize;
+    let scale_config = &PROP_SCALE_CONFIGS[SIZE_CHART_PROP_SCALES[size_chart_idx] as usize];
 
-    // TODO_HIGH: rest of function
-    // let x = (katamari.get_vol() - min_kat_volume) *
+    let dist_bound = extra_vol * scale_config.field_0x8
+        / (min_kat_volume * scale_config.field_0xc - min_kat_volume)
+        + scale_config.min_alert_dist;
 
-    true
+    compare_lateral_prop_kat_dist(prop, katamari, DistComparison::Smaller, dist_bound)
+}
+
+pub fn nearby_and_1m_kat_predicate(prop: &Prop, katamari: &Katamari) -> bool {
+    katamari.get_diam_cm() > 100.0
+        && compare_lateral_prop_kat_dist(prop, katamari, DistComparison::Smaller, 200.0)
+}
+
+/// Switches to alt motion if:
+///   - the prop's immediate parent is attached, AND
+///   - the katamari is in the same zone as the prop
+/// offset: 0x36050
+pub fn guard_parent_in_zone_predicate(
+    parent_prop: Option<&Prop>,
+    prop_zone: Option<u8>,
+    kat_zone: Option<u8>,
+) -> bool {
+    if let Some(parent_prop) = parent_prop {
+        assert!(prop_zone.is_some());
+        prop_zone == kat_zone && parent_prop.global_state == PropGlobalState::Attached
+    } else {
+        false
+    }
+}
+
+/// Switches to alt motion *and detaches itself from the parent* when the parent is attached.
+/// offset: 0x361b0
+pub fn guard_parent_predicate(prop: &mut Prop, parent_prop: Option<&mut Prop>) -> bool {
+    if let Some(parent_prop) = parent_prop {
+        let parent_attached = parent_prop.global_state == PropGlobalState::Attached;
+
+        if parent_attached {
+            prop.parent = None;
+            prop.next_sibling = None;
+            parent_prop.first_child = None;
+        }
+
+        parent_attached
+    } else {
+        prop.alt_motion_action = None;
+        prop.move_type = None;
+        false
+    }
+}
+
+// TODO
+/// offset: 0x362b0
+pub fn behavior_3_predicate() {}
+
+// TODO
+/// offset: 0x36080
+pub fn behavior_5_predicate() {}
+
+/// Never switches to alt motion.
+/// offset: 0x35f80
+pub fn never_predicate() -> bool {
+    false
+}
+
+/// Switches to alt motion when the area `trigger_area` is loaded.
+/// offset: 0x360a0
+pub fn area_loaded_predicate(trigger_area: u8, loaded_area: u8) -> bool {
+    trigger_area == loaded_area
 }

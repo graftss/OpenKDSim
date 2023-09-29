@@ -104,32 +104,32 @@ pub struct NamePropConfig {
     // Begin `name_prop_0x8_table.bin` fields.
     ///////////////////////////////////////////
     /// offset: 0x0
-    np_0x8_field_0x0: u8,
+    pub np_0x8_field_0x0: u8,
 
     /// offset: 0x1
-    np_0x8_field_0x1: u8,
+    pub np_0x8_field_0x1: u8,
 
     /// The prop's category in the "size chart" collection view, where objects of roughly similar
     /// size are grouped together.
     /// The value 0 corresponds to the smallest group ("The Smallest").
     /// The value 11 corresponds to the largest group ("The Largest").
     /// offset: 0x2
-    size_chart_size: u8,
+    pub size_chart_idx: u8,
 
     /// offset: 0x3
-    np_0x8_field_0x3: u8,
+    pub np_0x8_field_0x3: u8,
 
     /// offset: 0x4
-    np_0x8_field_0x4: u8,
+    pub np_0x8_field_0x4: u8,
 
     /// offset: 0x5
-    np_0x8_field_0x5: u8,
+    pub np_0x8_field_0x5: u8,
 
     /// offset: 0x6
-    np_0x8_field_0x6: u8,
+    pub np_0x8_field_0x6: u8,
 
     /// offset: 0x7
-    np_0x8_field_0x7: u8,
+    pub np_0x8_field_0x7: u8,
     ///////////////////////////////////////////
     // End `name_prop_0x8_table.bin` fields.
     ///////////////////////////////////////////
@@ -172,7 +172,7 @@ impl NamePropConfig {
         for config in configs.iter_mut() {
             config.np_0x8_field_0x0 = read_u8!(table, base + 0x0);
             config.np_0x8_field_0x1 = read_u8!(table, base + 0x1);
-            config.size_chart_size = read_u8!(table, base + 0x2);
+            config.size_chart_idx = read_u8!(table, base + 0x2);
             config.np_0x8_field_0x3 = read_u8!(table, base + 0x3);
             config.np_0x8_field_0x4 = read_u8!(table, base + 0x4);
             config.np_0x8_field_0x5 = read_u8!(table, base + 0x5);
@@ -243,7 +243,7 @@ mod test {
         let config = &NAME_PROP_CONFIGS[1];
         assert_eq!(config.np_0x8_field_0x0, 1);
         assert_eq!(config.np_0x8_field_0x1, 4);
-        assert_eq!(config.size_chart_size, 2);
+        assert_eq!(config.size_chart_idx, 2);
         assert_eq!(config.np_0x8_field_0x3, 7);
         assert_eq!(config.np_0x8_field_0x4, 1);
         assert_eq!(config.np_0x8_field_0x5, 0);
@@ -253,7 +253,7 @@ mod test {
         let config = &NAME_PROP_CONFIGS[544];
         assert_eq!(config.np_0x8_field_0x0, 1);
         assert_eq!(config.np_0x8_field_0x1, 7);
-        assert_eq!(config.size_chart_size, 3);
+        assert_eq!(config.size_chart_idx, 3);
         assert_eq!(config.np_0x8_field_0x3, 0x41);
         assert_eq!(config.np_0x8_field_0x4, 1);
         assert_eq!(config.np_0x8_field_0x5, 0);

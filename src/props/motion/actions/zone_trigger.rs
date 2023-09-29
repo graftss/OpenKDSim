@@ -66,6 +66,10 @@ impl ActionUpdate for ZoneTrigger {
     fn should_do_alt_motion(&self) -> bool {
         self.do_alt_action
     }
+
+    fn get_zone(&self) -> Option<u8> {
+        self.zone
+    }
 }
 
 impl ZoneTrigger {

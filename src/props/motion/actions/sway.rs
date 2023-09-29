@@ -105,4 +105,8 @@ impl ActionUpdate for SwayAction {
     fn should_do_alt_motion(&self) -> bool {
         false
     }
+
+    fn get_zone(&self) -> Option<u8> {
+        None
+    }
 }
