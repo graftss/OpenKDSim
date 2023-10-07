@@ -11,7 +11,10 @@ use crate::{
     mission::{state::MissionState, vsmode::VsModeState, GameMode},
     mono_data::MonoData,
     player::{Player, PlayersState},
-    props::{prop::AddPropArgs, PropsState},
+    props::{
+        prop::{AddPropArgs, PropRef},
+        PropsState,
+    },
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -74,8 +77,12 @@ impl GameState {
         self.players.get(player_idx).unwrap()
     }
 
-    pub fn get_mut_player(&mut self, player_idx: usize) -> &mut Player {
+    pub fn get_player_mut(&mut self, player_idx: usize) -> &mut Player {
         self.players.get_mut(player_idx).unwrap()
+    }
+
+    pub fn get_prop_ref(&self, ctrl_idx: u16) -> Option<&PropRef> {
+        self.props.props.get(ctrl_idx as usize)
     }
 
     /// Mimicks `SetKatamariSpeed` API function.
@@ -116,7 +123,7 @@ impl GameState {
         self.global.game_time_ms = game_time_ms;
         self.global.remain_time_ticks = remain_time_ticks;
         self.global.freeze = freeze > 0;
-        self.get_mut_player(0 as usize)
+        self.get_player_mut(0 as usize)
             .camera
             .set_cam_eff_1P(cam_eff_1P);
     }
@@ -163,7 +170,7 @@ impl GameState {
     pub fn set_game_start(&mut self, player_idx: usize, _area: u8) {
         self.global.freeze = false;
         self.global.map_change_mode = false;
-        self.get_mut_player(player_idx)
+        self.get_player_mut(player_idx)
             .prince
             .set_ignore_input_timer(0);
     }
@@ -286,6 +293,14 @@ impl GameState {
         // TODO_PROPS: init_cache_gemini_twins();
         self.props.gps.init();
         self.global.props_initialized = true;
+
+        // This seems like a good of a place as any to initialize prop link references
+        // (which isn't something the original simulation needs to do).
+        // It needs to happen after all props have been added during mission initialization, so
+        // the end of mission initialization seems reasonable.
+        // for prop in self.props.props_iter_mut() {
+        //     prop.borrow_mut().hydrate_prop_links(&self.props);
+        // }
     }
 
     /// Mimicks the `SetStoreFlag` API function.

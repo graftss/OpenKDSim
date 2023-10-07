@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fmt::{Debug, Display},
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 use gl_matrix::{
@@ -221,6 +221,13 @@ enum UnattachedTransformState {
     MovingChildStalled,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum PropLinkType {
+    Parent,
+    FirstChild,
+    NextSibling,
+}
+
 bitflags::bitflags! {
     /// Definition of the 0x6 offset field of `Prop`, which is a 1-byte bitfield.
     #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -380,11 +387,17 @@ pub struct Prop {
     /// offset: 0x28
     pub next_sibling: Option<u16>,
 
+    #[serde(skip)]
+    pub next_sibling_ref: Option<PropRef>,
+
     /// The first child of this prop in its family tree.
     /// NOTE: the original simulation keeps a pointer to the prop, but we only store
     /// the control index here because it's safer/rustier.
     /// offset: 0x30
     pub first_child: Option<u16>,
+
+    #[serde(skip)]
+    pub first_child_ref: Option<PropRef>,
 
     /// The area in which this prop loaded.
     /// offset: 0x38
@@ -468,6 +481,10 @@ pub struct Prop {
     /// the control index here because it's safer/rustier.
     /// offset: 0x578
     pub parent: Option<u16>,
+
+    /// A reference to the parent prop from its child.
+    #[serde(skip)]
+    pub parent_ref: Option<WeakPropRef>,
 
     /// (??) name taken from unity code
     /// offset: 0x580
@@ -709,6 +726,7 @@ pub struct Prop {
 }
 
 pub type PropRef = Rc<RefCell<Prop>>;
+pub type WeakPropRef = Weak<RefCell<Prop>>;
 pub type MeshRef = Rc<RefCell<Mesh>>;
 
 impl Display for Prop {
@@ -882,6 +900,9 @@ impl Prop {
             collision_mesh: None,
             trajectory_velocity: [0.0; 3],
             motion_flags: PropMotionFlags::empty(),
+            parent_ref: None,
+            first_child_ref: None,
+            next_sibling_ref: None,
         };
 
         // from the prop's `move_type`, we can infer its other motion types from the game data
@@ -1692,6 +1713,18 @@ impl Prop {
         self.dist_to_p0 = vec3::distance(&self.pos, player.katamari.get_center());
 
         // TODO_VS: `prop_cache_distance_to_players:18+` (cache distance to other players)
+    }
+    /// Populate this prop's references to linked props (its `parent_ref`, `first_child_ref`, and
+    /// `next_sibling_ref`) from its corresponding control index fields (`parent`, etc.).
+    pub fn hydrate_prop_links(
+        &mut self,
+        parent_ref: Option<PropRef>,
+        first_child_ref: Option<PropRef>,
+        next_sibling_ref: Option<PropRef>,
+    ) {
+        self.parent_ref = parent_ref.map(|p| Rc::downgrade(&p));
+        self.first_child_ref = first_child_ref.map(|p| p.clone());
+        self.next_sibling_ref = next_sibling_ref.map(|p| p.clone());
     }
 }
 

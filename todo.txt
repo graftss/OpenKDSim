@@ -37,6 +37,9 @@ refactoring
   - replace `Katamari::ray_contact_floor_idxs` (a vector of ray indices that contact a floor)
     with an array [bool; u32], that's true at index i if ray i contacts a floor
   - move `katamari/collision.rs` -> `katamari/collision/mod.rs`
+  - be consistent about integer arguments to functions that are vector indices - should probably never
+    actually be `usize` arguments if they're consistently stored as smaller in our data structures
+    - e.g. `Props::get_prop`
 
 perf
   - is it possible to drop the static `include_bytes!` data after

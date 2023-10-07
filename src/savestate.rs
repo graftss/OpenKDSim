@@ -48,16 +48,6 @@ impl Hydrate for GameState {
     }
 }
 
-impl Hydrate for Prop {
-    fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
-        let name_idx = self.get_name_idx();
-
-        let prop_mono_data = &old_state_ref.borrow().mono_data.props[name_idx as usize];
-        let config = NamePropConfig::get(name_idx);
-        self.init_mono_data_fields(prop_mono_data, config)
-    }
-}
-
 impl Hydrate for PropsState {
     fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
         let old_state = old_state_ref.borrow();
@@ -68,6 +58,19 @@ impl Hydrate for PropsState {
         for prop_ref in self.props.iter() {
             prop_ref.borrow_mut().hydrate(old_state_ref);
         }
+
+        self.hydrate_prop_links();
+    }
+}
+
+impl Hydrate for Prop {
+    fn hydrate(&mut self, old_state_ref: &RefCell<GameState>) {
+        let name_idx = self.get_name_idx();
+
+        // rebuild mono data
+        let prop_mono_data = &old_state_ref.borrow().mono_data.props[name_idx as usize];
+        let config = NamePropConfig::get(name_idx);
+        self.init_mono_data_fields(prop_mono_data, config);
     }
 }
 

@@ -251,7 +251,7 @@ pub extern "C" fn SetKatamariTranslation(player_idx: i32, x: f32, y: f32, z: f32
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(player_idx as usize)
+            .get_player_mut(player_idx as usize)
             .katamari
             .set_translation(x, y, z);
     })
@@ -371,7 +371,7 @@ pub extern "C" fn TakesCallbackOujiState(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(player_idx as usize)
+            .get_player_mut(player_idx as usize)
             .prince
             .copy_oujistate_ptr(oujistate, data_size);
         true
@@ -480,7 +480,7 @@ pub extern "C" fn SetStickState(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(player_idx as usize)
+            .get_player_mut(player_idx as usize)
             .input
             .set_stick_state(ls_x, ls_y, rs_x, rs_y, l3_down, r3_down, l3_held, r3_held);
     })
@@ -502,7 +502,7 @@ pub extern "C" fn SetTriggerState(
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(player_idx as usize)
+            .get_player_mut(player_idx as usize)
             .input
             .set_trigger_state(
                 l1_down != 0,
@@ -785,6 +785,7 @@ pub extern "C" fn MonoInitAddPropSetParent(ctrl_idx: i32, parent_ctrl_idx: i32) 
 #[no_mangle]
 pub extern "C" fn MonoInitEnd() {
     STATE.with(|state| {
+        temp_debug_log!("mono init end");
         state.borrow_mut().mono_init_end();
     });
 }
@@ -821,7 +822,7 @@ pub extern "C" fn SetCameraMode(player_idx: i32, mode: i32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(player_idx as usize)
+            .get_player_mut(player_idx as usize)
             .set_camera_mode(mode.into());
     });
 }
@@ -831,7 +832,7 @@ pub extern "C" fn SetCameraCheckScaleUp(player_idx: i32, flag: i32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(player_idx as usize)
+            .get_player_mut(player_idx as usize)
             .camera
             .check_scale_up(flag != 0)
     });
@@ -842,7 +843,7 @@ pub extern "C" fn SetShootingMode(player_idx: i32, fg: i32, reset: i32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(player_idx as usize)
+            .get_player_mut(player_idx as usize)
             .set_shooting_mode(fg != 0, reset != 0)
     });
 }
@@ -852,7 +853,7 @@ pub extern "C" fn SetPreclearMode(mode: i32) {
     STATE.with(|state| {
         state
             .borrow_mut()
-            .get_mut_player(0)
+            .get_player_mut(0)
             .camera
             .preclear
             .set_mode(mode != 0);

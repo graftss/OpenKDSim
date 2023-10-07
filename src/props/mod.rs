@@ -79,6 +79,23 @@ impl PropsState {
         self.random.reset();
         self.config = Some(&NAME_PROP_CONFIGS);
     }
+
+    /// Each prop contains three fields that may be the control index of another linked prop.
+    /// This method maps those control indices to actual `PropRef` values, and stores those values
+    /// on each prop as well.
+    pub fn hydrate_prop_links(&mut self) {
+        for ctrl_idx in 0..self.props.len() {
+            let mut prop = self.props[ctrl_idx].borrow_mut();
+
+            let parent_ref = prop.parent.map(|idx| self.props[idx as usize].clone());
+            let first_child_ref = prop.first_child.map(|idx| self.props[idx as usize].clone());
+            let next_sibling_ref = prop
+                .next_sibling
+                .map(|idx| self.props[idx as usize].clone());
+
+            prop.hydrate_prop_links(parent_ref, first_child_ref, next_sibling_ref);
+        }
+    }
 }
 
 impl HasDelegates for PropsState {
