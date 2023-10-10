@@ -16,7 +16,10 @@ use crate::{
 use self::{
     comments::KingCommentState,
     config::{NamePropConfig, NAME_PROP_CONFIGS},
-    motion::{actions::MotionAction, global_path::GlobalPathState},
+    motion::{
+        actions::{MotionActionState},
+        global_path::GlobalPathState,
+    },
     params::PropParams,
     prop::{AddPropArgs, Prop, PropRef},
     random::RandomPropsState,
@@ -37,7 +40,7 @@ pub struct PropsState {
     // into a separate `Props` struct
     // TODO: replace `PropRef` with `Prop` here
     pub props: Vec<PropRef>,
-    pub prop_motions: Vec<Option<MotionAction>>,
+    pub prop_motions: Vec<Option<MotionActionState>>,
 
     pub gps: GlobalPathState,
 
@@ -184,7 +187,7 @@ impl PropsState {
     fn add_prop_motion(&mut self, prop_ref: &PropRef) {
         let prop = prop_ref.borrow();
 
-        let motion_action = prop.get_motion_action().map(MotionAction::parse_id);
+        let motion_action = prop.get_motion_action().map(MotionActionState::parse_id);
         self.prop_motions.push(motion_action);
     }
 

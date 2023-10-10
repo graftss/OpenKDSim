@@ -5,7 +5,7 @@ use crate::{
     props::prop::{Prop, PropAnimationType, PropMotionFlags},
 };
 
-use super::ActionUpdate;
+use super::MotionAction;
 
 #[derive(Debug, Serialize, Deserialize)]
 enum ZoneTriggerState {
@@ -58,12 +58,8 @@ pub struct ZoneTrigger {
     field_0x18: u64,
 }
 
-impl ActionUpdate for ZoneTrigger {
-    fn update(&mut self, _prop: &mut Prop) {
-        // TODO
-    }
-
-    fn should_do_alt_motion(&self) -> bool {
+impl MotionAction for ZoneTrigger {
+    fn should_do_alt_action(&self) -> bool {
         self.do_alt_action
     }
 
@@ -73,6 +69,15 @@ impl ActionUpdate for ZoneTrigger {
 }
 
 impl ZoneTrigger {
+    /// The main update behavior for the `ZoneTrigger` action.
+    /// offset: 0x3c230
+    pub fn update(&mut self, prop: &mut Prop, raycast_ref: RaycastRef) {
+        match self.state {
+            ZoneTriggerState::Init => self.update_state_init(prop, raycast_ref),
+            ZoneTriggerState::WaitForTrigger => self.update_state_wait_for_trigger(prop),
+        }
+    }
+
     /// offset: 0x3c250
     fn update_state_init(&mut self, prop: &mut Prop, raycast_ref: RaycastRef) {
         self.do_alt_action = false;

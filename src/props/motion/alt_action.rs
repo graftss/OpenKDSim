@@ -6,7 +6,7 @@ use crate::{
     player::katamari::Katamari,
     props::{
         config::NamePropConfig,
-        prop::{Prop, PropGlobalState},
+        prop::{Prop, PropGlobalState, PropRef},
     },
 };
 
@@ -159,11 +159,15 @@ pub fn nearby_and_1m_kat_predicate(prop: &Prop, katamari: &Katamari) -> bool {
 ///   - the katamari is in the same zone as the prop
 /// offset: 0x36050
 pub fn guard_parent_in_zone_predicate(
-    parent_prop: Option<&Prop>,
+    prop_ref: PropRef,
     prop_zone: Option<u8>,
     kat_zone: Option<u8>,
 ) -> bool {
-    if let Some(parent_prop) = parent_prop {
+    let prop = prop_ref.as_ref().borrow();
+    let parent_ref = prop.parent_ref.as_ref().and_then(|p| p.upgrade());
+
+    if let Some(parent_ref) = parent_ref {
+        let parent_prop = parent_ref.borrow();
         assert!(prop_zone.is_some());
         prop_zone == kat_zone && parent_prop.global_state == PropGlobalState::Attached
     } else {
@@ -173,8 +177,10 @@ pub fn guard_parent_in_zone_predicate(
 
 /// Switches to alt motion *and detaches itself from the parent* when the parent is attached.
 /// offset: 0x361b0
-pub fn guard_parent_predicate(prop: &mut Prop, parent_prop: Option<&mut Prop>) -> bool {
-    if let Some(parent_prop) = parent_prop {
+pub fn guard_parent_predicate(prop: &mut Prop) -> bool {
+    let parent_ref = prop.parent_ref.as_ref().and_then(|p| p.upgrade());
+    if let Some(parent_ref) = parent_ref {
+        let mut parent_prop = parent_ref.borrow_mut();
         let parent_attached = parent_prop.global_state == PropGlobalState::Attached;
 
         if parent_attached {

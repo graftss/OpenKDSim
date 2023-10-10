@@ -20,6 +20,8 @@ use crate::{
     },
 };
 
+use super::MotionAction;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 enum RoamState {
     Init = 0,
@@ -137,6 +139,16 @@ pub struct Roam {
 
     /// offset: 0x80
     scary_kat_vol_m3: f32,
+}
+
+impl MotionAction for Roam {
+    fn should_do_alt_action(&self) -> bool {
+        self.do_alt_action
+    }
+
+    fn get_zone(&self) -> Option<u8> {
+        self.zone
+    }
 }
 
 /// Compute the random length of the timer counting down before a roaming NPC turns.

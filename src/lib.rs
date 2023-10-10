@@ -785,7 +785,6 @@ pub extern "C" fn MonoInitAddPropSetParent(ctrl_idx: i32, parent_ctrl_idx: i32) 
 #[no_mangle]
 pub extern "C" fn MonoInitEnd() {
     STATE.with(|state| {
-        temp_debug_log!("mono init end");
         state.borrow_mut().mono_init_end();
     });
 }

@@ -8,7 +8,7 @@ use crate::{
     props::prop::{Prop, PropFlags2},
 };
 
-use super::ActionUpdate;
+use super::MotionAction;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct SwayAction {
@@ -35,8 +35,18 @@ pub struct SwayAction {
     sway_angle_deg: f32,
 }
 
-impl ActionUpdate for SwayAction {
-    fn update(&mut self, prop: &mut Prop) {
+impl MotionAction for SwayAction {
+    fn should_do_alt_action(&self) -> bool {
+        false
+    }
+
+    fn get_zone(&self) -> Option<u8> {
+        None
+    }
+}
+
+impl SwayAction {
+    pub fn update(&mut self, prop: &mut Prop) {
         if !self.initialized {
             // not initialized: do initialization (`pmot_misc_init`)
             let name_idx = prop.get_name_idx();
@@ -100,13 +110,5 @@ impl ActionUpdate for SwayAction {
 
             prop.rotation_vec[2] = sway_angle_rad;
         }
-    }
-
-    fn should_do_alt_motion(&self) -> bool {
-        false
-    }
-
-    fn get_zone(&self) -> Option<u8> {
-        None
     }
 }

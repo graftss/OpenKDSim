@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-use super::common::is_not_facing_target;
+use super::{common::is_not_facing_target, MotionAction};
 
 pub trait PathMotion {
     fn get_flags(&self) -> FollowPathFlags;
@@ -156,6 +156,16 @@ pub struct FollowPath {
     /// If a katamari with at least this volume comes near the prop, the prop will be scared.
     /// offset: 0x100
     scary_kat_vol_m3: f32,
+}
+
+impl MotionAction for FollowPath {
+    fn should_do_alt_action(&self) -> bool {
+        self.do_alt_motion
+    }
+
+    fn get_zone(&self) -> Option<u8> {
+        None
+    }
 }
 
 /// (??) Computes the (yaw) angle from the `forward` vector at the point `pos` to the point `target`.

@@ -15,12 +15,9 @@ pub mod roam;
 pub mod sway;
 pub mod zone_trigger;
 
-pub trait ActionUpdate {
-    /// Updates the prop's motion action.
-    fn update(&mut self, prop: &mut Prop);
-
+pub trait MotionAction {
     // this might be worded wrongly? it's recording if the prop is in its alt motion
-    fn should_do_alt_motion(&self) -> bool;
+    fn should_do_alt_action(&self) -> bool;
 
     /// Returns the zone associated to the prop's motion action.
     /// For example, if a prop randomly roams, the zone it roams in will be returned.
@@ -29,7 +26,7 @@ pub trait ActionUpdate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum MotionAction {
+pub enum MotionActionState {
     FollowPath(FollowPath),
     Roam(Roam),
     ZoneTrigger(ZoneTrigger),
@@ -39,7 +36,7 @@ pub enum MotionAction {
     Unimplemented(u16),
 }
 
-impl MotionAction {
+impl MotionActionState {
     pub fn parse_id(action_id: u16) -> Self {
         match action_id {
             0x2 => Self::FollowPath(FollowPath::default()),
@@ -58,16 +55,16 @@ impl MotionAction {
         gps: &GlobalPathState,
         mission_state: &MissionState,
         global_state: &mut GlobalState,
-        raycasts: RaycastRef,
+        raycast_ref: RaycastRef,
     ) {
         match self {
-            MotionAction::FollowPath(follow_path) => {
+            MotionActionState::FollowPath(follow_path) => {
                 follow_path.update(prop, gps, mission_state.mission)
             }
-            MotionAction::Roam(roam) => roam.update(prop, global_state, raycasts),
-            MotionAction::ZoneTrigger(zone_trigger) => zone_trigger.update(prop),
-            MotionAction::MiscSway(sway) => sway.update(prop),
-            MotionAction::Unimplemented(_) => {}
+            MotionActionState::Roam(roam) => roam.update(prop, global_state, raycast_ref),
+            MotionActionState::ZoneTrigger(zone_trigger) => zone_trigger.update(prop, raycast_ref),
+            MotionActionState::MiscSway(sway) => sway.update(prop),
+            MotionActionState::Unimplemented(_) => {}
         }
     }
 }

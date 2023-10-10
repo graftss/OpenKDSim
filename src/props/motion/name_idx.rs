@@ -5,7 +5,10 @@ use crate::{
     props::prop::Prop,
 };
 
-use super::{actions::MotionAction, global_path::GlobalPathState};
+use super::{
+    actions::{MotionActionState},
+    global_path::GlobalPathState,
+};
 
 /// Motion common to all props with the same name index.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -22,7 +25,7 @@ impl Default for NameIndexMotion {
 impl Prop {
     pub fn update_name_index_motion(
         &mut self,
-        motion: Option<&mut MotionAction>,
+        motion: Option<&mut MotionActionState>,
         gps: &GlobalPathState,
         mission_state: &MissionState,
         global_state: &mut GlobalState,
